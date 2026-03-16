@@ -133,6 +133,8 @@ Next: {下一步提示}
 | `~go exec` | 执行已有方案 |
 | `~compare` | 多模型并发对比（默认含当前会话模型；可用模型数不足 2 时降级并给出原因） |
 
+说明：当前仓库若存在 `scripts/go_plan_runtime.py`，`~go plan` 应优先走该 repo-local runtime 入口；不存在时再回退到方案设计规则。
+
 **workflow-learning 主动记录策略：**
 ```yaml
 workflow:
@@ -256,7 +258,7 @@ progressive: 按需创建文件 (默认)
 检查命令前缀 (~go, ~go plan, ~go exec, ~compare)
     ↓
 ├─ ~go exec → 执行已有方案
-├─ ~go plan → 规划模式 (需求分析 → 方案设计)
+├─ ~go plan → 规划模式 (需求分析 → 方案设计；若存在 scripts/go_plan_runtime.py 则优先走 repo-local runtime 入口)
 ├─ ~go → 全流程模式
 ├─ ~compare → 模型对比（调用 scripts/model_compare_runtime.py 运行时）
 └─ 无前缀 → 语义分析
@@ -401,6 +403,14 @@ Next: 请验证功能
 ~go exec         # 执行已有方案
 ~compare         # 对同一问题做多模型并发对比（可用模型不足 2 时自动单模型并解释原因）
 ```
+
+**repo-local runtime helper：**
+```
+scripts/go_plan_runtime.py      # 当前仓库用于 ~go plan 的本地入口
+scripts/model_compare_runtime.py  # 当前仓库用于 ~compare 的本地入口
+```
+
+说明：当前只有 `~go plan` 与 `~compare` 在仓库内有明确脚本入口；其余命令仍以契约层和分阶段技能为主。
 
 **配置文件：** `sopify.config.yaml` (项目根目录)
 

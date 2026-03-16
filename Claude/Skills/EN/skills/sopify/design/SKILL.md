@@ -219,6 +219,19 @@ User replies with feedback:
   → Stay in design phase → Update plan files → Re-output summary
 ```
 
+## Repo-Local Runtime Helper
+
+If the current repository provides `scripts/go_plan_runtime.py` and the goal is to execute the `~go plan` path:
+
+- Prefer that entry instead of hand-assembling the plan summary
+- Let the runtime own config loading, routing, plan scaffold generation, state/replay persistence, and unified output rendering
+- Keep this skill as the contract source for plan structure, task breakdown, and summary format
+
+If that helper does not exist:
+
+- Generate the plan files manually from this skill template
+- Keep the output summary aligned with this skill definition
+
 ---
 
 ## Plan Package Naming Rules

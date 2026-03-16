@@ -68,6 +68,14 @@ cp -r Codex/Skills/CN/* ~/.codex/
 cp -r Codex/Skills/EN/* ~/.codex/
 ```
 
+说明：
+
+- 上述复制命令同步的是技能文档、模板和子技能目录，不会单独把仓库根目录下的 `runtime/` 与 `scripts/` 自动安装到目标项目
+- 当前仓库内已经收口的 repo-local runtime 入口有两个：
+  - `scripts/go_plan_runtime.py`：用于 runtime-backed `~go plan`
+  - `scripts/model_compare_runtime.py`：用于 `~compare`
+- 如果要复用这套 runtime 资产，请保留本仓库的 `runtime/` 与 `scripts/`，不要只复制 `Codex/Skills/*` 或 `Claude/Skills/*`
+
 ### 验证安装
 
 重启终端，输入：
@@ -99,6 +107,31 @@ cp -r Codex/Skills/EN/* ~/.codex/
 "~compare 给这个重构方案做对比分析"
 "对比分析：给这个重构方案做对比分析"
 ```
+
+### 仓库内最小验证
+
+当前仓库已经收口的最小 runtime 验证路径：
+
+```bash
+# 在当前仓库直接验证
+python3 scripts/go_plan_runtime.py "重构数据库层"
+
+# 指向其他工作区验证
+python3 scripts/go_plan_runtime.py --workspace-root /path/to/project "重构数据库层"
+```
+
+预期结果：
+
+- 生成 `.sopify-skills/plan/`
+- 更新 `.sopify-skills/state/`
+- 写入 `.sopify-skills/replay/`
+- 终端输出 Sopify 统一摘要，而不是原始结构化对象
+
+当前边界：
+
+- 已收口 repo-local runtime helper：`~go plan`、`~compare`
+- 尚未提供独立 runtime helper：`~go`、`~go exec`、`workflow-learning`
+- 因此当前更适合“自用 + 二次接入”，不是完整安装器形态
 
 ---
 
@@ -210,9 +243,11 @@ multi_model:
 | 命令 | 说明 |
 |-----|------|
 | `~go` | 全流程自动执行 |
-| `~go plan` | 只规划不执行 |
+| `~go plan` | 只规划不执行；当前仓库提供 `scripts/go_plan_runtime.py` 作为 repo-local runtime helper |
 | `~go exec` | 执行已有方案 |
-| `~compare` | 按配置并发对比多个模型；默认纳入当前会话模型，可用模型数不足 2 时单模型降级并说明原因 |
+| `~compare` | 按配置并发对比多个模型；执行实现收口在 `scripts/model_compare_runtime.py`，可用模型数不足 2 时单模型降级并说明原因 |
+
+说明：当前只有 `~go plan` 与 `~compare` 在仓库内有明确脚本入口；其他命令仍以契约层和分阶段技能为主。
 
 ---
 

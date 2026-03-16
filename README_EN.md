@@ -68,6 +68,14 @@ cp -r Codex/Skills/EN/* ~/.codex/
 cp -r Codex/Skills/CN/* ~/.codex/
 ```
 
+Notes:
+
+- The copy commands above sync skill docs, templates, and sub-skill folders only; they do not automatically install the repo-root `runtime/` and `scripts/` into another project
+- This repository currently closes two repo-local runtime entry points:
+  - `scripts/go_plan_runtime.py`: runtime-backed `~go plan`
+  - `scripts/model_compare_runtime.py`: `~compare`
+- If you want to reuse the runtime assets, keep this repository's `runtime/` and `scripts/` together instead of copying only `Codex/Skills/*` or `Claude/Skills/*`
+
 ### Verify Installation
 
 Restart your terminal and type:
@@ -99,6 +107,31 @@ Show skills list
 "~compare Compare options for this refactor"
 "对比分析：Compare options for this refactor"
 ```
+
+### Minimal Repo-Local Validation
+
+This repository now provides a minimal runtime validation path:
+
+```bash
+# Validate in this repository
+python3 scripts/go_plan_runtime.py "Refactor the database layer"
+
+# Validate against another workspace
+python3 scripts/go_plan_runtime.py --workspace-root /path/to/project "Refactor the database layer"
+```
+
+Expected result:
+
+- generate `.sopify-skills/plan/`
+- update `.sopify-skills/state/`
+- write `.sopify-skills/replay/`
+- print the unified Sopify summary instead of a raw structured object
+
+Current boundary:
+
+- repo-local runtime helpers are closed for `~go plan` and `~compare`
+- no standalone runtime helper is provided yet for `~go`, `~go exec`, or `workflow-learning`
+- the current shape is better suited for self-use and secondary integration than for a full installer flow
 
 ---
 
@@ -210,9 +243,11 @@ Note: intent recognition for replay/review/why-explanations remains available in
 | Command | Description |
 |---------|-------------|
 | `~go` | Full workflow auto-execution |
-| `~go plan` | Plan only, no execution |
+| `~go plan` | Plan only, no execution; this repo provides `scripts/go_plan_runtime.py` as the repo-local runtime helper |
 | `~go exec` | Execute existing plan |
-| `~compare` | Run parallel comparison across configured models; includes the session default model by default and falls back with reasons when usable model count is below 2 |
+| `~compare` | Run parallel comparison across configured models; the implementation is closed in `scripts/model_compare_runtime.py`, with fallback when usable model count is below 2 |
+
+Note: only `~go plan` and `~compare` have explicit script entry points inside this repository today. Other commands still rely on the contract layer and staged skills.
 
 ---
 

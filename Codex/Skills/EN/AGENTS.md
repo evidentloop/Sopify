@@ -133,6 +133,8 @@ Complex Task (full 3 phases):
 | `~go exec` | Execute existing plan |
 | `~compare` | Multi-model parallel comparison (includes session default model by default; falls back with reasons when usable model count is below 2) |
 
+Note: when the current repository provides `scripts/go_plan_runtime.py`, `~go plan` should prefer that repo-local runtime entry; otherwise fall back to the solution-design rules.
+
 **workflow-learning proactive capture policy:**
 ```yaml
 workflow:
@@ -256,7 +258,7 @@ User Input
 Check command prefix (~go, ~go plan, ~go exec, ~compare)
     ↓
 ├─ ~go exec → Execute existing plan
-├─ ~go plan → Plan mode (Analysis → Design)
+├─ ~go plan → Plan mode (Analysis → Design; prefer scripts/go_plan_runtime.py when the repo-local helper exists)
 ├─ ~go → Full workflow mode
 ├─ ~compare → Model compare (wired to scripts/model_compare_runtime.py runtime)
 └─ No prefix → Semantic analysis
@@ -401,6 +403,14 @@ Next: Please verify the functionality
 ~go exec         # Execute existing plan
 ~compare         # Compare one prompt across models (fallbacks below 2 usable models with explicit reasons)
 ```
+
+**Repo-local runtime helpers:**
+```
+scripts/go_plan_runtime.py        # repo-local entry for ~go plan
+scripts/model_compare_runtime.py  # repo-local entry for ~compare
+```
+
+Note: only `~go plan` and `~compare` have explicit script entry points inside this repository today. Other commands still rely on the contract layer and staged skills.
 
 **Configuration File:** `sopify.config.yaml` (project root)
 
