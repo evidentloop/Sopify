@@ -17,6 +17,8 @@ This changelog is maintained manually (not auto-generated).
 ### Added
 
 - Minimal KB bootstrap in `runtime/kb.py`, creating `project.md`, `wiki/overview.md`, `user/preferences.md`, and `history/index.md` on first runtime execution.
+- New bundle manifest contract in `runtime/manifest.py`, written to `.sopify-runtime/manifest.json` during bundle sync.
+- New runtime handoff contract in `runtime/handoff.py`, written to `.sopify-skills/state/current_handoff.json` for non-terminal routes.
 - New sub-skill `model-compare` (CN/EN) for configuration-driven multi-model parallel comparison with manual user selection.
 - New compare trigger contract:
   - Command: `~compare <question>`
@@ -25,16 +27,24 @@ This changelog is maintained manually (not auto-generated).
 - New GitHub Actions workflow `.github/workflows/ci.yml` to gate PR/Push with sync and version checks.
 - Default repo-local raw-input runtime entry `scripts/sopify_runtime.py` and plan-only helper `scripts/go_plan_runtime.py`.
 - Runtime bundle sync script `scripts/sync-runtime-assets.sh` for vendoring `.sopify-runtime/` into another repository.
+- One-command installer entry `scripts/install-sopify.sh` with a Python installer core and host adapters for `codex:zh-CN`, `codex:en-US`, `claude:zh-CN`, and `claude:en-US`.
 - Runtime smoke check script `scripts/check-runtime-smoke.sh`.
 - Runtime behavior test coverage in `tests/test_runtime.py`, including vendored bundle validation.
+- Installer test coverage in `tests/test_installer.py` for Codex/Claude sample install paths.
 
 ### Changed
 
+- Updated bundle sync, installer validation, and smoke checks to treat `.sopify-runtime/manifest.json` as a required control-plane artifact.
+- Updated runtime output to render `Next:` from the structured handoff contract before falling back to route-only copy.
+- Refactored runtime builtin-skill discovery to a catalog-first model via `runtime/builtin_catalog.py`, so vendored bundles no longer depend on scanning `Codex/Skills` or `Claude/Skills` trees.
+- Extended `SkillMeta` and external skill manifests with forward-compatible catalog fields: `entry_kind`, `handoff_kind`, `contract_version`, and `supports_routes`.
+- Added explicit builtin override policy in `runtime/skill_registry.py`: external skills can only replace builtin ids when `override_builtin: true` is declared.
 - Updated CN/EN AGENTS routing and command references to include `~compare` and `model-compare`.
 - Updated `README.md` and `README_EN.md` with:
   - 7-skill install verification list
   - Multi-model MVP quick start
   - Environment-variable-only API key setup (`export ...`, including `~/.zshrc` persistence guidance)
+  - Recommended one-command installer usage for host prompt setup + vendored bundle sync
 - Added MVP fallback rule: when no usable multi-model config exists, `~compare` / `对比分析：` should not fail and must fallback to single-model with a clear notice.
 - Clarified two-layer compare switches:
   - `multi_model.enabled` = feature-level gate

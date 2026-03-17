@@ -8,8 +8,9 @@ from typing import Any, Mapping, Optional
 
 from .config import load_runtime_config
 from .context_recovery import recover_context
+from .handoff import build_runtime_handoff
 from .kb import bootstrap_kb
-from .models import KbArtifact, PlanArtifact, ReplayEvent, RouteDecision, RunState, RuntimeResult, SkillMeta
+from .models import KbArtifact, PlanArtifact, ReplayEvent, RouteDecision, RunState, RuntimeHandoff, RuntimeResult, SkillMeta
 from .plan_scaffold import create_plan_scaffold
 from .replay import ReplayWriter
 from .router import Router
@@ -54,6 +55,7 @@ def run_runtime(
     plan_artifact: PlanArtifact | None = None
     skill_result: Mapping[str, Any] | None = None
     replay_session_dir: str | None = None
+    handoff: RuntimeHandoff | None = None
     replay_events: list[ReplayEvent] = []
 
     if decision.route_name == "cancel_active":
@@ -115,6 +117,25 @@ def run_runtime(
         )
         replay_session_dir = str(session_dir.relative_to(config.workspace_root))
 
+    if decision.route_name == "cancel_active":
+        handoff = None
+    else:
+        current_run = state_store.get_current_run() or recovered.current_run
+        current_plan = plan_artifact or state_store.get_current_plan() or recovered.current_plan
+        handoff = build_runtime_handoff(
+            decision=decision,
+            run_id=(current_run.run_id if current_run is not None else _make_run_id(decision.request_text)),
+            current_plan=current_plan,
+            kb_artifact=kb_artifact,
+            replay_session_dir=replay_session_dir,
+            skill_result=skill_result,
+            notes=notes,
+        )
+        if handoff is not None:
+            state_store.set_current_handoff(handoff)
+        else:
+            state_store.clear_current_handoff()
+
     latest_context = recover_context(decision, config=config, state_store=state_store)
     return RuntimeResult(
         route=decision,
@@ -124,6 +145,7 @@ def run_runtime(
         plan_artifact=plan_artifact,
         skill_result=skill_result,
         replay_session_dir=replay_session_dir,
+        handoff=handoff,
         notes=tuple(notes),
     )
 

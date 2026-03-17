@@ -63,6 +63,10 @@ class SkillMeta:
     runtime_entry: Optional[Path] = None
     triggers: tuple[str, ...] = ()
     metadata: Mapping[str, Any] = field(default_factory=dict)
+    entry_kind: Optional[str] = None
+    handoff_kind: Optional[str] = None
+    contract_version: str = "1"
+    supports_routes: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -75,6 +79,10 @@ class SkillMeta:
             "runtime_entry": str(self.runtime_entry) if self.runtime_entry else None,
             "triggers": list(self.triggers),
             "metadata": dict(self.metadata),
+            "entry_kind": self.entry_kind,
+            "handoff_kind": self.handoff_kind,
+            "contract_version": self.contract_version,
+            "supports_routes": list(self.supports_routes),
         }
 
 
@@ -252,6 +260,52 @@ class RecoveredContext:
 
 
 @dataclass(frozen=True)
+class RuntimeHandoff:
+    """Structured machine handoff for downstream host execution."""
+
+    schema_version: str
+    route_name: str
+    run_id: str
+    plan_id: Optional[str] = None
+    plan_path: Optional[str] = None
+    handoff_kind: str = "default"
+    required_host_action: str = "continue_host_workflow"
+    recommended_skill_ids: tuple[str, ...] = ()
+    artifacts: Mapping[str, Any] = field(default_factory=dict)
+    notes: tuple[str, ...] = ()
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "route_name": self.route_name,
+            "run_id": self.run_id,
+            "plan_id": self.plan_id,
+            "plan_path": self.plan_path,
+            "handoff_kind": self.handoff_kind,
+            "required_host_action": self.required_host_action,
+            "recommended_skill_ids": list(self.recommended_skill_ids),
+            "artifacts": dict(self.artifacts),
+            "notes": list(self.notes),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> "RuntimeHandoff":
+        artifacts = data.get("artifacts")
+        return cls(
+            schema_version=str(data.get("schema_version") or "1"),
+            route_name=str(data.get("route_name") or "consult"),
+            run_id=str(data.get("run_id") or ""),
+            plan_id=data.get("plan_id") or None,
+            plan_path=data.get("plan_path") or None,
+            handoff_kind=str(data.get("handoff_kind") or "default"),
+            required_host_action=str(data.get("required_host_action") or "continue_host_workflow"),
+            recommended_skill_ids=tuple(data.get("recommended_skill_ids") or ()),
+            artifacts=dict(artifacts) if isinstance(artifacts, Mapping) else {},
+            notes=tuple(data.get("notes") or ()),
+        )
+
+
+@dataclass(frozen=True)
 class ReplayEvent:
     """Append-only replay event payload."""
 
@@ -292,6 +346,7 @@ class RuntimeResult:
     plan_artifact: Optional[PlanArtifact] = None
     skill_result: Optional[Mapping[str, Any]] = None
     replay_session_dir: Optional[str] = None
+    handoff: Optional[RuntimeHandoff] = None
     notes: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
@@ -303,5 +358,6 @@ class RuntimeResult:
             "plan_artifact": self.plan_artifact.to_dict() if self.plan_artifact else None,
             "skill_result": dict(self.skill_result or {}),
             "replay_session_dir": self.replay_session_dir,
+            "handoff": self.handoff.to_dict() if self.handoff else None,
             "notes": list(self.notes),
         }

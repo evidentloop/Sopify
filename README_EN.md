@@ -48,35 +48,28 @@
 
 ### Installation
 
-**For Claude Code users:**
+**One-command setup (recommended):**
 
 ```bash
-# English version
-cp -r Claude/Skills/EN/* ~/.claude/
+# Use the current directory as the target workspace
+bash scripts/install-sopify.sh --target codex:zh-CN
 
-# Chinese version
-cp -r Claude/Skills/CN/* ~/.claude/
+# Use an explicit workspace path
+bash scripts/install-sopify.sh --target claude:en-US --workspace /path/to/project
 ```
 
-**For Codex CLI users:**
+Supported `target` values:
 
-```bash
-# English version
-cp -r Codex/Skills/EN/* ~/.codex/
-
-# Chinese version
-cp -r Codex/Skills/CN/* ~/.codex/
-```
+- `codex:zh-CN`
+- `codex:en-US`
+- `claude:zh-CN`
+- `claude:en-US`
 
 Notes:
 
-- The copy commands above sync skill docs, templates, and sub-skill folders only; they do not automatically install the repo-root `runtime/` and `scripts/` into another project
-- To sync runtime assets into another repository, run `bash scripts/sync-runtime-assets.sh /path/to/project`; this creates a self-contained `.sopify-runtime/` bundle in the target repo by default
-- This repository currently closes two repo-local runtime entry points:
-  - `scripts/sopify_runtime.py`: the default raw-input entry, which hands input directly to the router
-  - `scripts/go_plan_runtime.py`: the plan-only helper, which forces the `~go plan` path
-- `scripts/model_compare_runtime.py` is the runtime implementation for `~compare`, not the default generic CLI entry
-- For secondary integration, do not copy only `Codex/Skills/*` or `Claude/Skills/*`; sync the `.sopify-runtime/` bundle as well
+- The installer sets up the selected host prompt layer and syncs the `.sopify-runtime/` bundle into the target workspace
+- `--workspace` is optional and defaults to the current directory
+- This is the recommended entry point for end users
 
 ### Verify Installation
 
@@ -89,7 +82,7 @@ Show skills list
 
 ### Vendored Runtime Bundle
 
-If you want to reuse this runtime directly inside another repository:
+If you need maintainer-level control over bundle sync, run:
 
 ```bash
 # 1. Sync the runtime bundle from this repository
@@ -106,8 +99,11 @@ bash /path/to/project/.sopify-runtime/scripts/check-runtime-smoke.sh
 Notes:
 
 - `.sopify-runtime/` keeps a self-contained `runtime/` + `scripts/` + `tests/` layout
+- `.sopify-runtime/manifest.json` is the machine contract for the bundle; host integrations should read the manifest first and only fall back to fixed script paths if needed
 - the default vendored entry is `.sopify-runtime/scripts/sopify_runtime.py`
 - the vendored plan-only helper is `.sopify-runtime/scripts/go_plan_runtime.py`
+- builtin skill discovery is owned by `runtime/builtin_catalog.py`, so the bundle does not depend on shipping `Codex/Skills` or `Claude/Skills` directories
+- non-terminal routes now write `.sopify-skills/state/current_handoff.json`, and `Next:` is rendered from the handoff contract first
 
 ### First Use
 
@@ -172,6 +168,8 @@ Current boundary:
   - `scripts/sopify_runtime.py`: default raw-input entry
   - `scripts/go_plan_runtime.py`: plan-only helper
 - `scripts/sync-runtime-assets.sh` can now sync the runtime bundle into `.sopify-runtime/` in another repository
+- bundle sync now generates `.sopify-runtime/manifest.json` to describe entries, supported routes, builtin catalog, and the future handoff file location
+- runtime now writes `.sopify-skills/state/current_handoff.json` so the host can read the structured next action directly
 - the `.sopify-runtime/` bundle already includes portable `tests/test_runtime.py` and `scripts/check-runtime-smoke.sh`
 - `P1-A` is now landed: the first runtime execution bootstraps the minimum KB skeleton, but this still does not include selective history recovery or history archive
 - not part of this release slice: generic-entry auto-bridge for `~compare`, a standalone `workflow-learning` runtime helper, and the `~go exec` develop bridge

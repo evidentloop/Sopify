@@ -133,7 +133,8 @@ Next: {下一步提示}
  | `~go exec` | 执行已有方案 |
  | `~compare` | 多模型并发对比（默认含当前会话模型；可用模型数不足 2 时降级并给出原因） |
  
-说明：当前仓库若存在 `scripts/sopify_runtime.py`，原始输入应优先走该默认 repo-local runtime 入口；若 runtime 以 bundle 方式接入到其他仓库，则优先走 `.sopify-runtime/scripts/sopify_runtime.py`；仅在明确只走 `~go plan` 时使用对应的 `go_plan_runtime.py` helper。
+说明：当前仓库若存在 `scripts/sopify_runtime.py`，原始输入应优先走该默认 repo-local runtime 入口；若 runtime 以 bundle 方式接入到其他仓库，则宿主应优先读取 `.sopify-runtime/manifest.json` 决定入口，默认再回退到 `.sopify-runtime/scripts/sopify_runtime.py`；仅在明确只走 `~go plan` 时使用对应的 `go_plan_runtime.py` helper。
+说明：runtime 执行后，若存在 `.sopify-skills/state/current_handoff.json`，宿主应优先按其中的 `required_host_action`、`recommended_skill_ids` 与 `artifacts` 决定下一步；`Next:` 行仅作为面向人的摘要提示，不应作为唯一机器依据。
 
 **workflow-learning 主动记录策略：**
 ```yaml
@@ -283,6 +284,11 @@ progressive: 按需创建文件 (默认)
 | 轻量迭代 | 3-5 文件，清晰需求 | light 方案 + 执行 |
 | 完整开发 | >5 文件或架构变更 | 3 阶段完整流程 |
 
+**宿主接入约定：**
+- `Codex/Skills` 只承担提示层职责，不作为 vendored runtime 的机器契约来源。
+- vendored runtime 的机器入口以 `.sopify-runtime/manifest.json` 为准。
+- runtime 执行后的机器交接以 `.sopify-skills/state/current_handoff.json` 为准；仅当 handoff 缺失时才回退到输出文案中的 `Next:`。
+
 ---
 
 ## 阶段执行
@@ -411,9 +417,11 @@ scripts/sopify_runtime.py                    # 当前仓库默认原始输入入
 scripts/go_plan_runtime.py                   # 当前仓库用于 plan-only slice 的 helper
 .sopify-runtime/scripts/go_plan_runtime.py   # vendored plan-only helper
 scripts/model_compare_runtime.py             # ~compare 的运行时实现，不是默认通用入口
+.sopify-runtime/manifest.json                # vendored bundle 机器契约，宿主应优先读取
+.sopify-skills/state/current_handoff.json    # runtime 写出的结构化交接文件，宿主应优先读取
 ```
 
-说明：当前默认入口是 `scripts/sopify_runtime.py`；若以 bundle 方式接入则入口对应 `.sopify-runtime/scripts/sopify_runtime.py`；`go_plan_runtime.py` 只负责 plan-only；`~compare` 仍依赖宿主侧专用桥接。
+说明：当前默认入口是 `scripts/sopify_runtime.py`；若以 bundle 方式接入，优先按 `.sopify-runtime/manifest.json` 选入口，再回退到 `.sopify-runtime/scripts/sopify_runtime.py`；`go_plan_runtime.py` 只负责 plan-only；执行结束后宿主应优先读取 `.sopify-skills/state/current_handoff.json` 决定下一步；`~compare` 仍依赖宿主侧专用桥接。
 
 **配置文件：** `sopify.config.yaml` (项目根目录)
 

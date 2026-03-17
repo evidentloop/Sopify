@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import sys
 
+from .handoff import CURRENT_HANDOFF_RELATIVE_PATH
 from .models import RuntimeResult
 
 _PHASE_LABELS = {
@@ -44,6 +45,7 @@ _LABELS = {
         "route": "路由",
         "reason": "原因",
         "status": "状态",
+        "handoff": "交接",
         "current_plan": "当前方案",
         "stage": "阶段",
         "missing": "未生成",
@@ -71,6 +73,14 @@ _LABELS = {
         "next_replay": "继续使用 workflow-learning 回放链路",
         "next_quick_fix": "在宿主会话中继续执行快速修复",
         "next_consult": "在宿主会话中继续问答，或改成明确变更请求",
+        "handoff_review_or_execute_plan": "已写入 plan handoff，宿主可继续评审方案或执行",
+        "handoff_continue_host_workflow": "已写入 workflow handoff，后续阶段需宿主继续",
+        "handoff_continue_host_develop": "已写入 develop handoff，后续开发需宿主继续",
+        "handoff_continue_host_quick_fix": "已写入 quick-fix handoff，当前 runtime 未直接改代码",
+        "handoff_host_compare_bridge_required": "已写入 compare handoff，当前仍需宿主侧 compare bridge",
+        "handoff_review_compare_results": "已写入 compare handoff，可在宿主侧继续选择结果",
+        "handoff_host_replay_bridge_required": "已写入 replay handoff，当前仍需 workflow-learning 专用链路",
+        "handoff_continue_host_consult": "已写入 consult handoff，当前 runtime 不生成正文回答",
     },
     "en-US": {
         "plan": "Plan",
@@ -79,6 +89,7 @@ _LABELS = {
         "route": "Route",
         "reason": "Reason",
         "status": "Status",
+        "handoff": "Handoff",
         "current_plan": "Current Plan",
         "stage": "Stage",
         "missing": "not generated",
@@ -106,6 +117,14 @@ _LABELS = {
         "next_replay": "Use the workflow-learning replay flow",
         "next_quick_fix": "Continue the quick-fix flow in the host session",
         "next_consult": "Continue the discussion in the host session, or restate it as a change request",
+        "handoff_review_or_execute_plan": "plan handoff written; the host can review the plan or execute it",
+        "handoff_continue_host_workflow": "workflow handoff written; downstream stages still need the host flow",
+        "handoff_continue_host_develop": "develop handoff written; downstream implementation still needs the host flow",
+        "handoff_continue_host_quick_fix": "quick-fix handoff written; the runtime did not modify code directly",
+        "handoff_host_compare_bridge_required": "compare handoff written; the host-side compare bridge is still required",
+        "handoff_review_compare_results": "compare handoff written; candidate results are ready for host-side review",
+        "handoff_host_replay_bridge_required": "replay handoff written; workflow-learning still needs its dedicated bridge",
+        "handoff_continue_host_consult": "consult handoff written; the runtime does not generate a full answer body",
     },
 }
 
@@ -183,6 +202,7 @@ def _core_lines(result: RuntimeResult, language: str) -> list[str]:
         return [
             f"{labels['plan']}: {result.plan_artifact.path}",
             f"{labels['summary']}: {result.plan_artifact.summary}",
+            f"{labels['handoff']}: {_handoff_label(result, language)}",
             f"{labels['replay']}: {replay_value}",
         ]
 
@@ -190,7 +210,7 @@ def _core_lines(result: RuntimeResult, language: str) -> list[str]:
         return [
             f"{labels['plan']}: {result.plan_artifact.path}",
             f"{labels['summary']}: {result.plan_artifact.summary}",
-            f"{labels['status']}: {_route_status_message(result, language)}",
+            f"{labels['status']}: {_status_message(result, language)}",
         ]
 
     if route_name in {"resume_active", "exec_plan"} and result.recovered_context.current_run is not None:
@@ -198,7 +218,7 @@ def _core_lines(result: RuntimeResult, language: str) -> list[str]:
         return [
             f"{labels['current_plan']}: {current_plan.path if current_plan is not None else labels['missing']}",
             f"{labels['stage']}: {result.recovered_context.current_run.stage}",
-            f"{labels['status']}: {_route_status_message(result, language)}",
+            f"{labels['status']}: {_status_message(result, language)}",
         ]
 
     if route_name == "cancel_active":
@@ -210,7 +230,7 @@ def _core_lines(result: RuntimeResult, language: str) -> list[str]:
 
     return [
         f"{labels['route']}: {route_name}",
-        f"{labels['status']}: {_route_status_message(result, language)}",
+        f"{labels['status']}: {_status_message(result, language)}",
         f"{labels['reason']}: {_diagnostic_reason(result)}",
     ]
 
@@ -230,32 +250,18 @@ def _collect_changes(result: RuntimeResult) -> list[str]:
         if path not in seen:
             seen.add(path)
             ordered.append(path)
+    if result.handoff is not None and CURRENT_HANDOFF_RELATIVE_PATH not in seen:
+        seen.add(CURRENT_HANDOFF_RELATIVE_PATH)
+        ordered.append(CURRENT_HANDOFF_RELATIVE_PATH)
     return ordered
 
 
 def _next_hint(result: RuntimeResult, language: str) -> str:
     labels = _LABELS[language]
-    route_name = result.route.route_name
-    if route_name == "plan_only" and result.plan_artifact is not None:
-        return labels["next_plan"]
-    if route_name == "workflow" and result.plan_artifact is not None:
-        return labels["next_workflow"]
-    if route_name == "light_iterate" and result.plan_artifact is not None:
-        return labels["next_light_iterate"]
-    if route_name == "resume_active":
-        return labels["next_resume"]
-    if route_name == "exec_plan":
-        return labels["next_exec"]
-    if route_name == "cancel_active":
+    if result.handoff is not None:
+        return _handoff_next_hint(result, language)
+    if result.route.route_name == "cancel_active":
         return labels["next_cancel"]
-    if route_name == "compare":
-        return labels["next_compare"] if result.skill_result else labels["next_compare_bridge"]
-    if route_name == "replay":
-        return labels["next_replay"]
-    if route_name == "quick_fix":
-        return labels["next_quick_fix"]
-    if route_name == "consult":
-        return labels["next_consult"]
     return labels["next_retry"]
 
 
@@ -274,8 +280,12 @@ def _status_symbol(result: RuntimeResult) -> str:
     return "✓"
 
 
-def _route_status_message(result: RuntimeResult, language: str) -> str:
+def _status_message(result: RuntimeResult, language: str) -> str:
     labels = _LABELS[language]
+    if result.handoff is not None:
+        key = f"handoff_{result.handoff.required_host_action}"
+        if key in labels:
+            return labels[key]
     route_name = result.route.route_name
     if route_name == "workflow":
         return labels["workflow_handoff"]
@@ -294,6 +304,36 @@ def _route_status_message(result: RuntimeResult, language: str) -> str:
     if route_name == "exec_plan":
         return labels["exec_handoff"]
     return labels["default_handoff"]
+
+
+def _handoff_label(result: RuntimeResult, language: str) -> str:
+    if result.handoff is None:
+        return _LABELS[language]["missing"]
+    return CURRENT_HANDOFF_RELATIVE_PATH
+
+
+def _handoff_next_hint(result: RuntimeResult, language: str) -> str:
+    labels = _LABELS[language]
+    handoff = result.handoff
+    if handoff is None:
+        return labels["next_retry"]
+    if handoff.handoff_kind == "plan":
+        return labels["next_plan"]
+    if handoff.handoff_kind == "workflow":
+        return labels["next_workflow"]
+    if handoff.handoff_kind == "light_iterate":
+        return labels["next_light_iterate"]
+    if handoff.handoff_kind == "develop":
+        return labels["next_resume"] if result.route.route_name == "resume_active" else labels["next_exec"]
+    if handoff.handoff_kind == "quick_fix":
+        return labels["next_quick_fix"]
+    if handoff.handoff_kind == "compare":
+        return labels["next_compare"] if handoff.required_host_action == "review_compare_results" else labels["next_compare_bridge"]
+    if handoff.handoff_kind == "replay":
+        return labels["next_replay"]
+    if handoff.handoff_kind == "consult":
+        return labels["next_consult"]
+    return labels["next_retry"]
 
 
 def _diagnostic_reason(result: RuntimeResult) -> str:

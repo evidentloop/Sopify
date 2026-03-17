@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 import subprocess
 import sys
@@ -187,6 +188,84 @@ class SkillRegistryTests(unittest.TestCase):
             model_compare = next(skill for skill in skills if skill.skill_id == "model-compare")
             self.assertEqual(model_compare.mode, "runtime")
             self.assertIsNotNone(model_compare.runtime_entry)
+            self.assertEqual(model_compare.entry_kind, "python")
+            self.assertEqual(model_compare.handoff_kind, "compare")
+            self.assertEqual(model_compare.supports_routes, ("compare",))
+
+    def test_skill_registry_builtin_catalog_does_not_require_builtin_skill_dirs(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            workspace = temp_root / "workspace"
+            target_root = temp_root / "target"
+            workspace.mkdir()
+            target_root.mkdir()
+
+            sync_script = REPO_ROOT / "scripts" / "sync-runtime-assets.sh"
+            completed = subprocess.run(
+                ["bash", str(sync_script), str(target_root)],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(completed.returncode, 0, msg=completed.stderr)
+
+            bundle_root = target_root / ".sopify-runtime"
+            config = load_runtime_config(workspace)
+            skills = SkillRegistry(config, repo_root=bundle_root, user_home=workspace / "home").discover()
+            skill_ids = {skill.skill_id for skill in skills}
+
+            self.assertIn("analyze", skill_ids)
+            self.assertIn("workflow-learning", skill_ids)
+            self.assertIn("model-compare", skill_ids)
+
+            model_compare = next(skill for skill in skills if skill.skill_id == "model-compare")
+            self.assertEqual(model_compare.source, "builtin")
+            self.assertEqual(model_compare.runtime_entry, (bundle_root / "scripts" / "model_compare_runtime.py").resolve())
+            self.assertEqual(model_compare.path, (bundle_root / "runtime" / "builtin_catalog.py").resolve())
+
+    def test_skill_registry_does_not_override_builtin_without_explicit_flag(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            project_skill = workspace / "skills" / "analyze"
+            project_skill.mkdir(parents=True)
+            (project_skill / "SKILL.md").write_text(
+                "---\nname: analyze\ndescription: local override attempt\n---\n\n# local\n",
+                encoding="utf-8",
+            )
+            (project_skill / "skill.yaml").write_text(
+                "id: analyze\nmode: advisory\n",
+                encoding="utf-8",
+            )
+
+            config = load_runtime_config(workspace)
+            skills = SkillRegistry(config, user_home=workspace / "home").discover()
+            analyze = next(skill for skill in skills if skill.skill_id == "analyze")
+
+            self.assertEqual(analyze.source, "builtin")
+            self.assertNotEqual(analyze.description, "local override attempt")
+
+    def test_skill_registry_allows_explicit_builtin_override(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            project_skill = workspace / "skills" / "analyze"
+            project_skill.mkdir(parents=True)
+            (project_skill / "SKILL.md").write_text(
+                "---\nname: analyze\ndescription: local override\n---\n\n# local\n",
+                encoding="utf-8",
+            )
+            (project_skill / "skill.yaml").write_text(
+                "id: analyze\noverride_builtin: true\nmode: advisory\nsupports_routes:\n  - workflow\n",
+                encoding="utf-8",
+            )
+
+            config = load_runtime_config(workspace)
+            skills = SkillRegistry(config, user_home=workspace / "home").discover()
+            analyze = next(skill for skill in skills if skill.skill_id == "analyze")
+
+            self.assertEqual(analyze.source, "project")
+            self.assertEqual(analyze.description, "local override")
+            self.assertTrue(analyze.metadata.get("override_builtin"))
+            self.assertEqual(analyze.supports_routes, ("workflow",))
 
 
 class KnowledgeBaseBootstrapTests(unittest.TestCase):
@@ -252,16 +331,36 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertTrue((workspace / ".sopify-skills" / "wiki" / "overview.md").exists())
             self.assertTrue((workspace / ".sopify-skills" / "user" / "preferences.md").exists())
             self.assertTrue((workspace / ".sopify-skills" / "history" / "index.md").exists())
+            self.assertEqual(first.handoff.required_host_action, "review_or_execute_plan")
+            self.assertTrue((workspace / ".sopify-skills" / "state" / "current_handoff.json").exists())
 
             resumed = run_runtime("继续", workspace_root=workspace, user_home=workspace / "home")
             self.assertEqual(resumed.route.route_name, "resume_active")
             self.assertTrue(resumed.recovered_context.has_active_run)
             self.assertTrue(resumed.recovered_context.loaded_files)
+            self.assertIsNotNone(resumed.handoff)
+            self.assertEqual(resumed.handoff.handoff_kind, "develop")
+            self.assertEqual(resumed.handoff.required_host_action, "continue_host_develop")
 
             canceled = run_runtime("取消", workspace_root=workspace, user_home=workspace / "home")
             self.assertEqual(canceled.route.route_name, "cancel_active")
             store = StateStore(load_runtime_config(workspace))
             self.assertFalse(store.has_active_flow())
+            self.assertFalse((workspace / ".sopify-skills" / "state" / "current_handoff.json").exists())
+
+    def test_engine_handoff_contracts_cover_compare_and_replay(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+
+            compare = run_runtime("~compare 方案对比", workspace_root=workspace, user_home=workspace / "home")
+            self.assertIsNotNone(compare.handoff)
+            self.assertEqual(compare.handoff.handoff_kind, "compare")
+            self.assertEqual(compare.handoff.required_host_action, "host_compare_bridge_required")
+
+            replay = run_runtime("回放最近一次实现", workspace_root=workspace, user_home=workspace / "home")
+            self.assertIsNotNone(replay.handoff)
+            self.assertEqual(replay.handoff.handoff_kind, "replay")
+            self.assertEqual(replay.handoff.required_host_action, "host_replay_bridge_required")
 
     def test_rendered_plan_output_and_repo_local_helper(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -277,6 +376,7 @@ class EngineIntegrationTests(unittest.TestCase):
 
             self.assertIn("[demo-ai] 方案设计 ✓", rendered)
             self.assertIn("方案: .sopify-skills/plan/", rendered)
+            self.assertIn("交接: .sopify-skills/state/current_handoff.json", rendered)
             self.assertIn("Next: ~go exec 执行 或 回复修改意见", rendered)
 
             script_path = REPO_ROOT / "scripts" / "go_plan_runtime.py"
@@ -311,9 +411,28 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertEqual(sync_completed.returncode, 0, msg=sync_completed.stderr)
 
             bundle_root = target_root / ".sopify-runtime"
+            manifest_path = bundle_root / "manifest.json"
             self.assertTrue((bundle_root / "runtime" / "__init__.py").exists())
             self.assertTrue((bundle_root / "scripts" / "check-runtime-smoke.sh").exists())
             self.assertTrue((bundle_root / "tests" / "test_runtime.py").exists())
+            self.assertTrue(manifest_path.exists())
+
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            self.assertEqual(manifest["schema_version"], "1")
+            self.assertEqual(manifest["default_entry"], "scripts/sopify_runtime.py")
+            self.assertEqual(manifest["plan_only_entry"], "scripts/go_plan_runtime.py")
+            self.assertEqual(manifest["handoff_file"], ".sopify-skills/state/current_handoff.json")
+            self.assertEqual(manifest["capabilities"]["bundle_role"], "control_plane")
+            self.assertTrue(manifest["capabilities"]["writes_handoff_file"])
+            self.assertIn("plan_only", manifest["limits"]["host_required_routes"])
+            self.assertIn("compare", manifest["supported_routes"])
+            self.assertIn("exec_plan", manifest["limits"]["host_required_routes"])
+            self.assertIn("model-compare", manifest["limits"]["runtime_payload_required_skill_ids"])
+            self.assertEqual(len(manifest["builtin_skills"]), 7)
+            model_compare = next(skill for skill in manifest["builtin_skills"] if skill["skill_id"] == "model-compare")
+            self.assertEqual(model_compare["runtime_entry"], "scripts/model_compare_runtime.py")
+            self.assertEqual(model_compare["entry_kind"], "python")
+            self.assertEqual(model_compare["supports_routes"], ["compare"])
 
             runtime_script = bundle_root / "scripts" / "sopify_runtime.py"
             completed = subprocess.run(
@@ -324,6 +443,7 @@ class EngineIntegrationTests(unittest.TestCase):
             )
             self.assertEqual(completed.returncode, 0, msg=completed.stderr)
             self.assertIn(".sopify-skills/plan/", completed.stdout)
+            self.assertTrue((workspace / ".sopify-skills" / "state" / "current_handoff.json").exists())
             self.assertTrue((workspace / ".sopify-skills" / "state" / "current_plan.json").exists())
             self.assertTrue((workspace / ".sopify-skills" / "replay" / "sessions").exists())
             self.assertTrue((workspace / ".sopify-skills" / "project.md").exists())

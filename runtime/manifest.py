@@ -1,0 +1,277 @@
+"""Bundle manifest generation for vendored Sopify runtime bundles."""
+
+from __future__ import annotations
+
+import argparse
+import json
+from pathlib import Path
+import re
+from tempfile import NamedTemporaryFile
+from typing import Any, Mapping
+
+from .builtin_catalog import load_builtin_skills
+from .handoff import CURRENT_HANDOFF_RELATIVE_PATH
+from .router import SUPPORTED_ROUTE_NAMES
+from .state import iso_now
+
+MANIFEST_SCHEMA_VERSION = "1"
+DEFAULT_MANIFEST_FILENAME = "manifest.json"
+DEFAULT_ENTRY = "scripts/sopify_runtime.py"
+PLAN_ONLY_ENTRY = "scripts/go_plan_runtime.py"
+_SOPIFY_VERSION_RE = re.compile(r"^<!--\s*SOPIFY_VERSION:\s*(?P<version>.+?)\s*-->$", re.MULTILINE)
+_CHANGELOG_VERSION_RE = re.compile(r"^## \[(?P<version>[^\]]+)\]", re.MULTILINE)
+
+
+class ManifestError(ValueError):
+    """Raised when a bundle manifest cannot be generated safely."""
+
+
+class BundleManifest:
+    """Typed view of the bundle manifest written into `.sopify-runtime/`."""
+
+    def __init__(
+        self,
+        *,
+        schema_version: str,
+        bundle_version: str,
+        generated_at: str,
+        default_entry: str,
+        plan_only_entry: str,
+        supported_routes: tuple[str, ...],
+        builtin_skills: tuple[Mapping[str, Any], ...],
+        handoff_file: str,
+        capabilities: Mapping[str, Any],
+        limits: Mapping[str, Any],
+    ) -> None:
+        self.schema_version = schema_version
+        self.bundle_version = bundle_version
+        self.generated_at = generated_at
+        self.default_entry = default_entry
+        self.plan_only_entry = plan_only_entry
+        self.supported_routes = supported_routes
+        self.builtin_skills = builtin_skills
+        self.handoff_file = handoff_file
+        self.capabilities = capabilities
+        self.limits = limits
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "bundle_version": self.bundle_version,
+            "generated_at": self.generated_at,
+            "default_entry": self.default_entry,
+            "plan_only_entry": self.plan_only_entry,
+            "supported_routes": list(self.supported_routes),
+            "builtin_skills": [dict(skill) for skill in self.builtin_skills],
+            "handoff_file": self.handoff_file,
+            "capabilities": dict(self.capabilities),
+            "limits": dict(self.limits),
+        }
+
+
+def build_bundle_manifest(
+    *,
+    bundle_root: Path,
+    source_root: Path | None = None,
+    bundle_version: str | None = None,
+) -> BundleManifest:
+    """Build the machine contract for a vendored Sopify runtime bundle."""
+    resolved_bundle_root = bundle_root.resolve()
+    resolved_source_root = (source_root or bundle_root).resolve()
+    # Entries must be bundle-relative, but the published version should come from the source repo when available.
+    builtin_skills = tuple(
+        _serialize_builtin_skill(skill=skill, bundle_root=resolved_bundle_root)
+        for skill in load_builtin_skills(repo_root=resolved_bundle_root, language="en-US")
+    )
+    runtime_skill_ids = tuple(skill["skill_id"] for skill in builtin_skills if skill["runtime_entry"] is not None)
+
+    return BundleManifest(
+        schema_version=MANIFEST_SCHEMA_VERSION,
+        bundle_version=_resolve_bundle_version(
+            source_root=resolved_source_root,
+            bundle_root=resolved_bundle_root,
+            explicit_version=bundle_version,
+        ),
+        generated_at=iso_now(),
+        default_entry=DEFAULT_ENTRY,
+        plan_only_entry=PLAN_ONLY_ENTRY,
+        supported_routes=SUPPORTED_ROUTE_NAMES,
+        builtin_skills=builtin_skills,
+        handoff_file=CURRENT_HANDOFF_RELATIVE_PATH,
+        capabilities={
+            "bundle_role": "control_plane",
+            "manifest_first": True,
+            "builtin_catalog": True,
+            "plan_scaffold": True,
+            "kb_bootstrap": True,
+            "replay_capture": True,
+            "writes_handoff_file": True,
+            "runtime_skill_ids": list(runtime_skill_ids),
+        },
+        limits={
+            "host_required_routes": [
+                "plan_only",
+                "workflow",
+                "light_iterate",
+                "quick_fix",
+                "resume_active",
+                "exec_plan",
+                "compare",
+                "replay",
+                "consult",
+            ],
+            "host_bridge_status": {
+                "develop": "required",
+                "compare": "required",
+                "replay": "required",
+            },
+            "runtime_payload_required_skill_ids": ["model-compare"],
+        },
+    )
+
+
+def write_bundle_manifest(
+    *,
+    bundle_root: Path,
+    output_path: Path | None = None,
+    source_root: Path | None = None,
+    bundle_version: str | None = None,
+) -> Path:
+    """Write `manifest.json` atomically and return the output path."""
+    resolved_bundle_root = bundle_root.resolve()
+    target_path = (output_path or (resolved_bundle_root / DEFAULT_MANIFEST_FILENAME)).resolve()
+    manifest = build_bundle_manifest(
+        bundle_root=resolved_bundle_root,
+        source_root=source_root,
+        bundle_version=bundle_version,
+    )
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    with NamedTemporaryFile("w", delete=False, dir=target_path.parent, encoding="utf-8") as handle:
+        json.dump(manifest.to_dict(), handle, ensure_ascii=False, indent=2, sort_keys=True)
+        handle.write("\n")
+        temp_path = Path(handle.name)
+    temp_path.replace(target_path)
+    return target_path
+
+
+def build_manifest_parser() -> argparse.ArgumentParser:
+    """Build the CLI parser for manifest generation."""
+    parser = argparse.ArgumentParser(description="Generate a Sopify bundle manifest.")
+    parser.add_argument(
+        "--bundle-root",
+        required=True,
+        help="Vendored bundle root, for example /path/to/project/.sopify-runtime",
+    )
+    parser.add_argument(
+        "--source-root",
+        default=None,
+        help="Optional source repository root used to resolve the published bundle version.",
+    )
+    parser.add_argument(
+        "--output",
+        default=None,
+        help="Optional manifest output path. Defaults to <bundle-root>/manifest.json.",
+    )
+    parser.add_argument(
+        "--bundle-version",
+        default=None,
+        help="Optional explicit bundle version. Overrides auto-detection.",
+    )
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    """CLI entry point used by the sync script."""
+    parser = build_manifest_parser()
+    args = parser.parse_args(argv)
+    bundle_root = Path(args.bundle_root).resolve()
+    if not bundle_root.is_dir():
+        raise SystemExit(f"Bundle root does not exist: {bundle_root}")
+
+    output_path = Path(args.output).resolve() if args.output else None
+    source_root = Path(args.source_root).resolve() if args.source_root else None
+    written_path = write_bundle_manifest(
+        bundle_root=bundle_root,
+        output_path=output_path,
+        source_root=source_root,
+        bundle_version=args.bundle_version,
+    )
+    print(written_path)
+    return 0
+
+
+def _serialize_builtin_skill(*, skill: Any, bundle_root: Path) -> Mapping[str, Any]:
+    return {
+        "skill_id": skill.skill_id,
+        "mode": skill.mode,
+        "entry_kind": skill.entry_kind,
+        "runtime_entry": _to_bundle_relative(skill.runtime_entry, bundle_root=bundle_root),
+        "handoff_kind": skill.handoff_kind,
+        "contract_version": skill.contract_version,
+        "supports_routes": list(skill.supports_routes),
+    }
+
+
+def _to_bundle_relative(path: Path | None, *, bundle_root: Path) -> str | None:
+    if path is None:
+        return None
+    resolved = path.resolve()
+    try:
+        return str(resolved.relative_to(bundle_root))
+    except ValueError as exc:  # pragma: no cover - defensive guard for invalid inputs
+        raise ManifestError(f"Manifest path escaped bundle root: {resolved}") from exc
+
+
+def _resolve_bundle_version(*, source_root: Path, bundle_root: Path, explicit_version: str | None) -> str:
+    if explicit_version:
+        return explicit_version
+
+    version = _read_version_header(source_root / "Codex" / "Skills" / "CN" / "AGENTS.md")
+    if version is not None:
+        return version
+
+    version = _read_existing_manifest_version(bundle_root / DEFAULT_MANIFEST_FILENAME)
+    if version is not None:
+        return version
+
+    version = _read_latest_changelog_version(source_root / "CHANGELOG.md")
+    if version is not None:
+        return version
+
+    return "0.0.0-dev"
+
+
+def _read_version_header(path: Path) -> str | None:
+    if not path.is_file():
+        return None
+    match = _SOPIFY_VERSION_RE.search(path.read_text(encoding="utf-8"))
+    if match is None:
+        return None
+    return match.group("version").strip()
+
+
+def _read_existing_manifest_version(path: Path) -> str | None:
+    if not path.is_file():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    value = payload.get("bundle_version")
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return None
+
+
+def _read_latest_changelog_version(path: Path) -> str | None:
+    if not path.is_file():
+        return None
+    for match in _CHANGELOG_VERSION_RE.finditer(path.read_text(encoding="utf-8")):
+        version = match.group("version").strip()
+        if version.lower() != "unreleased":
+            return version
+    return None
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

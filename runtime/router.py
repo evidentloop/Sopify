@@ -15,6 +15,18 @@ _COMMAND_PATTERNS = (
     (re.compile(r"^~go(?:\s+(?P<body>.+))?$", re.IGNORECASE), "~go"),
     (re.compile(r"^~compare(?:\s+(?P<body>.+))?$", re.IGNORECASE), "~compare"),
 )
+SUPPORTED_ROUTE_NAMES = (
+    "plan_only",
+    "workflow",
+    "light_iterate",
+    "quick_fix",
+    "resume_active",
+    "exec_plan",
+    "cancel_active",
+    "compare",
+    "replay",
+    "consult",
+)
 
 _REPLAY_KEYWORDS = (
     "回放",

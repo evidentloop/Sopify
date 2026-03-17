@@ -48,35 +48,28 @@
 
 ### 安装
 
-**Claude Code 用户：**
+**一键接入（推荐）：**
 
 ```bash
-# 中文版
-cp -r Claude/Skills/CN/* ~/.claude/
+# 当前目录作为目标仓库
+bash scripts/install-sopify.sh --target codex:zh-CN
 
-# 英文版
-cp -r Claude/Skills/EN/* ~/.claude/
+# 指定目标仓库
+bash scripts/install-sopify.sh --target claude:en-US --workspace /path/to/project
 ```
 
-**Codex CLI 用户：**
+当前支持的 `target`：
 
-```bash
-# 中文版
-cp -r Codex/Skills/CN/* ~/.codex/
-
-# 英文版
-cp -r Codex/Skills/EN/* ~/.codex/
-```
+- `codex:zh-CN`
+- `codex:en-US`
+- `claude:zh-CN`
+- `claude:en-US`
 
 说明：
 
-- 上述复制命令同步的是技能文档、模板和子技能目录，不会单独把仓库根目录下的 `runtime/` 与 `scripts/` 自动安装到目标项目
-- 如果要把 runtime 资产同步到另一个仓库，执行 `bash scripts/sync-runtime-assets.sh /path/to/project`，默认会在目标仓库生成一份自包含的 `.sopify-runtime/` bundle
-- 当前仓库内已经收口的 repo-local runtime 入口有两个：
-  - `scripts/sopify_runtime.py`：默认原始输入入口，直接交给 router 分流
-  - `scripts/go_plan_runtime.py`：plan-only helper，强制走 `~go plan`
-- `scripts/model_compare_runtime.py` 是 `~compare` 的运行时实现，不是默认通用 CLI 入口
-- 二次接入时不要只复制 `Codex/Skills/*` 或 `Claude/Skills/*`；应同时同步 `.sopify-runtime/` bundle
+- installer 会同时安装宿主提示层，并把 `.sopify-runtime/` bundle 同步到目标仓库
+- `--workspace` 可省略，默认使用当前目录
+- 该命令适合作为最终用户的一键接入入口
 
 ### 验证安装
 
@@ -89,7 +82,7 @@ cp -r Codex/Skills/EN/* ~/.codex/
 
 ### 二次接入 runtime bundle
 
-如果要在另一个仓库里直接复用这套 runtime：
+如果需要从维护者视角手工控制 bundle 同步过程，可以单独执行：
 
 ```bash
 # 1. 从当前仓库同步 runtime bundle
@@ -106,8 +99,11 @@ bash /path/to/project/.sopify-runtime/scripts/check-runtime-smoke.sh
 说明：
 
 - `.sopify-runtime/` 保持 `runtime/` + `scripts/` + `tests/` 的自包含布局
+- `.sopify-runtime/manifest.json` 是 bundle 的机器契约；宿主接入应优先读取 manifest，再回退到默认脚本路径
 - vendored 入口默认是 `.sopify-runtime/scripts/sopify_runtime.py`
 - plan-only helper 对应 `.sopify-runtime/scripts/go_plan_runtime.py`
+- builtin skill 发现由 `runtime/builtin_catalog.py` 负责，不依赖 bundle 内再携带 `Codex/Skills` 或 `Claude/Skills` 文档目录
+- 非闭环路由现在会写入 `.sopify-skills/state/current_handoff.json`，`Next:` 文案优先基于 handoff contract 渲染
 
 ### 首次使用
 
@@ -172,6 +168,8 @@ bash scripts/check-runtime-smoke.sh
   - `scripts/sopify_runtime.py`：默认原始输入入口
   - `scripts/go_plan_runtime.py`：plan-only helper
 - 已提供 `scripts/sync-runtime-assets.sh`，用于把 runtime bundle 同步到目标仓库的 `.sopify-runtime/`
+- bundle 同步后会生成 `.sopify-runtime/manifest.json`，用于描述入口、支持路由、builtin catalog 与 handoff 文件位置
+- runtime 现已真正写入 `.sopify-skills/state/current_handoff.json`，供宿主读取结构化下一步动作
 - `.sopify-runtime/` bundle 内已包含便携 `tests/test_runtime.py` 与 `scripts/check-runtime-smoke.sh`
 - 当前 `P1-A` 已落地：首次运行会 bootstrap 最小 KB 骨架，但还不包含选择性历史回收或 history 归档
 - 当前 KB 快照只读取根配置、manifest 与顶层目录，不做源码级扫描

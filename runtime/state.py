@@ -8,7 +8,8 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Any, Optional
 
-from .models import PlanArtifact, RouteDecision, RunState, RuntimeConfig
+from .handoff import read_runtime_handoff, write_runtime_handoff
+from .models import PlanArtifact, RouteDecision, RunState, RuntimeConfig, RuntimeHandoff
 
 
 class StateStore:
@@ -20,6 +21,7 @@ class StateStore:
         self.current_run_path = self.root / "current_run.json"
         self.last_route_path = self.root / "last_route.json"
         self.current_plan_path = self.root / "current_plan.json"
+        self.current_handoff_path = self.root / "current_handoff.json"
 
     def ensure(self) -> None:
         self.root.mkdir(parents=True, exist_ok=True)
@@ -56,6 +58,16 @@ class StateStore:
     def clear_current_plan(self) -> None:
         self.current_plan_path.unlink(missing_ok=True)
 
+    def get_current_handoff(self) -> Optional[RuntimeHandoff]:
+        return read_runtime_handoff(self.current_handoff_path)
+
+    def set_current_handoff(self, handoff: RuntimeHandoff) -> None:
+        self.ensure()
+        write_runtime_handoff(self.current_handoff_path, handoff)
+
+    def clear_current_handoff(self) -> None:
+        self.current_handoff_path.unlink(missing_ok=True)
+
     def has_active_flow(self) -> bool:
         current_run = self.get_current_run()
         return current_run is not None and current_run.is_active
@@ -63,6 +75,7 @@ class StateStore:
     def reset_active_flow(self) -> None:
         self.clear_current_run()
         self.clear_current_plan()
+        self.clear_current_handoff()
 
     def update_active_run(self, *, stage: Optional[str] = None, status: Optional[str] = None) -> Optional[RunState]:
         current = self.get_current_run()

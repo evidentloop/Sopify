@@ -84,6 +84,13 @@ rsync -a --delete --prune-empty-dirs \
   --exclude='*' \
   "$TESTS_SRC/" "$BUNDLE_DIR/tests/"
 
+# Generate the self-describing manifest after runtime assets have been copied into the bundle root.
+PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}" \
+  python3 -m runtime.manifest \
+    --source-root "$ROOT_DIR" \
+    --bundle-root "$BUNDLE_DIR" \
+    --output "$BUNDLE_DIR/manifest.json" >/dev/null
+
 chmod +x \
   "$BUNDLE_DIR/scripts/sopify_runtime.py" \
   "$BUNDLE_DIR/scripts/go_plan_runtime.py" \
@@ -94,6 +101,7 @@ cat <<EOF
 Synced Sopify runtime bundle:
   target root: $TARGET_ROOT
   bundle dir:  $BUNDLE_DIR
+  manifest:    $BUNDLE_DIR/manifest.json
 
 Launch examples:
   python3 $BUNDLE_DIR/scripts/sopify_runtime.py --workspace-root $TARGET_ROOT "重构数据库层"

@@ -23,6 +23,12 @@ if [[ ! -f "$RUNTIME_ENTRY" ]]; then
   exit 1
 fi
 
+MANIFEST_FILE="$BUNDLE_ROOT/manifest.json"
+if [[ ! -f "$MANIFEST_FILE" ]]; then
+  echo "Missing bundle manifest: $MANIFEST_FILE" >&2
+  exit 1
+fi
+
 WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/sopify-runtime-smoke.XXXXXX")"
 trap 'rm -rf "$WORK_DIR"' EXIT
 
@@ -35,6 +41,7 @@ OUTPUT="$(
 
 PLAN_DIR="$WORK_DIR/.sopify-skills/plan"
 STATE_FILE="$WORK_DIR/.sopify-skills/state/current_plan.json"
+HANDOFF_FILE="$WORK_DIR/.sopify-skills/state/current_handoff.json"
 REPLAY_DIR="$WORK_DIR/.sopify-skills/replay/sessions"
 PROJECT_FILE="$WORK_DIR/.sopify-skills/project.md"
 OVERVIEW_FILE="$WORK_DIR/.sopify-skills/wiki/overview.md"
@@ -48,6 +55,11 @@ fi
 
 if [[ ! -f "$STATE_FILE" ]]; then
   echo "Smoke check failed: missing state file: $STATE_FILE" >&2
+  exit 1
+fi
+
+if [[ ! -f "$HANDOFF_FILE" ]]; then
+  echo "Smoke check failed: missing handoff file: $HANDOFF_FILE" >&2
   exit 1
 fi
 
@@ -77,4 +89,6 @@ fi
 
 echo "Runtime smoke check passed:"
 echo "  bundle root: $BUNDLE_ROOT"
+echo "  manifest:    $MANIFEST_FILE"
+echo "  handoff:     $HANDOFF_FILE"
 echo "  workspace:   $WORK_DIR"

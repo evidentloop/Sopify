@@ -35,7 +35,7 @@ jobs:
           python-version: "3.11"
 
       - name: Run runtime unit tests
-        run: python3 -m unittest tests/test_runtime.py
+        run: python3 -m unittest tests/test_runtime.py tests/test_installer.py
 
       - name: Run runtime smoke check
         run: bash scripts/check-runtime-smoke.sh
