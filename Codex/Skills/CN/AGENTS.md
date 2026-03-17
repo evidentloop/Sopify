@@ -131,6 +131,7 @@ Next: {下一步提示}
  | `~go` | 自动判断并执行全流程 |
  | `~go plan` | 只规划不执行 |
  | `~go exec` | 执行已有方案 |
+ | `~go finalize` | 对当前 metadata-managed plan 执行收口归档 |
  | `~compare` | 多模型并发对比（默认含当前会话模型；可用模型数不足 2 时降级并给出原因） |
  
 说明：当前仓库若存在 `scripts/sopify_runtime.py`，原始输入应优先走该默认 repo-local runtime 入口；若 runtime 以 bundle 方式接入到其他仓库，则宿主应优先读取 `.sopify-runtime/manifest.json` 决定入口，默认再回退到 `.sopify-runtime/scripts/sopify_runtime.py`；仅在明确只走 `~go plan` 时使用对应的 `go_plan_runtime.py` helper。
@@ -266,8 +267,9 @@ progressive: 按需创建文件 (默认)
 ```
 用户输入
     ↓
-检查命令前缀 (~go, ~go plan, ~go exec, ~compare)
+检查命令前缀 (~go, ~go plan, ~go exec, ~go finalize, ~compare)
     ↓
+├─ ~go finalize → 收口当前活动 plan（刷新 blueprint 索引、归档 history、清理活动状态）
 ├─ ~go exec → 执行已有方案
 ├─ ~go plan → 规划模式 (需求分析 → 方案设计；若存在 scripts/sopify_runtime.py 或 .sopify-runtime/scripts/sopify_runtime.py，则原始输入优先走默认入口，plan-only 场景再使用对应的 go_plan_runtime.py)
 ├─ ~go → 全流程模式
@@ -300,6 +302,7 @@ progressive: 按需创建文件 (默认)
 - 当项目仓库缺少或不满足兼容要求的 `.sopify-runtime/manifest.json` 时，宿主应先调用 `~/.codex/sopify/helpers/bootstrap_workspace.py` 为当前仓库准备 `.sopify-runtime/`。
 - vendored runtime 的机器入口以 `.sopify-runtime/manifest.json` 为准。
 - runtime 执行后的机器交接以 `.sopify-skills/state/current_handoff.json` 为准；仅当 handoff 缺失时才回退到输出文案中的 `Next:`。
+- `~go finalize` 仍走默认 runtime 入口，不要求宿主额外 bridge；第一版仅支持 metadata-managed plan，旧遗留 plan 应直接拒绝而不是自动迁移。
 - 当 `current_handoff.json.required_host_action == confirm_decision` 时，宿主必须把 `.sopify-skills/state/current_decision.json` 视为本轮设计分叉的唯一机器事实来源。
 - decision checkpoint 首选交互是直接展示 `question`、按顺序列出 `options[*]`，并标明 `recommended_option_id`；用户可以直接回复 `1/2/...`，也可以显式使用 `~decide choose <option_id>`。
 - `~decide status|choose|cancel` 只作为 debug/override 入口；正常链路仍应由宿主根据 `confirm_decision` handoff 主动进入确认环节。
@@ -424,6 +427,7 @@ Next: 请验证功能
 ~go              # 全流程自动执行
 ~go plan         # 只规划不执行
 ~go exec         # 执行已有方案
+~go finalize     # 显式收口当前 metadata-managed plan
 ~compare         # 对同一问题做多模型并发对比（可用模型不足 2 时自动单模型并解释原因）
 ```
 
@@ -441,7 +445,7 @@ scripts/model_compare_runtime.py             # ~compare 的运行时实现，不
 .sopify-skills/state/current_decision.json   # decision checkpoint 状态文件；仅当 handoff 要求 confirm_decision 时读取
 ```
 
-说明：当前默认入口是 `scripts/sopify_runtime.py`；若以 bundle 方式接入，优先按 `.sopify-runtime/manifest.json` 选入口；若当前仓库尚未准备 bundle，则宿主应先按 `~/.codex/sopify/payload-manifest.json` 做 preflight，并在需要时调用 `~/.codex/sopify/helpers/bootstrap_workspace.py`；`go_plan_runtime.py` 只负责 plan-only；执行结束后宿主应优先读取 `.sopify-skills/state/current_handoff.json` 决定下一步；若 `required_host_action=confirm_decision`，继续读取 `.sopify-skills/state/current_decision.json` 进入确认环节；`~compare` 仍依赖宿主侧专用桥接。
+说明：当前默认入口是 `scripts/sopify_runtime.py`；若以 bundle 方式接入，优先按 `.sopify-runtime/manifest.json` 选入口；若当前仓库尚未准备 bundle，则宿主应先按 `~/.codex/sopify/payload-manifest.json` 做 preflight，并在需要时调用 `~/.codex/sopify/helpers/bootstrap_workspace.py`；`go_plan_runtime.py` 只负责 plan-only；`~go finalize` 没有单独 helper，仍由默认 runtime 入口处理；执行结束后宿主应优先读取 `.sopify-skills/state/current_handoff.json` 决定下一步；若 `required_host_action=confirm_decision`，继续读取 `.sopify-skills/state/current_decision.json` 进入确认环节；`~compare` 仍依赖宿主侧专用桥接。
 
 **配置文件：** `sopify.config.yaml` (项目根目录)
 

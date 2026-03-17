@@ -11,6 +11,7 @@ from .models import DecisionState, RouteDecision, RuntimeConfig, SkillMeta
 from .state import StateStore
 
 _COMMAND_PATTERNS = (
+    (re.compile(r"^~go\s+finalize(?:\s+(?P<body>.+))?$", re.IGNORECASE), "~go finalize"),
     (re.compile(r"^~go\s+plan(?:\s+(?P<body>.+))?$", re.IGNORECASE), "~go plan"),
     (re.compile(r"^~go\s+exec(?:\s+(?P<body>.+))?$", re.IGNORECASE), "~go exec"),
     (re.compile(r"^~go(?:\s+(?P<body>.+))?$", re.IGNORECASE), "~go"),
@@ -24,6 +25,7 @@ SUPPORTED_ROUTE_NAMES = (
     "resume_active",
     "exec_plan",
     "cancel_active",
+    "finalize_active",
     "decision_pending",
     "decision_resume",
     "compare",
@@ -223,6 +225,17 @@ def _classify_command(text: str) -> RouteDecision | None:
             continue
         body = (match.groupdict().get("body") or "").strip()
         request_text = body or text
+        if command == "~go finalize":
+            return RouteDecision(
+                route_name="finalize_active",
+                request_text=request_text,
+                reason="Matched explicit finalize command",
+                command=command,
+                complexity="medium",
+                should_recover_context=True,
+                candidate_skill_ids=("develop", "kb"),
+                active_run_action="finalize",
+            )
         if command == "~go plan":
             return RouteDecision(
                 route_name="plan_only",

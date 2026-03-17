@@ -113,14 +113,22 @@ archive_ready: false
 
 - `standard` 是否真的需要更新深层 blueprint，不再完全依赖语义猜测，而是在收口阶段结合改动类型与 obligation 共同判断
 - `full` 视为必须同步深层 blueprint
+- 第一版 runtime 通过显式 `~go finalize` 执行收口事务；旧遗留 plan 不自动迁移，只支持 metadata-managed plan
 
 ## 收口事务
 
 不依赖 commit hook；使用固定的“收口事务”统一完成文档生命周期。
 
+第一版实现边界：
+
+- 触发入口固定为 `~go finalize`
+- `~go finalize` 本身就是“准备交付验证”的显式收口信号
+- 仅支持新 runtime 生成、带 front matter 元数据的活动 plan
+- 若当前 plan 不满足 metadata-managed 前提，应直接拒绝，而不是隐式修复或自动迁移旧 plan
+
 建议事务顺序：
 
-1. 校验当前 plan 是否达到 `ready_for_verify`
+1. 校验当前 plan 属于 metadata-managed；显式 finalize 时把本轮视为 ready-for-verify 收口点
 2. 刷新 `blueprint/README.md` 托管区块
 3. 根据 `blueprint_obligation` 判断是否要求更新 `background.md / design.md / tasks.md`
 4. 归档当前 plan 到 `history/YYYY-MM/...`
@@ -136,7 +144,7 @@ archive_ready: false
 
 ### Standard
 
-仅在以下任一条件命中时，要求更新深层 blueprint：
+文档责任仍然针对以下变化类型：
 
 - 模块边界变化
 - 宿主接入契约变化
@@ -144,10 +152,16 @@ archive_ready: false
 - 目录契约变化
 - 长期技术约定变化
 
+第一版 runtime 的工程化判定先收敛为：
+
+- 若 `blueprint/background.md / design.md / tasks.md` 的修改时间晚于当前 plan 元数据文件，则视为“已完成深层 blueprint 更新”
+- 若未命中，则输出 `review_required` 软提醒，但不阻断 finalize
+
 ### Full
 
 - 必须更新 `background.md / design.md / tasks.md`
 - `README.md` 同步刷新当前焦点、关键契约与阅读入口
+- 第一版 runtime 对 `design_required` 采用硬阻断：未检测到 plan 创建后的深层 blueprint 更新时，不允许 finalize
 
 ## History 契约
 

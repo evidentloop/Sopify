@@ -18,6 +18,7 @@ _PHASE_LABELS = {
         "resume_active": "开发实施",
         "exec_plan": "开发实施",
         "cancel_active": "命令完成",
+        "finalize_active": "开发实施",
         "decision_pending": "方案设计",
         "decision_resume": "方案设计",
         "compare": "模型对比",
@@ -33,6 +34,7 @@ _PHASE_LABELS = {
         "resume_active": "Development",
         "exec_plan": "Development",
         "cancel_active": "Command Complete",
+        "finalize_active": "Development",
         "decision_pending": "Solution Design",
         "decision_resume": "Solution Design",
         "compare": "Model Compare",
@@ -50,6 +52,7 @@ _LABELS = {
         "route": "路由",
         "reason": "原因",
         "status": "状态",
+        "archive": "归档",
         "question": "问题",
         "options": "选项",
         "decision": "决策",
@@ -68,6 +71,8 @@ _LABELS = {
         "replay_handoff": "已识别 replay 路由，当前仍需 workflow-learning 专用链路",
         "resume_handoff": "已恢复当前流程，当前 repo-local runtime 未执行 develop bridge",
         "exec_handoff": "已识别 exec 路由，当前 repo-local runtime 未执行 develop bridge",
+        "finalize_success": "已完成活动方案收口、归档与状态清理",
+        "finalize_blocked": "当前无法完成收口事务",
         "default_handoff": "已识别路由，当前 repo-local runtime 未执行后续动作",
         "decision_pending_handoff": "已进入决策确认，正式 plan 会在用户拍板后生成",
         "next_retry": "检查输入、配置或运行时状态后重试",
@@ -77,6 +82,8 @@ _LABELS = {
         "next_resume": "在宿主会话中继续 develop 阶段",
         "next_exec": "在宿主会话中继续 develop 阶段",
         "next_cancel": "如需继续，重新发起 ~go plan 或 ~go",
+        "next_finalize_success": "请验证 blueprint 索引与 history 归档结果",
+        "next_finalize_retry": "补齐 blueprint 更新或切换到 metadata-managed plan 后重试",
         "next_compare": "人工选择候选结果并继续",
         "next_compare_bridge": "继续使用宿主侧 ~compare 专用桥接",
         "next_replay": "继续使用 workflow-learning 回放链路",
@@ -100,6 +107,7 @@ _LABELS = {
         "route": "Route",
         "reason": "Reason",
         "status": "Status",
+        "archive": "Archive",
         "question": "Question",
         "options": "Options",
         "decision": "Decision",
@@ -118,6 +126,8 @@ _LABELS = {
         "replay_handoff": "replay route recognized; workflow-learning still needs its dedicated bridge",
         "resume_handoff": "Active flow restored; the repo-local runtime has not executed the develop bridge",
         "exec_handoff": "exec route recognized; the repo-local runtime has not executed the develop bridge",
+        "finalize_success": "The active plan has been closed out, archived, and its runtime state was cleared",
+        "finalize_blocked": "The close-out transaction could not be completed",
         "default_handoff": "Route recognized; the repo-local runtime has not executed the downstream action",
         "decision_pending_handoff": "Decision checkpoint is pending; the formal plan will be created after user confirmation",
         "next_retry": "Check the input, config, or runtime state and retry",
@@ -127,6 +137,8 @@ _LABELS = {
         "next_resume": "Continue the develop stage in the host session",
         "next_exec": "Continue the develop stage in the host session",
         "next_cancel": "Start a new ~go plan or ~go flow when ready",
+        "next_finalize_success": "Review the blueprint index refresh and the history archive",
+        "next_finalize_retry": "Update the blueprint or switch to a metadata-managed plan and retry",
         "next_compare": "Review the candidate outputs and continue",
         "next_compare_bridge": "Use the host-side ~compare bridge for compare execution",
         "next_replay": "Use the workflow-learning replay flow",
@@ -236,6 +248,19 @@ def _core_lines(result: RuntimeResult, language: str) -> list[str]:
             f"{labels['status']}: {_decision_pending_status(language, recommended)}",
         ]
 
+    if route_name == "finalize_active":
+        if result.plan_artifact is not None:
+            return [
+                f"{labels['archive']}: {result.plan_artifact.path}",
+                f"{labels['summary']}: {result.plan_artifact.summary}",
+                f"{labels['status']}: {labels['finalize_success']}",
+            ]
+        return [
+            f"{labels['route']}: {route_name}",
+            f"{labels['status']}: {labels['finalize_blocked']}",
+            f"{labels['reason']}: {_diagnostic_reason(result)}",
+        ]
+
     if route_name in {"workflow", "light_iterate"} and result.plan_artifact is not None:
         return [
             f"{labels['plan']}: {result.plan_artifact.path}",
@@ -293,6 +318,8 @@ def _next_hint(result: RuntimeResult, language: str) -> str:
     labels = _LABELS[language]
     if result.handoff is not None:
         return _handoff_next_hint(result, language)
+    if result.route.route_name == "finalize_active":
+        return labels["next_finalize_success"] if result.plan_artifact is not None else labels["next_finalize_retry"]
     if result.route.route_name == "decision_pending":
         return labels["next_decision"]
     if result.route.route_name == "cancel_active":
@@ -303,6 +330,8 @@ def _next_hint(result: RuntimeResult, language: str) -> str:
 def _status_symbol(result: RuntimeResult) -> str:
     route_name = result.route.route_name
     if route_name == "plan_only":
+        return "✓" if result.plan_artifact is not None else "!"
+    if route_name == "finalize_active":
         return "✓" if result.plan_artifact is not None else "!"
     if route_name == "decision_pending":
         return "?"
@@ -342,6 +371,8 @@ def _status_message(result: RuntimeResult, language: str) -> str:
         return labels["resume_handoff"]
     if route_name == "exec_plan":
         return labels["exec_handoff"]
+    if route_name == "finalize_active":
+        return labels["finalize_success"] if result.plan_artifact is not None else labels["finalize_blocked"]
     return labels["default_handoff"]
 
 

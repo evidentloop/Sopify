@@ -147,6 +147,9 @@ python3 scripts/sopify_runtime.py "重构数据库层"
 # 显式命令也走同一个通用入口
 python3 scripts/sopify_runtime.py "~go plan 重构数据库层"
 
+# 显式收口当前 metadata-managed plan
+python3 scripts/sopify_runtime.py "~go finalize"
+
 # 只验证 plan-only slice
 python3 scripts/go_plan_runtime.py "重构数据库层"
 
@@ -180,8 +183,10 @@ bash scripts/check-runtime-smoke.sh
 - runtime 现已真正写入 `.sopify-skills/state/current_handoff.json`，供宿主读取结构化下一步动作
 - runtime 现已在真实项目首次触发时补最小 `blueprint/README.md`，并在首次进入 plan 生命周期时补齐完整 `blueprint/`
 - runtime 现已支持第一版 decision checkpoint：plan 设计阶段命中显式多方案分叉时，会先写入 `.sopify-skills/state/current_decision.json`，待确认后再生成正式 plan
+- runtime 现已支持第一版 `~go finalize`：对 metadata-managed 活动 plan 执行 README 托管区块刷新、`history/` 归档与活动状态清理
 - `.sopify-runtime/` bundle 内已包含便携 `tests/test_runtime.py` 与 `scripts/check-runtime-smoke.sh`
-- 当前 `P1-A` 已落地：首次运行会 bootstrap 最小 KB 骨架，但还不包含选择性历史回收或 history 归档
+- 当前 `P1-A/P1-B` 已落地：首次运行会 bootstrap 最小 KB 骨架，显式 `~go finalize` 可完成 metadata-managed plan 的收口归档
+- 旧遗留 plan 当前不会被自动迁移；第一版 finalize 只支持新 runtime 生成、带元数据的 plan
 - 当前 KB 快照只读取根配置、manifest 与顶层目录，不做源码级扫描
 - 不属于本轮发布切片：`~compare` 的通用入口自动桥接、`workflow-learning` 的独立 runtime helper、`~go exec` develop bridge
 - 因此当前已经适合“自用 + 二次接入”，但仍不是完整宿主安装器形态
@@ -198,7 +203,8 @@ bash scripts/check-runtime-smoke.sh
 - `replay/` 是可选回放能力，不属于基础文档治理契约
 - 首次在真实项目仓库触发 Sopify 时，应至少拥有 `.sopify-skills/blueprint/README.md`
 - 首次进入 plan 生命周期时，再补齐 `blueprint/background.md / design.md / tasks.md`
-- 当前 plan 到“本轮任务收口、准备交付验证”时再归档到 `history/`
+- 当前活动 plan 通过显式 `~go finalize` 进入“本轮任务收口、准备交付验证”事务后再归档到 `history/`
+- 第一版 finalize 只支持 metadata-managed plan；旧遗留 plan 不自动迁移
 
 第一版 decision checkpoint 说明：
 
@@ -319,6 +325,7 @@ multi_model:
 | `~go` | 全流程自动执行 |
 | `~go plan` | 只规划不执行；当前仓库提供 `scripts/go_plan_runtime.py` 作为 plan-only helper |
 | `~go exec` | 执行已有方案 |
+| `~go finalize` | 对当前 metadata-managed plan 执行收口事务：刷新 blueprint 索引、归档到 history、清理活动状态 |
 | `~compare` | 按配置并发对比多个模型；运行时实现收口在 `scripts/model_compare_runtime.py`，但默认通用入口不会自动构造 compare payload |
 
 说明：
@@ -327,6 +334,7 @@ multi_model:
 - 若以 bundle 方式接入到其他仓库，默认入口对应 `.sopify-runtime/scripts/sopify_runtime.py`
 - `scripts/go_plan_runtime.py` 只用于 plan-only slice
 - vendored plan-only helper 对应 `.sopify-runtime/scripts/go_plan_runtime.py`
+- `~go finalize` 没有单独 helper，仍走默认 runtime 入口；第一版仅支持 metadata-managed plan，旧遗留 plan 会被拒绝而不是自动迁移
 - `~compare` 仍依赖宿主侧专用桥接，通用入口不会自动接通
 
 ---

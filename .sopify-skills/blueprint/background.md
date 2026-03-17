@@ -35,7 +35,8 @@
   - `user/preferences.md`
   - `history/index.md`
 - `workflow-learning` 的 replay 能力仍保留为可选扩展，不纳入基础文档治理契约
-- `~compare` 的宿主专用桥接、`~go exec` develop bridge、history 自动归档仍属于后续阶段能力
+- metadata-managed plan 的 `~go finalize -> history` 收口归档已落地
+- `~compare` 的宿主专用桥接与 `~go exec` develop bridge 仍属于后续阶段能力
 
 当前不变的工程原则：
 

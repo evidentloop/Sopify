@@ -44,16 +44,17 @@
 - 不要求用户新增配置；默认行为即完成 bootstrap、索引刷新与方案收口
 - 首次 Sopify 触发只要求创建轻量 `blueprint/README.md`
 - 首次进入 plan 生命周期时，再补齐 `blueprint/background.md / design.md / tasks.md`
-- `plan` 只保留当前活动方案；到“本轮任务收口、准备交付验证”时再归档到 `history/`
+- `plan` 只保留当前活动方案；第一版通过显式 `~go finalize` 在“本轮任务收口、准备交付验证”时归档到 `history/`
 - `full` 任务必须更新深层 blueprint；`standard` 仅在边界或契约变化时更新；`light` 不强制
 - design 阶段若出现长期契约分叉，先进入 decision checkpoint；用户确认后才生成唯一正式 plan
+- 旧遗留 plan 不自动迁移；finalize 只支持 metadata-managed plan
 <!-- sopify:auto:contracts:end -->
 
 ## 当前焦点
 
 <!-- sopify:auto:focus:start -->
 - blueprint bootstrap 与 decision checkpoint 第一版已接入 runtime
-- 下一步收口 finalize_plan、history 归档与 blueprint obligation 判定
+- `finalize_plan`、history 归档与 blueprint obligation 判定已接入 runtime 主链路
 - 保持单活动 plan 模型，不引入额外 drafts 目录或 commit 阶段强校验
 <!-- sopify:auto:focus:end -->
 
@@ -71,6 +72,6 @@
 ## 维护说明
 
 - 本文件是项目级入口索引，不承载单次任务的完整实现细节。
-- 当前仓库已完成蓝图文档收口；blueprint bootstrap 与 decision checkpoint 第一版已落地，自动刷新与 finalize 收口仍待继续实现。
+- 当前仓库已完成蓝图文档收口；blueprint bootstrap、decision checkpoint 第一版与 metadata-managed plan 的 finalize 收口已落地。
 - 自动区块优先保持“短、稳、可扫描”；深入说明进入 `background.md / design.md / tasks.md`。
 - 若人工补充内容与代码、宿主契约、目录契约冲突，以实现与正式蓝图为准，并在后续收口时修正。

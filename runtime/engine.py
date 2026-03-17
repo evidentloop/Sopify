@@ -9,6 +9,7 @@ from typing import Any, Mapping, Optional
 from .config import load_runtime_config
 from .context_recovery import recover_context
 from .decision import build_decision_state, confirm_decision, consume_decision, parse_decision_response, stale_decision
+from .finalize import finalize_plan
 from .handoff import build_runtime_handoff
 from .kb import bootstrap_kb, ensure_blueprint_scaffold
 from .models import DecisionState, KbArtifact, PlanArtifact, ReplayEvent, RouteDecision, RunState, RuntimeHandoff, RuntimeResult, SkillMeta
@@ -74,6 +75,16 @@ def run_runtime(
     if effective_route.route_name == "cancel_active":
         state_store.reset_active_flow()
         notes.append("Active flow cleared")
+    elif effective_route.route_name == "finalize_active":
+        finalized = finalize_plan(
+            config=config,
+            state_store=state_store,
+            current_plan=state_store.get_current_plan() or recovered.current_plan,
+        )
+        plan_artifact = finalized.archived_plan
+        if finalized.kb_artifact is not None:
+            kb_artifact = finalized.kb_artifact
+        notes.extend(finalized.notes)
     elif effective_route.route_name == "decision_resume":
         effective_route, plan_artifact, decision_notes, kb_artifact = _handle_decision_resume(
             effective_route,

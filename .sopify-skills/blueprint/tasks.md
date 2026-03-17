@@ -44,7 +44,7 @@
 - [x] 2.2 设计托管区块标记 `<!-- sopify:auto:* -->`
 - [x] 2.3 限定自动刷新只覆盖托管区块
 - [x] 2.4 保留非托管区块用于人工补充
-- [ ] 2.5 为 README 模板与托管区块补测试
+- [x] 2.5 为 README 模板与托管区块补测试
 
 验收标准：
 
@@ -69,7 +69,7 @@
 - [x] 4.2 固化 `lifecycle_state` 状态集合
 - [x] 4.3 固化 `blueprint_obligation` 状态集合
 - [x] 4.4 建立 `light / standard / full` 到 obligation 的默认映射
-- [ ] 4.5 为元数据读写与兼容补测试
+- [x] 4.5 为元数据读写与兼容补测试
 
 验收标准：
 
@@ -78,12 +78,12 @@
 
 ## 5. 收口事务
 
-- [ ] 5.1 引入统一 `finalize_plan(...)` 收口事务
-- [ ] 5.2 在收口事务中刷新 `blueprint/README.md` 的索引区块
-- [ ] 5.3 在收口事务中检查 `blueprint_obligation`
-- [ ] 5.4 在收口事务中完成 `plan -> history` 归档
-- [ ] 5.5 在收口事务中更新 `history/index.md`
-- [ ] 5.6 在收口事务中清理活动状态
+- [x] 5.1 引入统一 `finalize_plan(...)` 收口事务
+- [x] 5.2 在收口事务中刷新 `blueprint/README.md` 的索引区块
+- [x] 5.3 在收口事务中检查 `blueprint_obligation`
+- [x] 5.4 在收口事务中完成 `plan -> history` 归档
+- [x] 5.5 在收口事务中更新 `history/index.md`
+- [x] 5.6 在收口事务中清理活动状态
 
 验收标准：
 
@@ -92,11 +92,11 @@
 
 ## 6. Blueprint 更新规则
 
-- [ ] 6.1 固化 `light` 只刷新索引、不强制改深层 blueprint
-- [ ] 6.2 固化 `standard` 在边界或契约变化时更新深层 blueprint
-- [ ] 6.3 固化 `full` 必须更新深层 blueprint
-- [ ] 6.4 为 `standard` 的命中条件建立可测试判定规则
-- [ ] 6.5 为 `full` 缺失深层更新的场景补失败提示
+- [x] 6.1 固化 `light` 只刷新索引、不强制改深层 blueprint
+- [x] 6.2 固化 `standard` 在边界或契约变化时更新深层 blueprint
+- [x] 6.3 固化 `full` 必须更新深层 blueprint
+- [x] 6.4 为 `standard` 的命中条件建立可测试判定规则
+- [x] 6.5 为 `full` 缺失深层更新的场景补失败提示
 
 验收标准：
 
@@ -109,7 +109,7 @@
 - [x] 7.2 明确 `history/` 不做实时镜像
 - [x] 7.3 明确 `history/` 不做多个 plan 自动归并
 - [x] 7.4 在 `history/index.md` 中保留摘要索引格式
-- [ ] 7.5 为归档与索引更新补测试
+- [x] 7.5 为归档与索引更新补测试
 
 验收标准：
 
@@ -155,7 +155,7 @@
 - [x] 10.2 更新 AGENTS/CLAUDE 文档，解释 blueprint 的默认行为
 - [ ] 10.3 更新 templates skill，补 blueprint 模板
 - [ ] 10.4 更新 kb/develop/design skill，接入 blueprint 生命周期
-- [ ] 10.5 增加 blueprint bootstrap、托管区块、收口事务、history 归档的自动化测试
+- [x] 10.5 增加 blueprint bootstrap、托管区块、收口事务、history 归档的自动化测试
 
 验收标准：
 

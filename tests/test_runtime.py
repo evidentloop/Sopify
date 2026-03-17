@@ -21,7 +21,7 @@ from runtime.replay import ReplayWriter
 from runtime.router import Router
 from runtime.skill_registry import SkillRegistry
 from runtime.state import StateStore, iso_now
-from runtime.models import ReplayEvent, RouteDecision, RunState
+from runtime.models import PlanArtifact, ReplayEvent, RouteDecision, RunState
 
 
 class RuntimeConfigTests(unittest.TestCase):
@@ -79,8 +79,11 @@ class RouterTests(unittest.TestCase):
             skills = SkillRegistry(config, user_home=workspace / "home").discover()
 
             plan_route = router.classify("~go plan 补 runtime 骨架", skills=skills)
+            finalize_route = router.classify("~go finalize", skills=skills)
             self.assertEqual(plan_route.route_name, "plan_only")
             self.assertTrue(plan_route.should_create_plan)
+            self.assertEqual(finalize_route.route_name, "finalize_active")
+            self.assertTrue(finalize_route.should_recover_context)
 
             run_state = RunState(
                 run_id="run-1",
@@ -374,6 +377,94 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertTrue((workspace / ".sopify-skills" / "blueprint" / "design.md").exists())
             self.assertTrue((workspace / ".sopify-skills" / "blueprint" / "tasks.md").exists())
 
+    def test_engine_finalizes_metadata_managed_plan_into_history(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+
+            first = run_runtime("~go plan 补 runtime 骨架", workspace_root=workspace, user_home=workspace / "home")
+            self.assertIsNotNone(first.plan_artifact)
+
+            result = run_runtime("~go finalize", workspace_root=workspace, user_home=workspace / "home")
+
+            self.assertEqual(result.route.route_name, "finalize_active")
+            self.assertIsNotNone(result.plan_artifact)
+            self.assertTrue(result.plan_artifact.path.startswith(".sopify-skills/history/"))
+            self.assertFalse((workspace / first.plan_artifact.path).exists())
+            self.assertTrue((workspace / result.plan_artifact.path).exists())
+            self.assertTrue(any("review_required" in note for note in result.notes))
+            self.assertFalse((workspace / ".sopify-skills" / "state" / "current_plan.json").exists())
+            self.assertFalse((workspace / ".sopify-skills" / "state" / "current_run.json").exists())
+            self.assertFalse((workspace / ".sopify-skills" / "state" / "current_handoff.json").exists())
+
+            history_index = (workspace / ".sopify-skills" / "history" / "index.md").read_text(encoding="utf-8")
+            self.assertIn(first.plan_artifact.plan_id, history_index)
+            self.assertNotIn("当前暂无已归档方案。", history_index)
+
+            blueprint_readme = (workspace / ".sopify-skills" / "blueprint" / "README.md").read_text(encoding="utf-8")
+            self.assertIn("sopify:auto:focus:start", blueprint_readme)
+            self.assertIn(result.plan_artifact.path, blueprint_readme)
+            self.assertIn("当前已无活动 plan", blueprint_readme)
+
+    def test_finalize_blocks_full_plan_without_deep_blueprint_update(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+
+            first = run_runtime("实现 runtime plugin bridge", workspace_root=workspace, user_home=workspace / "home")
+            self.assertIsNotNone(first.plan_artifact)
+            self.assertEqual(first.plan_artifact.level, "full")
+
+            result = run_runtime("~go finalize", workspace_root=workspace, user_home=workspace / "home")
+
+            self.assertEqual(result.route.route_name, "finalize_active")
+            self.assertIsNone(result.plan_artifact)
+            self.assertTrue(any("design_required" in note for note in result.notes))
+            self.assertTrue((workspace / first.plan_artifact.path).exists())
+            self.assertTrue((workspace / ".sopify-skills" / "state" / "current_plan.json").exists())
+
+    def test_finalize_rejects_legacy_plan_without_front_matter(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            config = load_runtime_config(workspace)
+            store = StateStore(config)
+            store.ensure()
+
+            legacy_dir = workspace / ".sopify-skills" / "plan" / "legacy_plan"
+            legacy_dir.mkdir(parents=True)
+            legacy_tasks = legacy_dir / "tasks.md"
+            legacy_tasks.write_text("# legacy plan\n", encoding="utf-8")
+
+            store.set_current_plan(
+                PlanArtifact(
+                    plan_id="legacy_plan",
+                    title="Legacy Plan",
+                    summary="legacy",
+                    level="standard",
+                    path=".sopify-skills/plan/legacy_plan",
+                    files=(".sopify-skills/plan/legacy_plan/tasks.md",),
+                    created_at=iso_now(),
+                )
+            )
+            store.set_current_run(
+                RunState(
+                    run_id="legacy-run",
+                    status="active",
+                    stage="plan_ready",
+                    route_name="workflow",
+                    title="Legacy Plan",
+                    created_at=iso_now(),
+                    updated_at=iso_now(),
+                    plan_id="legacy_plan",
+                    plan_path=".sopify-skills/plan/legacy_plan",
+                )
+            )
+
+            result = run_runtime("~go finalize", workspace_root=workspace, user_home=workspace / "home")
+
+            self.assertEqual(result.route.route_name, "finalize_active")
+            self.assertIsNone(result.plan_artifact)
+            self.assertTrue(any("metadata-managed" in note for note in result.notes))
+            self.assertTrue(legacy_tasks.exists())
+
     def test_engine_creates_decision_checkpoint_before_materializing_plan(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
@@ -545,6 +636,7 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertTrue(manifest["capabilities"]["writes_decision_file"])
             self.assertIn("plan_only", manifest["limits"]["host_required_routes"])
             self.assertIn("decision_pending", manifest["limits"]["host_required_routes"])
+            self.assertIn("finalize_active", manifest["supported_routes"])
             self.assertIn("compare", manifest["supported_routes"])
             self.assertIn("exec_plan", manifest["limits"]["host_required_routes"])
             self.assertEqual(manifest["limits"]["decision_file"], ".sopify-skills/state/current_decision.json")
