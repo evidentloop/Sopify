@@ -6,6 +6,8 @@ This changelog is maintained manually (not auto-generated).
 
 ## [Unreleased]
 
+## [2026-03-20.141842] - 2026-03-20
+
 ### Added
 
 - New `~summary` runtime route with deterministic daily recap artifacts:

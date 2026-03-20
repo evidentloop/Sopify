@@ -14,13 +14,14 @@ Thanks for your interest in contributing!
 
 ## Commit Hook Version Sync
 
-- This repo ships a `commit-msg` hook at `.githooks/commit-msg`.
+- This repo ships coordinated `pre-commit` + `commit-msg` hooks under `.githooks/`.
 - Enable it once per clone:
   - `git config core.hooksPath .githooks`
 - After that, every `git commit` checks the staged files and enters version-sync automation when release-relevant paths are touched (runtime/installer/release scripts/skills/readme/changelog).
-- The commit path runs `scripts/release-preflight.sh` first, then `scripts/release-sync.sh` with a timestamp version in `Asia/Shanghai`:
+- `pre-commit` runs `scripts/release-preflight.sh` first, then `scripts/release-sync.sh`, and re-stages the synced files so they land in the same commit:
   - Version format: `YYYY-MM-DD.HHMMSS`
   - Date used for changelog section: `YYYY-MM-DD`
+- `commit-msg` only appends `Release-Sync` / `Release-Version` / `Release-Date` trailers based on the pre-commit state handoff.
 - Version updates happen inside that commit path only after preflight passes; there is no separate manual release-hook workflow.
 - Common env toggles:
   - `SOPIFY_DISABLE_RELEASE_HOOK=1`: disable hook behavior for one commit

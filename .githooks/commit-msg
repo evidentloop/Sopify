@@ -15,21 +15,6 @@ if [[ -z "$ROOT_DIR" || ! -d "$ROOT_DIR" ]]; then
   exit 0
 fi
 
-is_release_relevant_file() {
-  local path="$1"
-  case "$path" in
-    runtime/*|installer/*|Codex/Skills/*|Claude/Skills/*|README.md|README_EN.md|CHANGELOG.md)
-      return 0
-      ;;
-    scripts/sopify_runtime.py|scripts/go_plan_runtime.py|scripts/model_compare_runtime.py|scripts/clarification_bridge_runtime.py|scripts/decision_bridge_runtime.py|scripts/develop_checkpoint_runtime.py|scripts/sync-runtime-assets.sh|scripts/check-runtime-smoke.sh|scripts/release-sync.sh|scripts/release-preflight.sh|scripts/sync-skills.sh|scripts/check-skills-sync.sh|scripts/check-version-consistency.sh)
-      return 0
-      ;;
-    *)
-      return 1
-      ;;
-  esac
-}
-
 append_trailer() {
   local file="$1"
   local key="$2"
@@ -40,67 +25,39 @@ append_trailer() {
   printf '\n%s: %s\n' "$key" "$value" >>"$file"
 }
 
-# Avoid re-running when amending a commit already stamped by this hook.
+STATE_FILE="$(git -C "$ROOT_DIR" rev-parse --git-path .sopify-release-sync-state)"
+
+# Avoid duplicate trailers when amending a commit already stamped by this hook.
 if grep -Eiq '^Release-Version:\s*' "$MESSAGE_FILE"; then
+  rm -f "$STATE_FILE"
   exit 0
 fi
 
-if [[ "${SOPIFY_FORCE_RELEASE_SYNC:-0}" != "1" ]]; then
-  STAGED_FILES="$(git -C "$ROOT_DIR" diff --cached --name-only --diff-filter=ACMRDTUXB -- || true)"
-  if [[ -z "$STAGED_FILES" ]]; then
-    exit 0
-  fi
-
-  RELEASE_RELEVANT=0
-  while IFS= read -r path; do
-    [[ -z "$path" ]] && continue
-    if is_release_relevant_file "$path"; then
-      RELEASE_RELEVANT=1
-      break
-    fi
-  done <<<"$STAGED_FILES"
-
-  if [[ "$RELEASE_RELEVANT" != "1" ]]; then
-    exit 0
-  fi
-fi
-
-PREFLIGHT_SCRIPT="$ROOT_DIR/scripts/release-preflight.sh"
-RELEASE_SYNC_SCRIPT="$ROOT_DIR/scripts/release-sync.sh"
-
-if [[ ! -x "$PREFLIGHT_SCRIPT" || ! -f "$RELEASE_SYNC_SCRIPT" ]]; then
-  echo "[sopify-release-hook] Missing release scripts. Skip auto release sync." >&2
+if [[ ! -f "$STATE_FILE" ]]; then
   exit 0
 fi
 
-RELEASE_VERSION="$(TZ=Asia/Shanghai date '+%Y-%m-%d.%H%M%S')"
-RELEASE_DATE="${RELEASE_VERSION%%.*}"
+RELEASE_VERSION=""
+RELEASE_DATE=""
 
-if [[ "${SOPIFY_RELEASE_HOOK_DRY_RUN:-0}" == "1" ]]; then
-  echo "[sopify-release-hook] Dry run: release pipeline is triggered for this commit." >&2
-  echo "[sopify-release-hook] Dry run: would run preflight + release-sync with version ${RELEASE_VERSION}." >&2
-  exit 0
+while IFS='=' read -r key value; do
+  case "$key" in
+    RELEASE_VERSION)
+      RELEASE_VERSION="$value"
+      ;;
+    RELEASE_DATE)
+      RELEASE_DATE="$value"
+      ;;
+  esac
+done <"$STATE_FILE"
+
+if [[ -z "$RELEASE_VERSION" || -z "$RELEASE_DATE" ]]; then
+  echo "[sopify-release-hook] Invalid release state file: $STATE_FILE" >&2
+  exit 1
 fi
-
-if [[ "${SOPIFY_SKIP_RELEASE_PREFLIGHT:-0}" != "1" ]]; then
-  bash "$PREFLIGHT_SCRIPT"
-fi
-
-bash "$RELEASE_SYNC_SCRIPT" "$RELEASE_VERSION" "$RELEASE_DATE"
-
-git -C "$ROOT_DIR" add \
-  README.md \
-  README_EN.md \
-  CHANGELOG.md \
-  Codex/Skills/CN/AGENTS.md \
-  Codex/Skills/EN/AGENTS.md \
-  Claude/Skills/CN/CLAUDE.md \
-  Claude/Skills/EN/CLAUDE.md \
-  Codex/Skills/CN/skills/sopify \
-  Codex/Skills/EN/skills/sopify \
-  Claude/Skills/CN/skills/sopify \
-  Claude/Skills/EN/skills/sopify
 
 append_trailer "$MESSAGE_FILE" "Release-Sync" "yes"
 append_trailer "$MESSAGE_FILE" "Release-Version" "$RELEASE_VERSION"
 append_trailer "$MESSAGE_FILE" "Release-Date" "$RELEASE_DATE"
+
+rm -f "$STATE_FILE"
