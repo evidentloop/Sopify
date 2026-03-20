@@ -122,7 +122,7 @@ Synced Sopify runtime bundle:
   manifest:    $BUNDLE_DIR/manifest.json
 
 Launch examples:
-  python3 $BUNDLE_DIR/scripts/sopify_runtime.py --workspace-root $TARGET_ROOT "重构数据库层"
+  python3 $BUNDLE_DIR/scripts/sopify_runtime.py --allow-direct-entry --workspace-root $TARGET_ROOT "重构数据库层"
   python3 $BUNDLE_DIR/scripts/runtime_gate.py enter --workspace-root $TARGET_ROOT --request "重构数据库层"
   python3 $BUNDLE_DIR/scripts/go_plan_runtime.py --workspace-root $TARGET_ROOT "重构数据库层"
   python3 -m unittest $BUNDLE_DIR/tests/test_runtime.py

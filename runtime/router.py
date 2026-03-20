@@ -87,11 +87,18 @@ _QUESTION_PREFIXES = (
     "可以",
 )
 _FILE_REF_RE = re.compile(r"(?:[\w.-]+/)+[\w.-]+|[\w.-]+\.(?:ts|tsx|js|jsx|py|md|json|yaml|yml|vue|rs|go)")
+_PROCESS_FORCE_KEYWORDS_EN = ("plan", "design", "develop", "decision", "checkpoint", "handoff")
+_PROCESS_FORCE_KEYWORDS_ZH = ("规划", "方案设计", "开发实施", "决策", "检查点", "交接", "门禁", "蓝图")
 _PROCESS_FORCE_PATTERNS = (
-    re.compile(r"(?<![\w-])(plan|design|develop|decision|checkpoint|handoff)(?![\w-])", re.IGNORECASE),
-    re.compile(r"(规划|方案设计|开发实施|决策|检查点|交接|门禁|蓝图)"),
+    re.compile(
+        rf"(?<![\w-])(?:{'|'.join(re.escape(keyword) for keyword in _PROCESS_FORCE_KEYWORDS_EN)})(?![\w-])",
+        re.IGNORECASE,
+    ),
+    re.compile(rf"(?:{'|'.join(re.escape(keyword) for keyword in _PROCESS_FORCE_KEYWORDS_ZH)})"),
 )
+RUNTIME_FIRST_PROTECTED_PATH_PREFIXES = (".sopify-skills/plan/",)
 _PROTECTED_PLAN_ASSET_RE = re.compile(r"(^|[\s'\"`])(?:\./)?\.sopify-skills/plan/[^\s'\"`]+", re.IGNORECASE)
+_TRADEOFF_FORCE_KEYWORDS = ("tradeoff", "trade-off", "取舍", "分叉", "长期", "long-term", "contract", "契约", "策略分歧")
 _TRADEOFF_FORCE_PATTERNS = (
     re.compile(r"(trade[\s-]?off|取舍|分叉|长期|long[\s-]?term|contract|契约|策略分歧)", re.IGNORECASE),
 )
@@ -116,6 +123,38 @@ class _ComplexitySignal:
     level: str
     reason: str
     plan_level: str | None
+
+
+def build_runtime_first_hints() -> dict[str, object]:
+    """Publish stable host-facing hints for requests that should enter via the gate."""
+    return {
+        "force_route_name": "workflow",
+        "entry_guard_reason_code": DIRECT_EDIT_BLOCKED_RUNTIME_REQUIRED_REASON_CODE,
+        "protected_path_prefixes": list(RUNTIME_FIRST_PROTECTED_PATH_PREFIXES),
+        "process_semantic_keywords": list(_PROCESS_FORCE_KEYWORDS_EN + _PROCESS_FORCE_KEYWORDS_ZH),
+        "tradeoff_keywords": list(_TRADEOFF_FORCE_KEYWORDS),
+        "long_term_contract_keywords": list(_LONG_TERM_CONTRACT_HINTS),
+    }
+
+
+def match_runtime_first_guard(text: str) -> dict[str, str] | None:
+    """Return the matched runtime-first guard, if this request should not enter direct edit paths."""
+    if _is_protected_plan_asset_request(text):
+        return {
+            "guard_kind": "protected_plan_asset",
+            "reason": "Blocked direct-edit path because the request targets protected .sopify-skills/plan assets",
+        }
+    if _has_process_semantic_intent(text):
+        return {
+            "guard_kind": "process_semantic_intent",
+            "reason": "Blocked direct-edit path because process-semantic keywords require runtime-first routing",
+        }
+    if _has_tradeoff_or_contract_split(text):
+        return {
+            "guard_kind": "tradeoff_contract_split",
+            "reason": "Blocked direct-edit path because tradeoff or long-term contract split requires runtime-first routing",
+        }
+    return None
 
 
 class Router:
@@ -215,20 +254,21 @@ class Router:
                 runtime_skill_id=_runtime_skill("compare", skills, "model-compare"),
             )
 
-        runtime_first_reason = _runtime_first_guard_reason(text)
-        if runtime_first_reason is not None:
+        runtime_first_guard = match_runtime_first_guard(text)
+        if runtime_first_guard is not None:
             return self._with_capture(
                 RouteDecision(
                     route_name="workflow",
                     request_text=text,
-                    reason=runtime_first_reason,
+                    reason=runtime_first_guard["reason"],
                     complexity="complex",
                     plan_level="standard",
                     should_create_plan=True,
                     candidate_skill_ids=_candidate_skills("workflow", skills, "analyze", "design", "develop"),
                     artifacts={
                         "entry_guard_reason_code": DIRECT_EDIT_BLOCKED_RUNTIME_REQUIRED_REASON_CODE,
-                        "direct_edit_guard_trigger": runtime_first_reason,
+                        "direct_edit_guard_kind": runtime_first_guard["guard_kind"],
+                        "direct_edit_guard_trigger": runtime_first_guard["reason"],
                     },
                 )
             )
@@ -625,16 +665,6 @@ def _is_consultation(text: str) -> bool:
     if text.endswith("?") or text.endswith("？"):
         return True
     return normalized.startswith(_QUESTION_PREFIXES)
-
-
-def _runtime_first_guard_reason(text: str) -> str | None:
-    if _is_protected_plan_asset_request(text):
-        return "Blocked direct-edit path because the request targets protected .sopify-skills/plan assets"
-    if _has_process_semantic_intent(text):
-        return "Blocked direct-edit path because process-semantic keywords require runtime-first routing"
-    if _has_tradeoff_or_contract_split(text):
-        return "Blocked direct-edit path because tradeoff or long-term contract split requires runtime-first routing"
-    return None
 
 
 def _is_protected_plan_asset_request(text: str) -> bool:

@@ -21,11 +21,14 @@ Thanks for your interest in contributing!
 - `pre-commit` runs `scripts/release-preflight.sh` first, then `scripts/release-sync.sh`, and re-stages the synced files so they land in the same commit:
   - Version format: `YYYY-MM-DD.HHMMSS`
   - Date used for changelog section: `YYYY-MM-DD`
+- When `CHANGELOG.md -> [Unreleased]` is empty, `release-sync` now auto-drafts a minimal note block from staged release-relevant files before bumping the version.
+- If `pre-commit` fails after touching release-managed files, the hook restores those files to the pre-hook snapshot to avoid leaving partially bumped badges / versions in the working tree.
 - `commit-msg` only appends `Release-Sync` / `Release-Version` / `Release-Date` trailers based on the pre-commit state handoff.
 - Version updates happen inside that commit path only after preflight passes; there is no separate manual release-hook workflow.
 - Common env toggles:
   - `SOPIFY_DISABLE_RELEASE_HOOK=1`: disable hook behavior for one commit
   - `SOPIFY_SKIP_RELEASE_PREFLIGHT=1`: skip preflight checks (emergency only)
+  - `SOPIFY_AUTO_DRAFT_CHANGELOG=0`: require manual `[Unreleased]` notes instead of auto-drafting
   - `SOPIFY_RELEASE_HOOK_DRY_RUN=1`: print what would happen without changing files
   - `SOPIFY_FORCE_RELEASE_SYNC=1`: force release-sync even when staged paths are not release-relevant
 

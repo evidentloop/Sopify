@@ -53,6 +53,7 @@ fi
 # behavior. Gate-first host ordering belongs to future host-bridge smoke.
 OUTPUT="$(
   python3 "$RUNTIME_ENTRY" \
+    --allow-direct-entry \
     --workspace-root "$WORK_DIR" \
     --no-color \
     "重构数据库层"

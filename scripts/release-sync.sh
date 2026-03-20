@@ -8,6 +8,7 @@ README_EN="$ROOT_DIR/README_EN.md"
 CHANGELOG="$ROOT_DIR/CHANGELOG.md"
 CODEX_CN="$ROOT_DIR/Codex/Skills/CN/AGENTS.md"
 CODEX_EN="$ROOT_DIR/Codex/Skills/EN/AGENTS.md"
+CHANGELOG_DRAFT_SCRIPT="$ROOT_DIR/scripts/release-draft-changelog.py"
 
 usage() {
   cat <<'EOF'
@@ -70,6 +71,7 @@ required_files=(
   "$CHANGELOG"
   "$CODEX_CN"
   "$CODEX_EN"
+  "$CHANGELOG_DRAFT_SCRIPT"
   "$ROOT_DIR/scripts/sync-skills.sh"
   "$ROOT_DIR/scripts/check-skills-sync.sh"
   "$ROOT_DIR/scripts/check-version-consistency.sh"
@@ -184,6 +186,52 @@ trim_blank_edges() {
   '
 }
 
+extract_unreleased_content() {
+  local file="$1"
+  local unreleased_line
+  local next_section_line
+  local total_lines
+
+  unreleased_line="$(grep -n '^## \[Unreleased\]$' "$file" | head -n 1 | cut -d: -f1 || true)"
+  if [[ -z "$unreleased_line" ]]; then
+    echo "CHANGELOG.md is missing section: ## [Unreleased]" >&2
+    return 1
+  fi
+
+  next_section_line="$(awk -v start="$unreleased_line" 'NR > start && /^## \[/ { print NR; exit }' "$file")"
+  total_lines="$(wc -l < "$file")"
+  if [[ -z "$next_section_line" ]]; then
+    next_section_line=$((total_lines + 1))
+  fi
+
+  if (( next_section_line <= unreleased_line + 1 )); then
+    return 0
+  fi
+
+  sed -n "$((unreleased_line + 1)),$((next_section_line - 1))p" "$file"
+}
+
+ensure_unreleased_content_ready() {
+  local trimmed_content
+
+  trimmed_content="$(extract_unreleased_content "$CHANGELOG" | trim_blank_edges)"
+  if [[ -n "$trimmed_content" ]]; then
+    return 0
+  fi
+
+  if [[ "${SOPIFY_AUTO_DRAFT_CHANGELOG:-1}" == "1" ]]; then
+    echo "CHANGELOG [Unreleased] is empty. Auto-drafting release notes from staged files..."
+    python3 "$CHANGELOG_DRAFT_SCRIPT" --root "$ROOT_DIR"
+    trimmed_content="$(extract_unreleased_content "$CHANGELOG" | trim_blank_edges)"
+    if [[ -n "$trimmed_content" ]]; then
+      return 0
+    fi
+  fi
+
+  echo "No content found under [Unreleased]. Add release notes before running release-sync." >&2
+  return 1
+}
+
 promote_unreleased_to_release() {
   local file="$1"
   local unreleased_line
@@ -199,23 +247,13 @@ promote_unreleased_to_release() {
   fi
 
   unreleased_line="$(grep -n '^## \[Unreleased\]$' "$file" | head -n 1 | cut -d: -f1 || true)"
-  if [[ -z "$unreleased_line" ]]; then
-    echo "CHANGELOG.md is missing section: ## [Unreleased]" >&2
-    exit 1
-  fi
-
   next_section_line="$(awk -v start="$unreleased_line" 'NR > start && /^## \[/ { print NR; exit }' "$file")"
   total_lines="$(wc -l < "$file")"
   if [[ -z "$next_section_line" ]]; then
     next_section_line=$((total_lines + 1))
   fi
 
-  if (( next_section_line <= unreleased_line + 1 )); then
-    echo "No content found under [Unreleased]. Add release notes before running release-sync." >&2
-    exit 1
-  fi
-
-  unreleased_content="$(sed -n "$((unreleased_line + 1)),$((next_section_line - 1))p" "$file")"
+  unreleased_content="$(extract_unreleased_content "$file")"
   trimmed_content="$(printf '%s\n' "$unreleased_content" | trim_blank_edges)"
 
   if [[ -z "$trimmed_content" ]]; then
@@ -248,6 +286,8 @@ if grep -Fq "## [$VERSION] - " "$CHANGELOG"; then
   echo "CHANGELOG already contains version $VERSION." >&2
   exit 1
 fi
+
+ensure_unreleased_content_ready
 
 update_readme_badge "$README_CN"
 update_readme_badge "$README_EN"

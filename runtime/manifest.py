@@ -23,7 +23,7 @@ from .clarification import CURRENT_CLARIFICATION_RELATIVE_PATH
 from .decision import CURRENT_DECISION_RELATIVE_PATH
 from .handoff import CURRENT_HANDOFF_RELATIVE_PATH
 from .preferences import PREFERENCES_PRELOAD_STATUSES
-from .router import SUPPORTED_ROUTE_NAMES
+from .router import SUPPORTED_ROUTE_NAMES, build_runtime_first_hints
 from .state import iso_now
 
 MANIFEST_SCHEMA_VERSION = "1"
@@ -59,6 +59,7 @@ class BundleManifest:
         handoff_file: str,
         dependency_model: Mapping[str, Any],
         capabilities: Mapping[str, Any],
+        runtime_first_hints: Mapping[str, Any],
         limits: Mapping[str, Any],
     ) -> None:
         self.schema_version = schema_version
@@ -71,6 +72,7 @@ class BundleManifest:
         self.handoff_file = handoff_file
         self.dependency_model = dependency_model
         self.capabilities = capabilities
+        self.runtime_first_hints = runtime_first_hints
         self.limits = limits
 
     def to_dict(self) -> dict[str, Any]:
@@ -85,6 +87,7 @@ class BundleManifest:
             "handoff_file": self.handoff_file,
             "dependency_model": dict(self.dependency_model),
             "capabilities": dict(self.capabilities),
+            "runtime_first_hints": dict(self.runtime_first_hints),
             "limits": dict(self.limits),
         }
 
@@ -147,6 +150,7 @@ def build_bundle_manifest(
             "writes_decision_file": True,
             "runtime_skill_ids": list(runtime_skill_ids),
         },
+        runtime_first_hints=build_runtime_first_hints(),
         limits={
             "host_required_routes": [
                 "plan_only",

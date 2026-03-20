@@ -68,6 +68,7 @@ def enter_runtime_gate(
         # persisted handoff as the only positive machine evidence.
         handoff_source = persisted_handoff or runtime_result.handoff
         contract["handoff"] = _normalize_handoff(handoff_source)
+        contract["trigger_evidence"] = contract["handoff"].pop("_trigger_evidence", {})
 
         manifest_path = workspace / ".sopify-runtime" / "manifest.json"
         strict_runtime_entry = bool(contract["handoff"].pop("_strict_runtime_entry", False))
@@ -150,6 +151,7 @@ def _base_contract(workspace_root: Path) -> dict[str, Any]:
         },
         "runtime": {},
         "handoff": {},
+        "trigger_evidence": {},
         "allowed_response_mode": ERROR_VISIBLE_RETRY,
         "evidence": {
             "manifest_found": False,
@@ -185,6 +187,8 @@ def _normalize_handoff(handoff: Any) -> dict[str, Any]:
     reason_code = str(artifacts.get("entry_guard_reason_code") or entry_guard.get("reason_code") or "").strip()
     pending_fail_closed = bool(entry_guard.get("pending_checkpoint_fail_closed", False))
     required_host_action = str(getattr(handoff, "required_host_action", "") or "").strip()
+    direct_edit_guard_kind = str(artifacts.get("direct_edit_guard_kind") or "").strip()
+    direct_edit_guard_trigger = str(artifacts.get("direct_edit_guard_trigger") or "").strip()
     if not pending_fail_closed and required_host_action in CHECKPOINT_ONLY_ACTIONS:
         pending_fail_closed = True
     payload = {
@@ -192,8 +196,16 @@ def _normalize_handoff(handoff: Any) -> dict[str, Any]:
         "pending_fail_closed": pending_fail_closed,
         "_strict_runtime_entry": bool(entry_guard.get("strict_runtime_entry", False)),
     }
+    trigger_evidence: dict[str, Any] = {}
     if reason_code:
         payload["entry_guard_reason_code"] = reason_code
+        trigger_evidence["entry_guard_reason_code"] = reason_code
+    if direct_edit_guard_kind:
+        trigger_evidence["direct_edit_guard_kind"] = direct_edit_guard_kind
+    if direct_edit_guard_trigger:
+        trigger_evidence["direct_edit_guard_trigger"] = direct_edit_guard_trigger
+    if trigger_evidence:
+        payload["_trigger_evidence"] = trigger_evidence
     return payload
 
 

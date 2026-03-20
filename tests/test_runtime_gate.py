@@ -12,6 +12,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from runtime.config import load_runtime_config
+from runtime.entry_guard import DIRECT_EDIT_BLOCKED_RUNTIME_REQUIRED_REASON_CODE
 from runtime.execution_gate import evaluate_execution_gate
 from runtime.gate import (
     CHECKPOINT_ONLY,
@@ -161,6 +162,28 @@ class RuntimeGateTests(unittest.TestCase):
             self.assertEqual(result["handoff"]["entry_guard_reason_code"], "entry_guard_execution_confirm_pending")
             self.assertEqual(result["allowed_response_mode"], CHECKPOINT_ONLY)
 
+    def test_gate_surfaces_trigger_evidence_for_protected_plan_assets(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+
+            result = enter_runtime_gate(
+                "分析下 .sopify-skills/plan/20260320_kb_layout_v2/tasks.md 的当前任务，并整理 README 职责表边界",
+                workspace_root=workspace,
+                user_home=workspace / "home",
+            )
+
+            self.assertEqual(result["status"], "ready")
+            self.assertEqual(result["runtime"]["route_name"], "workflow")
+            self.assertEqual(
+                result["trigger_evidence"]["entry_guard_reason_code"],
+                DIRECT_EDIT_BLOCKED_RUNTIME_REQUIRED_REASON_CODE,
+            )
+            self.assertEqual(result["trigger_evidence"]["direct_edit_guard_kind"], "protected_plan_asset")
+            self.assertIn(
+                "protected .sopify-skills/plan assets",
+                result["trigger_evidence"]["direct_edit_guard_trigger"],
+            )
+
     def test_gate_fail_closes_when_handoff_is_missing(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
@@ -218,6 +241,7 @@ class RuntimeGateTests(unittest.TestCase):
         self.assertTrue(payload["passed"])
         scenario_ids = {item["id"] for item in payload["scenarios"]}
         self.assertIn("normal_runtime_followup", scenario_ids)
+        self.assertIn("protected_plan_asset_runtime_first", scenario_ids)
         self.assertIn("clarification_checkpoint_only", scenario_ids)
         self.assertIn("decision_checkpoint_only", scenario_ids)
         self.assertIn("execution_confirm_checkpoint_only", scenario_ids)

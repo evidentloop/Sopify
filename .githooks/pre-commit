@@ -12,6 +12,79 @@ fi
 
 STATE_FILE="$(git -C "$ROOT_DIR" rev-parse --git-path .sopify-release-sync-state)"
 rm -f "$STATE_FILE"
+SNAPSHOT_DIR=""
+SNAPSHOT_MANIFEST=""
+
+snapshot_managed_release_paths() {
+  local managed_paths=(
+    "README.md"
+    "README_EN.md"
+    "CHANGELOG.md"
+    "Codex/Skills/CN/AGENTS.md"
+    "Codex/Skills/EN/AGENTS.md"
+    "Claude/Skills/CN/CLAUDE.md"
+    "Claude/Skills/EN/CLAUDE.md"
+    "Codex/Skills/CN/skills/sopify"
+    "Codex/Skills/EN/skills/sopify"
+    "Claude/Skills/CN/skills/sopify"
+    "Claude/Skills/EN/skills/sopify"
+  )
+  local path
+  local src
+  local dst
+
+  SNAPSHOT_DIR="$(mktemp -d "${TMPDIR:-/tmp}/sopify-release-hook.XXXXXX")"
+  SNAPSHOT_MANIFEST="$SNAPSHOT_DIR/.manifest"
+
+  for path in "${managed_paths[@]}"; do
+    src="$ROOT_DIR/$path"
+    dst="$SNAPSHOT_DIR/$path"
+    printf '%s\n' "$path" >>"$SNAPSHOT_MANIFEST"
+    if [[ -e "$src" ]]; then
+      mkdir -p "$(dirname "$dst")"
+      cp -R "$src" "$dst"
+    fi
+  done
+}
+
+restore_managed_release_paths() {
+  local path
+  local src
+  local dst
+
+  [[ -n "$SNAPSHOT_MANIFEST" && -f "$SNAPSHOT_MANIFEST" ]] || return 0
+
+  while IFS= read -r path; do
+    [[ -z "$path" ]] && continue
+    src="$SNAPSHOT_DIR/$path"
+    dst="$ROOT_DIR/$path"
+    rm -rf "$dst"
+    if [[ -e "$src" ]]; then
+      mkdir -p "$(dirname "$dst")"
+      cp -R "$src" "$dst"
+    fi
+  done <"$SNAPSHOT_MANIFEST"
+}
+
+cleanup_snapshot() {
+  if [[ -n "$SNAPSHOT_DIR" && -d "$SNAPSHOT_DIR" ]]; then
+    rm -rf "$SNAPSHOT_DIR"
+  fi
+  SNAPSHOT_DIR=""
+  SNAPSHOT_MANIFEST=""
+}
+
+on_exit() {
+  local status=$?
+  if [[ "$status" -ne 0 ]]; then
+    restore_managed_release_paths
+    rm -f "$STATE_FILE"
+  fi
+  cleanup_snapshot
+  exit "$status"
+}
+
+trap on_exit EXIT
 
 is_release_relevant_file() {
   local path="$1"
@@ -44,6 +117,8 @@ if [[ "${SOPIFY_FORCE_RELEASE_SYNC:-0}" != "1" ]]; then
   done <<<"$STAGED_FILES"
 
   if [[ "$RELEASE_RELEVANT" != "1" ]]; then
+    trap - EXIT
+    cleanup_snapshot
     exit 0
   fi
 fi
@@ -53,6 +128,8 @@ RELEASE_SYNC_SCRIPT="$ROOT_DIR/scripts/release-sync.sh"
 
 if [[ ! -x "$PREFLIGHT_SCRIPT" || ! -f "$RELEASE_SYNC_SCRIPT" ]]; then
   echo "[sopify-release-hook] Missing release scripts. Skip auto release sync." >&2
+  trap - EXIT
+  cleanup_snapshot
   exit 0
 fi
 
@@ -62,8 +139,12 @@ RELEASE_DATE="${RELEASE_VERSION%%.*}"
 if [[ "${SOPIFY_RELEASE_HOOK_DRY_RUN:-0}" == "1" ]]; then
   echo "[sopify-release-hook] Dry run: release pipeline is triggered for this commit." >&2
   echo "[sopify-release-hook] Dry run: would run preflight + release-sync with version ${RELEASE_VERSION}." >&2
+  trap - EXIT
+  cleanup_snapshot
   exit 0
 fi
+
+snapshot_managed_release_paths
 
 if [[ "${SOPIFY_SKIP_RELEASE_PREFLIGHT:-0}" != "1" ]]; then
   bash "$PREFLIGHT_SCRIPT"
@@ -88,3 +169,6 @@ cat >"$STATE_FILE" <<EOF
 RELEASE_VERSION=$RELEASE_VERSION
 RELEASE_DATE=$RELEASE_DATE
 EOF
+
+trap - EXIT
+cleanup_snapshot

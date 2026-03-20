@@ -6,6 +6,13 @@ This changelog is maintained manually (not auto-generated).
 
 ## [Unreleased]
 
+## [2026-03-20.214138] - 2026-03-20
+
+### Changed
+
+- Release hook automation now auto-drafts a minimal root `CHANGELOG.md` `[Unreleased]` block from staged release-relevant files when the section is empty.
+- `pre-commit` now snapshots release-managed files and restores them on hook failure, preventing partial README badge / SOPIFY_VERSION drift after a failed release sync.
+
 ## [2026-03-20.183348] - 2026-03-20
 
 ### Added

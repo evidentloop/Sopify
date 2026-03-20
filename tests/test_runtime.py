@@ -3591,6 +3591,15 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertTrue(manifest["capabilities"]["runtime_gate"])
             self.assertTrue(manifest["capabilities"]["runtime_entry_guard"])
             self.assertTrue(manifest["capabilities"]["writes_decision_file"])
+            self.assertEqual(manifest["runtime_first_hints"]["force_route_name"], "workflow")
+            self.assertEqual(
+                manifest["runtime_first_hints"]["entry_guard_reason_code"],
+                "direct_edit_blocked_runtime_required",
+            )
+            self.assertIn(".sopify-skills/plan/", manifest["runtime_first_hints"]["protected_path_prefixes"])
+            self.assertIn("蓝图", manifest["runtime_first_hints"]["process_semantic_keywords"])
+            self.assertIn("contract", manifest["runtime_first_hints"]["tradeoff_keywords"])
+            self.assertIn("runtime", manifest["runtime_first_hints"]["long_term_contract_keywords"])
             self.assertIn("plan_only", manifest["limits"]["host_required_routes"])
             self.assertIn("clarification_pending", manifest["limits"]["host_required_routes"])
             self.assertIn("clarification_resume", manifest["limits"]["host_required_routes"])
@@ -3639,7 +3648,15 @@ class EngineIntegrationTests(unittest.TestCase):
 
             runtime_script = bundle_root / "scripts" / "sopify_runtime.py"
             completed = subprocess.run(
-                [sys.executable, str(runtime_script), "--workspace-root", str(workspace), "--no-color", "重构数据库层"],
+                [
+                    sys.executable,
+                    str(runtime_script),
+                    "--allow-direct-entry",
+                    "--workspace-root",
+                    str(workspace),
+                    "--no-color",
+                    "重构数据库层",
+                ],
                 capture_output=True,
                 text=True,
                 check=False,
@@ -3716,6 +3733,7 @@ class EngineIntegrationTests(unittest.TestCase):
                 [
                     sys.executable,
                     str(runtime_script),
+                    "--allow-direct-entry",
                     "--workspace-root",
                     str(workspace),
                     "--no-color",
@@ -3775,6 +3793,7 @@ class EngineIntegrationTests(unittest.TestCase):
                 [
                     sys.executable,
                     str(runtime_script),
+                    "--allow-direct-entry",
                     "--workspace-root",
                     str(workspace),
                     "--no-color",
@@ -3811,14 +3830,31 @@ class EngineIntegrationTests(unittest.TestCase):
 
             _prepare_ready_plan_state(workspace)
             exec_pending = subprocess.run(
-                [sys.executable, str(runtime_script), "--workspace-root", str(workspace), "--no-color", "~go", "exec"],
+                [
+                    sys.executable,
+                    str(runtime_script),
+                    "--allow-direct-entry",
+                    "--workspace-root",
+                    str(workspace),
+                    "--no-color",
+                    "~go",
+                    "exec",
+                ],
                 capture_output=True,
                 text=True,
                 check=False,
             )
             self.assertEqual(exec_pending.returncode, 0, msg=exec_pending.stderr)
             started = subprocess.run(
-                [sys.executable, str(runtime_script), "--workspace-root", str(workspace), "--no-color", "开始"],
+                [
+                    sys.executable,
+                    str(runtime_script),
+                    "--allow-direct-entry",
+                    "--workspace-root",
+                    str(workspace),
+                    "--no-color",
+                    "开始",
+                ],
                 capture_output=True,
                 text=True,
                 check=False,
@@ -3900,6 +3936,7 @@ class EngineIntegrationTests(unittest.TestCase):
                 [
                     sys.executable,
                     str(runtime_script),
+                    "--allow-direct-entry",
                     "--workspace-root",
                     str(workspace),
                     "--no-color",
@@ -3944,6 +3981,7 @@ class EngineIntegrationTests(unittest.TestCase):
                 [
                     sys.executable,
                     str(runtime_script),
+                    "--allow-direct-entry",
                     "--workspace-root",
                     str(workspace),
                     "--no-color",
@@ -3979,6 +4017,7 @@ class EngineIntegrationTests(unittest.TestCase):
                 [
                     sys.executable,
                     str(runtime_script),
+                    "--allow-direct-entry",
                     "--workspace-root",
                     str(workspace),
                     "--no-color",
@@ -3998,6 +4037,7 @@ class EngineIntegrationTests(unittest.TestCase):
                 [
                     sys.executable,
                     str(runtime_script),
+                    "--allow-direct-entry",
                     "--workspace-root",
                     str(workspace),
                     "--no-color",
@@ -4011,6 +4051,48 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertIn(".sopify-skills/plan/", answered.stdout)
             self.assertFalse((workspace / ".sopify-skills" / "state" / "current_clarification.json").exists())
             self.assertTrue((workspace / ".sopify-skills" / "state" / "current_plan.json").exists())
+
+    def test_repo_local_runtime_entry_blocks_runtime_first_requests_without_override(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            runtime_script = REPO_ROOT / "scripts" / "sopify_runtime.py"
+            request = "分析下 .sopify-skills/plan/20260320_kb_layout_v2/tasks.md 的当前任务，并整理 README 职责表边界"
+
+            blocked = subprocess.run(
+                [
+                    sys.executable,
+                    str(runtime_script),
+                    "--workspace-root",
+                    str(workspace),
+                    "--no-color",
+                    request,
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(blocked.returncode, 2, msg=blocked.stderr)
+            self.assertIn("scripts/runtime_gate.py enter", blocked.stdout)
+            self.assertIn("direct_edit_blocked_runtime_required", blocked.stdout)
+            self.assertFalse((workspace / ".sopify-skills" / "state" / "current_handoff.json").exists())
+
+            allowed = subprocess.run(
+                [
+                    sys.executable,
+                    str(runtime_script),
+                    "--allow-direct-entry",
+                    "--workspace-root",
+                    str(workspace),
+                    "--no-color",
+                    request,
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(allowed.returncode, 0, msg=allowed.stderr)
+            self.assertIn(".sopify-skills/plan/", allowed.stdout)
+            self.assertTrue((workspace / ".sopify-skills" / "state" / "current_handoff.json").exists())
 
 
 if __name__ == "__main__":

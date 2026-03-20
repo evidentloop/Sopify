@@ -22,11 +22,14 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from runtime.config import load_runtime_config
+from runtime.entry_guard import DIRECT_EDIT_BLOCKED_RUNTIME_REQUIRED_REASON_CODE
 from runtime.execution_gate import evaluate_execution_gate
 from runtime.gate import CURRENT_GATE_RECEIPT_FILENAME
 from runtime.models import PlanArtifact, RouteDecision, RunState
 from runtime.plan_scaffold import create_plan_scaffold
 from runtime.state import StateStore, iso_now
+
+_SKIP_ASSERTION = object()
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -83,6 +86,24 @@ def run_smoke(*, temp_root: Path) -> dict[str, Any]:
             expected_action="continue_host_workflow",
             expected_error_code=None,
             expected_state_files=("current_handoff.json", "current_plan.json", CURRENT_GATE_RECEIPT_FILENAME),
+        )
+    )
+
+    protected_plan_workspace = temp_root / "protected-plan-asset"
+    scenarios.append(
+        _run_gate_scenario(
+            scenario_id="protected_plan_asset_runtime_first",
+            workspace=protected_plan_workspace,
+            request="分析下 .sopify-skills/plan/20260320_kb_layout_v2/tasks.md 的当前任务，并整理 README 职责表边界",
+            expected_exit_code=0,
+            expected_status="ready",
+            expected_mode="normal_runtime_followup",
+            expected_action="continue_host_workflow",
+            expected_error_code=None,
+            expected_state_files=("current_handoff.json", "current_plan.json", CURRENT_GATE_RECEIPT_FILENAME),
+            expected_runtime_route="workflow",
+            expected_entry_guard_reason_code=DIRECT_EDIT_BLOCKED_RUNTIME_REQUIRED_REASON_CODE,
+            expected_direct_edit_guard_kind="protected_plan_asset",
         )
     )
 
@@ -167,6 +188,9 @@ def _run_gate_scenario(
     expected_action: str | None,
     expected_error_code: str | None,
     expected_state_files: tuple[str, ...],
+    expected_runtime_route: str | None = None,
+    expected_entry_guard_reason_code: object = _SKIP_ASSERTION,
+    expected_direct_edit_guard_kind: object = _SKIP_ASSERTION,
 ) -> dict[str, Any]:
     workspace.mkdir(parents=True, exist_ok=True)
     payload, exit_code = _run_gate_cli(workspace=workspace, request=request)
@@ -187,11 +211,24 @@ def _run_gate_scenario(
             f"allowed_response_mode expected {expected_mode}, got {payload.get('allowed_response_mode')}"
         )
     actual_action = payload.get("handoff", {}).get("required_host_action")
+    actual_runtime_route = payload.get("runtime", {}).get("route_name")
+    actual_entry_guard_reason_code = payload.get("handoff", {}).get("entry_guard_reason_code")
+    actual_direct_edit_guard_kind = payload.get("trigger_evidence", {}).get("direct_edit_guard_kind")
     if expected_action is None:
         if actual_action is not None:
             failures.append(f"required_host_action expected None, got {actual_action}")
     elif actual_action != expected_action:
         failures.append(f"required_host_action expected {expected_action}, got {actual_action}")
+    if expected_runtime_route is not None and actual_runtime_route != expected_runtime_route:
+        failures.append(f"runtime.route_name expected {expected_runtime_route}, got {actual_runtime_route}")
+    if expected_entry_guard_reason_code is not _SKIP_ASSERTION and actual_entry_guard_reason_code != expected_entry_guard_reason_code:
+        failures.append(
+            f"entry_guard_reason_code expected {expected_entry_guard_reason_code}, got {actual_entry_guard_reason_code}"
+        )
+    if expected_direct_edit_guard_kind is not _SKIP_ASSERTION and actual_direct_edit_guard_kind != expected_direct_edit_guard_kind:
+        failures.append(
+            f"trigger_evidence.direct_edit_guard_kind expected {expected_direct_edit_guard_kind}, got {actual_direct_edit_guard_kind}"
+        )
     actual_error_code = payload.get("error_code")
     if expected_error_code is None:
         if actual_error_code is not None:
@@ -234,7 +271,10 @@ def _run_gate_scenario(
         "failures": failures,
         "status": payload.get("status"),
         "allowed_response_mode": payload.get("allowed_response_mode"),
+        "runtime_route_name": actual_runtime_route,
         "required_host_action": actual_action,
+        "entry_guard_reason_code": actual_entry_guard_reason_code,
+        "direct_edit_guard_kind": actual_direct_edit_guard_kind,
         "error_code": actual_error_code,
         "receipt_path": str(receipt_path),
     }

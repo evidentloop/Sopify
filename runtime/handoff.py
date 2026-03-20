@@ -173,6 +173,9 @@ def _collect_handoff_artifacts(
         artifacts["entry_guard_reason_code"] = explicit_guard_reason_code
     elif guard_reason_code:
         artifacts["entry_guard_reason_code"] = guard_reason_code
+    direct_edit_guard_kind = str(decision.artifacts.get("direct_edit_guard_kind") or "").strip()
+    if direct_edit_guard_kind:
+        artifacts["direct_edit_guard_kind"] = direct_edit_guard_kind
     direct_edit_guard_trigger = str(decision.artifacts.get("direct_edit_guard_trigger") or "").strip()
     if direct_edit_guard_trigger:
         artifacts["direct_edit_guard_trigger"] = direct_edit_guard_trigger
