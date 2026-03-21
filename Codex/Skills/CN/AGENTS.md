@@ -1,5 +1,5 @@
 <!-- bootstrap: lang=zh-CN; encoding=UTF-8 -->
-<!-- SOPIFY_VERSION: 2026-03-21.151713 -->
+<!-- SOPIFY_VERSION: 2026-03-21.160958 -->
 <!-- ARCHITECTURE: Adaptive Workflow + Layered Rules -->
 
 # Sopify (Sop AI) Skills - 自适应 AI 编程助手
@@ -74,7 +74,13 @@ Changes: {N} files
   - {file2}
 
 Next: {下一步提示}
+生成时间: {当前时间}
 ```
+
+**Footer 契约：**
+- footer 固定跟在 `Changes` 区块之后
+- `Next:` 必须先于 `生成时间:`
+- 若输出包含生成时间，`生成时间:` 必须作为最后一行。
 
 **状态符：**
 | 符号 | 含义 |
@@ -360,6 +366,7 @@ progressive: 按需创建文件 (默认)
 
 ---
 Next: 继续方案设计？(Y/n)
+生成时间: {当前时间}
 ```
 
 ### P2 | 方案设计
@@ -392,6 +399,7 @@ Changes: 3 files
   - .sopify-skills/plan/20260115_feature/tasks.md
 
 Next: 在宿主会话中继续评审或执行方案，或直接回复修改意见
+生成时间: {当前时间}
 ```
 
 ### P3 | 开发实施
@@ -423,6 +431,7 @@ Changes: 5 files
   - .sopify-skills/history/2026-01/...
 
 Next: 请验证功能
+生成时间: {当前时间}
 ```
 
 ---

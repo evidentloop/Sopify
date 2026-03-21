@@ -1,5 +1,5 @@
 <!-- bootstrap: lang=en-US; encoding=UTF-8 -->
-<!-- SOPIFY_VERSION: 2026-03-21.151713 -->
+<!-- SOPIFY_VERSION: 2026-03-21.160958 -->
 <!-- ARCHITECTURE: Adaptive Workflow + Layered Rules -->
 
 # Sopify (Sop AI) Skills - Adaptive AI Programming Assistant
@@ -74,7 +74,13 @@ Changes: {N} files
   - {file2}
 
 Next: {Next step hint}
+Generated At: {current time}
 ```
+
+**Footer Contract:**
+- the footer always follows the `Changes` block
+- `Next:` must appear before `Generated At:`
+- When a generated time is present, `Generated At:` must be the final line.
 
 **Status Symbols:**
 | Symbol | Meaning |
@@ -360,6 +366,7 @@ Scope: {N} files
 
 ---
 Next: Continue to solution design? (Y/n)
+Generated At: {current time}
 ```
 
 ### P2 | Solution Design
@@ -392,6 +399,7 @@ Changes: 3 files
   - .sopify-skills/plan/20260115_feature/tasks.md
 
 Next: Continue plan review or execution in the host session, or reply with feedback
+Generated At: {current time}
 ```
 
 ### P3 | Development
@@ -423,6 +431,7 @@ Changes: 5 files
   - .sopify-skills/history/2026-01/...
 
 Next: Please verify the functionality
+Generated At: {current time}
 ```
 
 ---

@@ -8,3 +8,4 @@ Current score: {X}/10. Please clarify the following:
 
 ---
 Next: Reply with the answers, or type "continue" to skip clarification
+Generated At: {current time}

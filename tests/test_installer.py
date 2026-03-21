@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import re
 import sys
 import tempfile
 import unittest
@@ -17,6 +18,8 @@ from installer.hosts.codex import CODEX_ADAPTER
 from installer.models import InstallPhaseResult, InstallResult, parse_install_target
 from installer.payload import _REQUIRED_BUNDLE_CAPABILITIES, _payload_is_current, install_global_payload
 from installer.validate import validate_bundle_install, validate_host_install
+from runtime.engine import run_runtime
+from runtime.output import render_runtime_output
 from scripts.install_sopify import render_result
 
 
@@ -196,6 +199,104 @@ class WorkspaceBootstrapCompatibilityTests(unittest.TestCase):
 
 
 class HostPromptContractTests(unittest.TestCase):
+    def _assert_footer_contract_block(
+        self,
+        content: str,
+        *,
+        next_line: str,
+        generated_at_line: str,
+    ) -> None:
+        self.assertIn(f"{next_line}\n{generated_at_line}", content)
+
+    def _assert_footer_contract_tail(
+        self,
+        content: str,
+        *,
+        next_prefix: str,
+        generated_at_line: str,
+    ) -> None:
+        lines = content.rstrip().splitlines()
+        self.assertGreaterEqual(len(lines), 2)
+        self.assertTrue(lines[-2].startswith(next_prefix), msg=content)
+        self.assertEqual(lines[-1], generated_at_line)
+
+    def _assert_rendered_footer_contract(
+        self,
+        rendered: str,
+        *,
+        next_prefix: str,
+        generated_at_prefix: str,
+    ) -> None:
+        lines = rendered.rstrip().splitlines()
+        self.assertGreaterEqual(len(lines), 2)
+        self.assertTrue(lines[-2].startswith(next_prefix), msg=rendered)
+        self.assertRegex(
+            lines[-1],
+            rf"^{re.escape(generated_at_prefix)} \d{{4}}-\d{{2}}-\d{{2}} \d{{2}}:\d{{2}}:\d{{2}}$",
+        )
+
+    def _assert_installed_footer_contract(
+        self,
+        *,
+        adapter,
+        language_directory: str,
+        next_template_line: str,
+        generated_at_placeholder: str,
+        footer_contract_line: str,
+        runtime_language: str,
+        runtime_generated_at_label: str,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            home_root = Path(temp_dir)
+
+            install_host_assets(
+                adapter,
+                repo_root=REPO_ROOT,
+                home_root=home_root,
+                language_directory=language_directory,
+            )
+            validate_host_install(adapter, home_root=home_root)
+
+            prompt_root = home_root / adapter.destination_dirname
+            prompt = (prompt_root / adapter.header_filename).read_text(encoding="utf-8")
+            self._assert_footer_contract_block(
+                prompt,
+                next_line=next_template_line,
+                generated_at_line=generated_at_placeholder,
+            )
+            self.assertIn(footer_contract_line, prompt)
+
+            asset_paths = (
+                Path("skills/sopify/analyze/assets/question-output.md"),
+                Path("skills/sopify/analyze/assets/success-output.md"),
+                Path("skills/sopify/design/assets/output-summary.md"),
+                Path("skills/sopify/develop/assets/output-success.md"),
+                Path("skills/sopify/develop/assets/output-quick-fix.md"),
+                Path("skills/sopify/develop/assets/output-partial.md"),
+            )
+            for relative_path in asset_paths:
+                content = (prompt_root / relative_path).read_text(encoding="utf-8")
+                self._assert_footer_contract_tail(
+                    content,
+                    next_prefix="Next:",
+                    generated_at_line=generated_at_placeholder,
+                )
+
+            workspace = home_root / "workspace"
+            result = run_runtime("~go plan 补 runtime 骨架", workspace_root=workspace, user_home=home_root / "runtime-home")
+            rendered = render_runtime_output(
+                result,
+                brand="demo-ai",
+                language=runtime_language,
+                title_color="none",
+                use_color=False,
+            )
+            self._assert_rendered_footer_contract(
+                rendered,
+                next_prefix="Next:",
+                generated_at_prefix=runtime_generated_at_label,
+            )
+
     def test_codex_cn_prompt_install_keeps_workspace_preflight_contract(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             home_root = Path(temp_dir)
@@ -231,6 +332,17 @@ class HostPromptContractTests(unittest.TestCase):
             self.assertIn("即使用户显式输入 `~go exec`", prompt)
             self.assertIn("必须继续遵守对应 checkpoint 的机器契约", prompt)
 
+    def test_codex_cn_installed_prompt_assets_keep_footer_contract(self) -> None:
+        self._assert_installed_footer_contract(
+            adapter=CODEX_ADAPTER,
+            language_directory="CN",
+            next_template_line="Next: {下一步提示}",
+            generated_at_placeholder="生成时间: {当前时间}",
+            footer_contract_line="- 若输出包含生成时间，`生成时间:` 必须作为最后一行。",
+            runtime_language="zh-CN",
+            runtime_generated_at_label="生成时间:",
+        )
+
     def test_claude_en_prompt_install_keeps_workspace_preflight_contract(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             home_root = Path(temp_dir)
@@ -265,6 +377,17 @@ class HostPromptContractTests(unittest.TestCase):
             self.assertIn("scripts/develop_checkpoint_runtime.py submit --payload-json ...", prompt)
             self.assertIn("Even when the user explicitly types `~go exec`", prompt)
             self.assertIn("must still honor the machine contract", prompt)
+
+    def test_claude_en_installed_prompt_assets_keep_footer_contract(self) -> None:
+        self._assert_installed_footer_contract(
+            adapter=CLAUDE_ADAPTER,
+            language_directory="EN",
+            next_template_line="Next: {Next step hint}",
+            generated_at_placeholder="Generated At: {current time}",
+            footer_contract_line="- When a generated time is present, `Generated At:` must be the final line.",
+            runtime_language="en-US",
+            runtime_generated_at_label="Generated At:",
+        )
 
 
 class InstallRenderTests(unittest.TestCase):

@@ -204,6 +204,22 @@ def _init_git_workspace(workspace: Path) -> None:
     subprocess.run(["git", "-C", str(workspace), "config", "user.email", "test@example.com"], capture_output=True, text=True, check=True)
 
 
+def _assert_rendered_footer_contract(
+    testcase: unittest.TestCase,
+    rendered: str,
+    *,
+    next_prefix: str,
+    generated_at_prefix: str,
+) -> None:
+    lines = rendered.rstrip().splitlines()
+    testcase.assertGreaterEqual(len(lines), 2)
+    testcase.assertTrue(lines[-2].startswith(next_prefix), msg=rendered)
+    testcase.assertRegex(
+        lines[-1],
+        rf"^{re.escape(generated_at_prefix)} \d{{4}}-\d{{2}}-\d{{2}} \d{{2}}:\d{{2}}:\d{{2}}$",
+    )
+
+
 class RuntimeConfigTests(unittest.TestCase):
     def test_zero_config_uses_defaults(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -3494,7 +3510,12 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertIn("方案: .sopify-skills/plan/", rendered)
             self.assertIn("交接: .sopify-skills/state/current_handoff.json", rendered)
             self.assertIn("Next: 在宿主会话中继续评审或执行方案，或直接回复修改意见", rendered)
-            self.assertRegex(rendered, r"时间: \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}")
+            _assert_rendered_footer_contract(
+                self,
+                rendered,
+                next_prefix="Next:",
+                generated_at_prefix="生成时间:",
+            )
 
             events_path = workspace / result.replay_session_dir / "events.jsonl"
             event_payload = json.loads(events_path.read_text(encoding="utf-8").splitlines()[0])
@@ -3552,7 +3573,12 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertIn("范围:", rendered)
             self.assertIn("## 代码变更详解", rendered)
             self.assertIn("Next: 可再次运行 ~summary 刷新，或继续当前开发流", rendered)
-            self.assertRegex(rendered, r"时间: \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}")
+            _assert_rendered_footer_contract(
+                self,
+                rendered,
+                next_prefix="Next:",
+                generated_at_prefix="生成时间:",
+            )
 
     def test_summary_route_includes_uncommitted_git_changes(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

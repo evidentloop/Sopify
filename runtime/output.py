@@ -269,7 +269,7 @@ def render_runtime_error(
         f"  - {labels['none']}",
         "",
         f"Next: {labels['next_retry']}",
-        f"Time: {local_display_now()}" if locale == "en-US" else f"时间: {local_display_now()}",
+        f"Generated At: {local_display_now()}" if locale == "en-US" else f"生成时间: {local_display_now()}",
     ]
     return "\n".join(lines)
 
@@ -656,8 +656,8 @@ def _time_line(result: RuntimeResult, *, language: str) -> str | None:
     if activation is None or not activation.display_time:
         return None
     if language == "en-US":
-        return f"Time: {activation.display_time}"
-    return f"时间: {activation.display_time}"
+        return f"Generated At: {activation.display_time}"
+    return f"生成时间: {activation.display_time}"
 
 
 def _colorize(text: str, *, title_color: str, use_color: bool | None) -> str:

@@ -8,3 +8,4 @@ Changes: {N} files
   - {file2}
 
 Next: 请验证修复
+生成时间: {当前时间}
