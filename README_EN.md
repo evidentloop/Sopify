@@ -6,7 +6,7 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 [![Docs](https://img.shields.io/badge/docs-CC%20BY%204.0-green.svg)](./LICENSE-docs)
-[![Version](https://img.shields.io/badge/version-2026--03--21.163146-orange.svg)](#version-history)
+[![Version](https://img.shields.io/badge/version-2026--03--21.203721-orange.svg)](#version-history)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
 [English](./README_EN.md) · [简体中文](./README.md) · [Quick Start](#quick-start) · [Configuration](#configuration)
@@ -271,8 +271,9 @@ This section defines the outward-facing documentation contract; runtime automati
 
 Projects integrated with Sopify follow this default documentation model:
 
-- `blueprint/README.md` is a pure index page and keeps only entry-level descriptions plus status
+- `blueprint/README.md` is a pure index page and keeps only `status / maintenance / current goal / current focus / read next`
 - `blueprint/` is the project-level long-lived blueprint and is tracked by default
+- if extra long-lived topic docs exist at the `blueprint/` root, `blueprint/README.md` must list them explicitly
 - `plan/` stores working plan packages and is local-only by default; only the plan bound by `current_plan.path + current_plan.files` is machine-active
 - `history/` is the finalized archive and is local-only by default
 - `state/` is runtime checkpoint / handoff state and is always ignored
@@ -283,6 +284,7 @@ Projects integrated with Sopify follow this default documentation model:
 - first-version finalize only supports metadata-managed plans; legacy plans are rejected instead of being auto-migrated
 - the formal `active_plan` resolution is `current_plan.path + current_plan.files`
 - `knowledge_sync` is the only formal sync contract; `blueprint_obligation` remains legacy-only for reject / projection behavior
+- `blueprint/tasks.md` keeps only unfinished long-term items and explicit deferrals; completed items should not remain in this file
 
 ### KB Responsibility Matrix
 
@@ -651,7 +653,7 @@ Next: ~go exec to execute or reply with feedback
 ```
 .sopify-skills/                        # Knowledge base root
 ├── blueprint/                 # Project-level long-lived blueprint, tracked by default
-│   ├── README.md              # Pure index page with entry-level status only
+│   ├── README.md              # Pure index page with status/maintenance/current-goal/current-focus/read-next only
 │   ├── background.md          # Long-term goals, scope, non-goals
 │   ├── design.md              # Module / host / directory / consumption contracts
 │   └── tasks.md               # Unfinished long-term items and explicit deferrals

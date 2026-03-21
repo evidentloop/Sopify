@@ -24,6 +24,10 @@ _PREFERENCES_PROMPT_PREFIX = (
     "Apply these as durable collaboration rules for this Sopify run.\n"
     "If a rule conflicts with the current explicit task, follow the current task."
 )
+_PREFERENCES_PLACEHOLDER_LINES = (
+    "当前暂无已确认的长期偏好。",
+    "No confirmed long-term preferences yet.",
+)
 
 
 @dataclass(frozen=True)
@@ -34,6 +38,8 @@ class PreferencesPreloadResult:
     workspace_root: str
     plan_directory: str
     preferences_path: str
+    feedback_path: str
+    feedback_present: bool
     injected: bool
     error_code: str | None = None
     injection_text: str = ""
@@ -45,6 +51,8 @@ class PreferencesPreloadResult:
             "workspace_root": self.workspace_root,
             "plan_directory": self.plan_directory,
             "preferences_path": self.preferences_path,
+            "feedback_path": self.feedback_path,
+            "feedback_present": self.feedback_present,
             "injected": self.injected,
             "error_code": self.error_code,
             "injection_text": self.injection_text,
@@ -57,13 +65,21 @@ def resolve_preferences_path(config: RuntimeConfig) -> Path:
     return config.runtime_root / "user" / "preferences.md"
 
 
+def resolve_feedback_path(config: RuntimeConfig) -> Path:
+    """Resolve the workspace-scoped raw feedback log path from normalized config."""
+    return config.runtime_root / "user" / "feedback.jsonl"
+
+
 def preload_preferences(config: RuntimeConfig) -> PreferencesPreloadResult:
     """Load workspace preferences and build the host injection block when possible."""
     preferences_path = resolve_preferences_path(config)
+    feedback_path = resolve_feedback_path(config)
     base_payload = {
         "workspace_root": str(config.workspace_root),
         "plan_directory": config.plan_directory,
         "preferences_path": str(preferences_path),
+        "feedback_path": str(feedback_path),
+        "feedback_present": feedback_path.exists(),
     }
 
     if not preferences_path.exists():
@@ -135,6 +151,18 @@ def build_preferences_injection(raw_content: str) -> str:
     return f"{_PREFERENCES_PROMPT_PREFIX}\n\n{trimmed}"
 
 
+def preferences_have_confirmed_entries(raw_content: str) -> bool:
+    """Return whether a preferences file contains explicit durable preferences."""
+    trimmed = raw_content.strip()
+    if not trimmed:
+        return False
+    normalized = trimmed.casefold()
+    for placeholder in _PREFERENCES_PLACEHOLDER_LINES:
+        if placeholder.casefold() in normalized:
+            return False
+    return True
+
+
 def _read_error_code(exc: OSError) -> str:
     if getattr(exc, "errno", None) is None:
         return "os_read_error"
@@ -146,7 +174,9 @@ __all__ = [
     "PreferencesPreloadResult",
     "PreferencesPreloadStatus",
     "build_preferences_injection",
+    "preferences_have_confirmed_entries",
     "preload_preferences",
     "preload_preferences_for_workspace",
+    "resolve_feedback_path",
     "resolve_preferences_path",
 ]

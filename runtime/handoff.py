@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+from hashlib import sha1
 import json
 from pathlib import Path
 from tempfile import NamedTemporaryFile
@@ -101,7 +103,35 @@ def build_runtime_handoff(
         recommended_skill_ids=tuple(decision.candidate_skill_ids),
         artifacts=artifacts,
         notes=normalized_notes,
+        observability={
+            "source": "runtime_handoff",
+            "generated_at": _iso_now(),
+            "request_excerpt": _summarize_request_text(decision.request_text),
+            "request_sha1": _stable_request_sha1(decision.request_text),
+            "decision_reason": decision.reason,
+            "required_host_action": required_host_action,
+        },
     )
+
+
+def _iso_now() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+def _stable_request_sha1(text: str) -> str:
+    normalized = " ".join(str(text or "").split())
+    if not normalized:
+        return ""
+    return sha1(normalized.encode("utf-8")).hexdigest()[:12]
+
+
+def _summarize_request_text(text: str, *, limit: int = 120) -> str:
+    compact = " ".join(str(text or "").split())
+    if len(compact) <= limit:
+        return compact
+    if limit <= 3:
+        return compact[:limit]
+    return compact[: limit - 3].rstrip() + "..."
 
 
 def read_runtime_handoff(path: Path) -> RuntimeHandoff | None:

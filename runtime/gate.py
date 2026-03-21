@@ -11,7 +11,7 @@ from .config import ConfigError, load_runtime_config
 from .engine import run_runtime
 from .entry_guard import ENTRY_GUARD_PENDING_ACTIONS
 from .preferences import PreferencesPreloadResult, preload_preferences
-from .state import StateStore
+from .state import StateStore, iso_now, stable_request_sha1, summarize_request_text
 from .workspace_preflight import WorkspacePreflightError, preflight_workspace_runtime
 
 GATE_SCHEMA_VERSION = "1"
@@ -57,6 +57,7 @@ def enter_runtime_gate(
             global_config_path=global_config_path,
             user_home=user_home,
         )
+        contract["preferences"] = _normalize_preferences(preload_preferences(config))
         contract["runtime"] = {
             "route_name": runtime_result.route.route_name,
             "reason": runtime_result.route.reason,
@@ -64,6 +65,7 @@ def enter_runtime_gate(
 
         store = StateStore(config)
         persisted_handoff = store.get_current_handoff()
+        current_run = store.get_current_run()
         # Normalize from the in-memory runtime result when needed, but keep
         # persisted handoff as the only positive machine evidence.
         handoff_source = persisted_handoff or runtime_result.handoff
@@ -72,11 +74,28 @@ def enter_runtime_gate(
 
         manifest_path = workspace / ".sopify-runtime" / "manifest.json"
         strict_runtime_entry = bool(contract["handoff"].pop("_strict_runtime_entry", False))
+        handoff_source_kind = _handoff_source_kind(persisted_handoff=persisted_handoff, runtime_handoff=runtime_result.handoff)
+        persisted_matches_current = _persisted_handoff_matches_current_request(
+            persisted_handoff=persisted_handoff,
+            runtime_handoff=runtime_result.handoff,
+            request_sha1=stable_request_sha1(request),
+        )
         contract["evidence"] = {
             "manifest_found": manifest_path.is_file(),
             "handoff_found": persisted_handoff is not None,
             "strict_runtime_entry": strict_runtime_entry,
+            "handoff_source_kind": handoff_source_kind,
+            "current_request_produced_handoff": runtime_result.handoff is not None,
+            "persisted_handoff_matches_current_request": persisted_matches_current,
         }
+        contract["observability"] = _build_gate_observability(
+            request=request,
+            runtime_route=runtime_result.route.route_name,
+            persisted_handoff=persisted_handoff,
+            runtime_handoff=runtime_result.handoff,
+            current_run=current_run,
+            ingress_mode="runtime_gate_enter",
+        )
 
         if not contract["handoff"]:
             contract.update(
@@ -134,7 +153,7 @@ def enter_runtime_gate(
     if config is not None and write_receipt:
         receipt_path = config.state_dir / CURRENT_GATE_RECEIPT_FILENAME
         contract["receipt_path"] = str(receipt_path)
-        _write_receipt(receipt_path, contract)
+        write_gate_receipt(receipt_path, contract)
     return contract
 
 
@@ -152,11 +171,15 @@ def _base_contract(workspace_root: Path) -> dict[str, Any]:
         "runtime": {},
         "handoff": {},
         "trigger_evidence": {},
+        "observability": {},
         "allowed_response_mode": ERROR_VISIBLE_RETRY,
         "evidence": {
             "manifest_found": False,
             "handoff_found": False,
             "strict_runtime_entry": False,
+            "handoff_source_kind": "missing",
+            "current_request_produced_handoff": False,
+            "persisted_handoff_matches_current_request": False,
         },
     }
 
@@ -166,6 +189,8 @@ def _normalize_preferences(result: PreferencesPreloadResult) -> dict[str, Any]:
         "status": result.status,
         "injected": result.injected,
         "preferences_path": result.preferences_path,
+        "feedback_path": result.feedback_path,
+        "feedback_present": result.feedback_present,
         "plan_directory": result.plan_directory,
     }
     if result.error_code:
@@ -209,7 +234,79 @@ def _normalize_handoff(handoff: Any) -> dict[str, Any]:
     return payload
 
 
-def _write_receipt(path: Path, payload: Mapping[str, Any]) -> None:
+def _handoff_source_kind(*, persisted_handoff: Any, runtime_handoff: Any) -> str:
+    if persisted_handoff is None and runtime_handoff is None:
+        return "missing"
+    if persisted_handoff is None and runtime_handoff is not None:
+        return "current_request_not_persisted"
+    if persisted_handoff is not None and runtime_handoff is None:
+        return "reused_prior_state"
+    if getattr(persisted_handoff, "run_id", "") == getattr(runtime_handoff, "run_id", ""):
+        return "current_request_persisted"
+    return "persisted_runtime_mismatch"
+
+
+def _persisted_handoff_matches_current_request(*, persisted_handoff: Any, runtime_handoff: Any, request_sha1: str) -> bool:
+    if persisted_handoff is None:
+        return False
+    if runtime_handoff is not None:
+        return getattr(persisted_handoff, "run_id", "") == getattr(runtime_handoff, "run_id", "")
+    observability = getattr(persisted_handoff, "observability", {})
+    if not isinstance(observability, Mapping):
+        return False
+    return str(observability.get("request_sha1") or "") == request_sha1 and bool(request_sha1)
+
+
+def _build_gate_observability(
+    *,
+    request: str,
+    runtime_route: str,
+    persisted_handoff: Any,
+    runtime_handoff: Any,
+    current_run: Any,
+    ingress_mode: str,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "receipt_kind": "runtime_gate",
+        "ingress_mode": ingress_mode,
+        "written_at": iso_now(),
+        "request_excerpt": summarize_request_text(request),
+        "request_sha1": stable_request_sha1(request),
+        "runtime_route_name": runtime_route,
+        "handoff_source_kind": _handoff_source_kind(persisted_handoff=persisted_handoff, runtime_handoff=runtime_handoff),
+    }
+    if current_run is not None:
+        payload["current_run"] = {
+            "run_id": getattr(current_run, "run_id", ""),
+            "route_name": getattr(current_run, "route_name", ""),
+            "stage": getattr(current_run, "stage", ""),
+            "updated_at": getattr(current_run, "updated_at", ""),
+            "request_excerpt": getattr(current_run, "request_excerpt", ""),
+            "request_sha1": getattr(current_run, "request_sha1", ""),
+        }
+    if persisted_handoff is not None:
+        handoff_observability = getattr(persisted_handoff, "observability", {})
+        if not isinstance(handoff_observability, Mapping):
+            handoff_observability = {}
+        payload["persisted_handoff"] = {
+            "run_id": getattr(persisted_handoff, "run_id", ""),
+            "route_name": getattr(persisted_handoff, "route_name", ""),
+            "required_host_action": getattr(persisted_handoff, "required_host_action", ""),
+            "generated_at": str(handoff_observability.get("generated_at") or ""),
+            "written_at": str(handoff_observability.get("written_at") or ""),
+            "request_excerpt": str(handoff_observability.get("request_excerpt") or ""),
+            "request_sha1": str(handoff_observability.get("request_sha1") or ""),
+        }
+    if runtime_handoff is not None:
+        payload["current_request_handoff"] = {
+            "run_id": getattr(runtime_handoff, "run_id", ""),
+            "route_name": getattr(runtime_handoff, "route_name", ""),
+            "required_host_action": getattr(runtime_handoff, "required_host_action", ""),
+        }
+    return payload
+
+
+def write_gate_receipt(path: Path, payload: Mapping[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with NamedTemporaryFile("w", delete=False, dir=path.parent, encoding="utf-8") as handle:
         json.dump(dict(payload), handle, ensure_ascii=False, indent=2, sort_keys=True)
@@ -235,4 +332,5 @@ __all__ = [
     "GATE_SCHEMA_VERSION",
     "NORMAL_RUNTIME_FOLLOWUP",
     "enter_runtime_gate",
+    "write_gate_receipt",
 ]

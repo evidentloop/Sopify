@@ -234,6 +234,8 @@ class RunState:
     plan_id: Optional[str] = None
     plan_path: Optional[str] = None
     execution_gate: Optional[ExecutionGate] = None
+    request_excerpt: str = ""
+    request_sha1: str = ""
 
     @property
     def is_active(self) -> bool:
@@ -251,6 +253,8 @@ class RunState:
             "plan_id": self.plan_id,
             "plan_path": self.plan_path,
             "execution_gate": self.execution_gate.to_dict() if self.execution_gate else None,
+            "request_excerpt": self.request_excerpt,
+            "request_sha1": self.request_sha1,
         }
 
     @classmethod
@@ -266,6 +270,8 @@ class RunState:
             plan_id=data.get("plan_id") or None,
             plan_path=data.get("plan_path") or None,
             execution_gate=ExecutionGate.from_dict(data["execution_gate"]) if isinstance(data.get("execution_gate"), Mapping) else None,
+            request_excerpt=str(data.get("request_excerpt") or ""),
+            request_sha1=str(data.get("request_sha1") or ""),
         )
 
 
@@ -1355,6 +1361,7 @@ class RuntimeHandoff:
     recommended_skill_ids: tuple[str, ...] = ()
     artifacts: Mapping[str, Any] = field(default_factory=dict)
     notes: tuple[str, ...] = ()
+    observability: Mapping[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -1368,6 +1375,7 @@ class RuntimeHandoff:
             "recommended_skill_ids": list(self.recommended_skill_ids),
             "artifacts": dict(self.artifacts),
             "notes": list(self.notes),
+            "observability": _json_mapping(self.observability),
         }
 
     @classmethod
@@ -1384,6 +1392,7 @@ class RuntimeHandoff:
             recommended_skill_ids=tuple(data.get("recommended_skill_ids") or ()),
             artifacts=dict(artifacts) if isinstance(artifacts, Mapping) else {},
             notes=tuple(data.get("notes") or ()),
+            observability=_json_mapping(data.get("observability")),
         )
 
 

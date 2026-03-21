@@ -9,6 +9,8 @@ description: Document template collection; read when creating docs; includes all
 1. Replace `{...}` with actual content.
 2. Formal plan packages include the scoring block by default.
 3. `blueprint/README.md` stays as a lightweight index only.
+4. If extra long-lived topic docs exist at the `blueprint/` root, they must be linked explicitly from `blueprint/README.md`.
+5. `blueprint/tasks.md` keeps only unfinished long-term items and explicit deferrals; completed items do not remain in that file.
 
 ## A1 | Knowledge Base Templates
 
@@ -39,16 +41,23 @@ description: Document template collection; read when creating docs; includes all
 # Project Blueprint Index
 
 Status: {current status}
-Maintenance: keep only entry-level index rows; move long explanations into other blueprint files
+Maintenance: keep only status, current goal, current focus, and read-next links on this page; move long explanations into other blueprint files
 
-| Entry | Meaning | Status |
-|-----|------|------|
-| `../project.md` | Project-level technical conventions | active |
-| `./background.md` | Long-term goals, scope, non-goals | active |
-| `./design.md` | Module / host / directory / consumption contracts | active |
-| `./tasks.md` | Unfinished long-term items and explicit deferrals | active |
-| `../plan/` | Current active plan | on-demand |
-| `../history/index.md` | Archive index | on-demand |
+## Current Goal
+- Project: `{project_name}`
+- Long-term goals and scope live in `./background.md`
+
+## Current Focus
+- Active plan: {present/none}
+- History archive: {status}
+
+## Read Next
+- [Technical Conventions](../project.md)
+- [Blueprint Background](./background.md)
+- [Blueprint Design](./design.md)
+- [Blueprint Tasks](./tasks.md)
+- [Blueprint Topic](./{extra_blueprint_doc}.md) # list each additional long-lived topic doc when present
+- [Change History](../history/index.md)
 ```
 
 ### blueprint/background.md
@@ -90,6 +99,8 @@ Maintenance: keep only entry-level index rows; move long explanations into other
 
 ```markdown
 # Blueprint Tasks
+
+Status: keep only unfinished long-term items and explicit deferrals; completed items do not remain in this file.
 
 ## Unfinished Long-Term Items
 - [ ] {long-term item}

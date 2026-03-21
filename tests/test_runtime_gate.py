@@ -111,6 +111,10 @@ class RuntimeGateTests(unittest.TestCase):
             self.assertEqual(result["handoff"]["required_host_action"], "review_or_execute_plan")
             self.assertTrue(result["evidence"]["handoff_found"])
             self.assertTrue(result["evidence"]["strict_runtime_entry"])
+            self.assertEqual(result["evidence"]["handoff_source_kind"], "current_request_persisted")
+            self.assertTrue(result["evidence"]["current_request_produced_handoff"])
+            self.assertTrue(result["evidence"]["persisted_handoff_matches_current_request"])
+            self.assertIn("补 runtime gate 骨架", result["observability"]["request_excerpt"])
             self.assertTrue((workspace / ".sopify-skills" / "state" / CURRENT_GATE_RECEIPT_FILENAME).exists())
 
     def test_gate_maps_clarification_pending_to_checkpoint_only(self) -> None:
@@ -183,6 +187,31 @@ class RuntimeGateTests(unittest.TestCase):
                 "protected .sopify-skills/plan assets",
                 result["trigger_evidence"]["direct_edit_guard_trigger"],
             )
+
+    def test_gate_marks_reused_prior_handoff_observability(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+
+            first = enter_runtime_gate(
+                "~go plan 补 runtime gate 骨架",
+                workspace_root=workspace,
+                user_home=workspace / "home",
+            )
+            self.assertEqual(first["status"], "ready")
+
+            result = enter_runtime_gate(
+                "~summary",
+                workspace_root=workspace,
+                user_home=workspace / "home",
+            )
+
+            self.assertEqual(result["status"], "ready")
+            self.assertEqual(result["runtime"]["route_name"], "summary")
+            self.assertEqual(result["evidence"]["handoff_source_kind"], "reused_prior_state")
+            self.assertFalse(result["evidence"]["current_request_produced_handoff"])
+            self.assertFalse(result["evidence"]["persisted_handoff_matches_current_request"])
+            self.assertEqual(result["observability"]["runtime_route_name"], "summary")
+            self.assertIn("补 runtime gate 骨架", result["observability"]["persisted_handoff"]["request_excerpt"])
 
     def test_gate_fail_closes_when_handoff_is_missing(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

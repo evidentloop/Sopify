@@ -12,7 +12,7 @@ description: Knowledge base management skill; read during KB operations; include
 ```text
 .sopify-skills/
 ├── blueprint/
-│   ├── README.md           # Pure index page with entry-level status only
+│   ├── README.md           # Pure index page with index-required sections only
 │   ├── background.md       # Long-term goals, scope, non-goals
 │   ├── design.md           # Module / host / directory / consumption contracts
 │   └── tasks.md            # Unfinished long-term items and explicit deferrals
@@ -92,6 +92,17 @@ Rules:
 
 ## Update Rules
 
+### L0 Index Guardrails
+
+- `blueprint/README.md` keeps only `status / maintenance / current goal / current focus / read next`.
+- Do not write absolute workspace paths, long-form architecture prose, or formal contract bodies into `blueprint/README.md`.
+- If extra long-lived topic docs exist at the `blueprint/` root, `blueprint/README.md` must list them explicitly.
+
+### `blueprint/tasks.md` Boundaries
+
+- Keep only unfinished long-term items and explicit deferrals.
+- `[x]` completed items must not remain in `blueprint/tasks.md`.
+
 ### Must update
 
 - `project.md`: reusable technical conventions changed
@@ -105,6 +116,7 @@ Rules:
 - one-off implementation details
 - short-term task breakdown from the current plan
 - temporary tradeoffs that belong only to this task
+- completed task checklists lingering in `blueprint/tasks.md`
 - copying history body text back into blueprint
 
 ## `knowledge_sync` Sync Contract

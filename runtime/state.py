@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from datetime import datetime, time, timezone
+from hashlib import sha1
 import json
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Any, Mapping, Optional
 
-from .handoff import read_runtime_handoff, write_runtime_handoff
+from .handoff import read_runtime_handoff
 from .models import ClarificationState, DecisionState, DecisionSubmission, PlanArtifact, RouteDecision, RunState, RuntimeConfig, RuntimeHandoff
 
 
@@ -34,7 +35,22 @@ class StateStore:
 
     def set_current_run(self, run_state: RunState) -> None:
         self.ensure()
-        self._write_json(self.current_run_path, run_state.to_dict())
+        payload = run_state.to_dict()
+        payload["observability"] = {
+            "state_kind": "current_run",
+            "writer": "runtime.state",
+            "written_at": iso_now(),
+            "workspace_root": str(self.config.workspace_root),
+            "runtime_root": str(self.config.runtime_root.relative_to(self.config.workspace_root)),
+            "state_path": str(self.current_run_path.relative_to(self.config.workspace_root)),
+            "run_id": run_state.run_id,
+            "route_name": run_state.route_name,
+            "stage": run_state.stage,
+            "status": run_state.status,
+            "request_excerpt": run_state.request_excerpt,
+            "request_sha1": run_state.request_sha1,
+        }
+        self._write_json(self.current_run_path, payload)
 
     def clear_current_run(self) -> None:
         self.current_run_path.unlink(missing_ok=True)
@@ -118,7 +134,23 @@ class StateStore:
 
     def set_current_handoff(self, handoff: RuntimeHandoff) -> None:
         self.ensure()
-        write_runtime_handoff(self.current_handoff_path, handoff)
+        payload = handoff.to_dict()
+        observability = dict(payload.get("observability") or {})
+        observability.update(
+            {
+                "state_kind": "current_handoff",
+                "writer": "runtime.state",
+                "written_at": iso_now(),
+                "workspace_root": str(self.config.workspace_root),
+                "runtime_root": str(self.config.runtime_root.relative_to(self.config.workspace_root)),
+                "state_path": str(self.current_handoff_path.relative_to(self.config.workspace_root)),
+                "run_id": handoff.run_id,
+                "route_name": handoff.route_name,
+                "required_host_action": handoff.required_host_action,
+            }
+        )
+        payload["observability"] = observability
+        self._write_json(self.current_handoff_path, payload)
 
     def clear_current_handoff(self) -> None:
         self.current_handoff_path.unlink(missing_ok=True)
@@ -149,6 +181,8 @@ class StateStore:
             plan_id=current.plan_id,
             plan_path=current.plan_path,
             execution_gate=current.execution_gate,
+            request_excerpt=current.request_excerpt,
+            request_sha1=current.request_sha1,
         )
         self.set_current_run(updated)
         return updated
@@ -170,6 +204,24 @@ class StateStore:
 def iso_now() -> str:
     """Return a stable UTC ISO timestamp."""
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+def stable_request_sha1(text: str) -> str:
+    """Return a short stable fingerprint for request-level observability."""
+    normalized = " ".join(str(text or "").split())
+    if not normalized:
+        return ""
+    return sha1(normalized.encode("utf-8")).hexdigest()[:12]
+
+
+def summarize_request_text(text: str, *, limit: int = 120) -> str:
+    """Return a compact single-line excerpt for request observability."""
+    compact = " ".join(str(text or "").split())
+    if len(compact) <= limit:
+        return compact
+    if limit <= 3:
+        return compact[:limit]
+    return compact[: limit - 3].rstrip() + "..."
 
 
 def local_now() -> datetime:

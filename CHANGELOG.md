@@ -6,6 +6,44 @@ This changelog is maintained manually (not auto-generated).
 
 ## [Unreleased]
 
+## [2026-03-21.203721] - 2026-03-21
+
+### Changed
+
+- Updated release-relevant files:
+  - `.sopify-skills/blueprint/README.md`
+  - `.sopify-skills/blueprint/tasks.md`
+  - `Claude/Skills/CN/CLAUDE.md`
+  - `Claude/Skills/CN/skills/sopify/kb/SKILL.md`
+  - `Claude/Skills/CN/skills/sopify/templates/SKILL.md`
+  - `Claude/Skills/EN/CLAUDE.md`
+  - `Claude/Skills/EN/skills/sopify/kb/SKILL.md`
+  - `Claude/Skills/EN/skills/sopify/templates/SKILL.md`
+  - `Codex/Skills/CN/AGENTS.md`
+  - `Codex/Skills/CN/skills/sopify/kb/SKILL.md`
+  - `Codex/Skills/CN/skills/sopify/templates/SKILL.md`
+  - `Codex/Skills/EN/AGENTS.md`
+  - `Codex/Skills/EN/skills/sopify/kb/SKILL.md`
+  - `Codex/Skills/EN/skills/sopify/templates/SKILL.md`
+  - `README.md`
+  - `README_EN.md`
+  - `runtime/develop_checkpoint.py`
+  - `runtime/engine.py`
+  - `runtime/gate.py`
+  - `runtime/handoff.py`
+  - `runtime/kb.py`
+  - `runtime/models.py`
+  - `runtime/preferences.py`
+  - `runtime/router.py`
+  - `runtime/state.py`
+  - `scripts/sopify_runtime.py`
+
+### Tests
+
+- Updated automated coverage:
+  - `tests/test_runtime.py`
+  - `tests/test_runtime_gate.py`
+
 ## [2026-03-21.163146] - 2026-03-21
 
 ### Changed

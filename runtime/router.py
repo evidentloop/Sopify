@@ -130,6 +130,10 @@ def build_runtime_first_hints() -> dict[str, object]:
     return {
         "force_route_name": "workflow",
         "entry_guard_reason_code": DIRECT_EDIT_BLOCKED_RUNTIME_REQUIRED_REASON_CODE,
+        "required_entry": "scripts/runtime_gate.py",
+        "required_subcommand": "enter",
+        "direct_entry_block_error_code": "runtime_gate_required",
+        "debug_bypass_flag": "--allow-direct-entry",
         "protected_path_prefixes": list(RUNTIME_FIRST_PROTECTED_PATH_PREFIXES),
         "process_semantic_keywords": list(_PROCESS_FORCE_KEYWORDS_EN + _PROCESS_FORCE_KEYWORDS_ZH),
         "tradeoff_keywords": list(_TRADEOFF_FORCE_KEYWORDS),

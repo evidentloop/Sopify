@@ -7,7 +7,10 @@ import re
 
 from .knowledge_layout import materialization_stage
 from .models import KbArtifact, RuntimeConfig
+from .preferences import preferences_have_confirmed_entries, resolve_feedback_path, resolve_preferences_path
 from .state import iso_now
+
+_STANDARD_BLUEPRINT_FILENAMES = frozenset({"README.md", "background.md", "design.md", "tasks.md"})
 
 
 def bootstrap_kb(config: RuntimeConfig) -> KbArtifact:
@@ -27,6 +30,10 @@ def bootstrap_kb(config: RuntimeConfig) -> KbArtifact:
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(content, encoding="utf-8")
         created_files.append(str(target.relative_to(config.workspace_root)))
+
+    feedback_log = ensure_feedback_log(config)
+    if feedback_log is not None and feedback_log not in created_files:
+        created_files.append(feedback_log)
 
     if _should_bootstrap_blueprint_index(config):
         created_files.extend(ensure_blueprint_index(config))
@@ -80,6 +87,30 @@ def ensure_blueprint_scaffold(config: RuntimeConfig) -> tuple[str, ...]:
         created.append(str(path.relative_to(config.workspace_root)))
     created.extend(ensure_blueprint_index(config))
     return tuple(created)
+
+
+def ensure_feedback_log(config: RuntimeConfig) -> str | None:
+    """Materialize the raw feedback log when the KB contract requires it."""
+    feedback_path = resolve_feedback_path(config)
+    if feedback_path.exists():
+        return None
+
+    should_materialize = config.kb_init == "full"
+    if not should_materialize:
+        preferences_path = resolve_preferences_path(config)
+        if preferences_path.is_file():
+            try:
+                raw_content = preferences_path.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                raw_content = ""
+            should_materialize = preferences_have_confirmed_entries(raw_content)
+
+    if not should_materialize:
+        return None
+
+    feedback_path.parent.mkdir(parents=True, exist_ok=True)
+    feedback_path.write_text("", encoding="utf-8")
+    return str(feedback_path.relative_to(config.workspace_root))
 
 
 def _bootstrap_files(config: RuntimeConfig) -> dict[Path, str]:
@@ -239,6 +270,7 @@ def render_blueprint_index(config: RuntimeConfig) -> str:
             )
         else:
             read_next.append("- Deeper blueprint docs will be created on the first plan lifecycle.")
+        read_next.extend(_additional_blueprint_entries(config))
         if has_history:
             read_next.append("- [Change History](../history/index.md)")
         else:
@@ -251,38 +283,12 @@ def render_blueprint_index(config: RuntimeConfig) -> str:
             [
                 "# Project Blueprint Index\n\n",
                 f"Status: {stage}\n",
-                f"Workspace: `{config.workspace_root}`\n",
-                f"Runtime root: `{root.relative_to(config.workspace_root)}`\n",
-                "Maintenance: Sopify refreshes managed sections; free-text notes may be edited manually.\n\n",
+                "Maintenance: Sopify refreshes managed sections; keep only status, current goal, current focus, and read-next links on this page.\n\n",
                 "## Current Goal\n\n",
                 "<!-- sopify:auto:goal:start -->\n",
                 f"- Project: `{project_name}`.\n",
                 goal_block,
                 "<!-- sopify:auto:goal:end -->\n\n",
-                "## Project Overview\n\n",
-                "<!-- sopify:auto:overview:start -->\n",
-                "- blueprint: tracked long-lived project facts\n",
-                "- plan: active working plans created on demand\n",
-                "- history: finalized archives created on close-out\n",
-                "- replay: optional replay capability\n",
-                "<!-- sopify:auto:overview:end -->\n\n",
-                "## Architecture Map\n\n",
-                "<!-- sopify:auto:architecture:start -->\n",
-                "```text\n",
-                ".sopify-skills/\n",
-                "├── blueprint/\n",
-                "├── plan/\n",
-                "├── history/\n",
-                "├── state/\n",
-                "└── replay/\n",
-                "```\n",
-                "<!-- sopify:auto:architecture:end -->\n\n",
-                "## Key Contracts\n\n",
-                "<!-- sopify:auto:contracts:start -->\n",
-                "- Bootstrap creates only the minimum long-lived KB skeleton.\n",
-                "- Deeper blueprint files appear on the first plan lifecycle, or earlier when `kb_init: full` is configured.\n",
-                "- History is generated only during explicit `~go finalize` close-out.\n",
-                "<!-- sopify:auto:contracts:end -->\n\n",
                 "## Current Focus\n\n",
                 "<!-- sopify:auto:focus:start -->\n",
                 f"- Active plan: {'present' if has_active_plan else 'none'}.\n",
@@ -299,7 +305,7 @@ def render_blueprint_index(config: RuntimeConfig) -> str:
     goal_block = (
         "- 当前尚未物化长期目标摘要；首次进入 plan 生命周期后会补齐深层 blueprint 文档。\n"
         if not has_deep_blueprint
-        else "- 长期目标与范围收敛到 `./background.md`；本索引只保留入口与状态，不展开正文。\n"
+            else "- 长期目标与范围收敛到 `./background.md`；本索引只保留索引必需区块，不展开正文。\n"
     )
     focus_block = (
         f"- history 归档：已可用；最近归档为 `{latest_archive}`。\n"
@@ -317,6 +323,7 @@ def render_blueprint_index(config: RuntimeConfig) -> str:
         )
     else:
         read_next.append("- 深层 blueprint 文档会在首次进入 plan 生命周期后生成。")
+    read_next.extend(_additional_blueprint_entries(config))
     if has_history:
         read_next.append("- [变更历史](../history/index.md)")
     else:
@@ -329,38 +336,12 @@ def render_blueprint_index(config: RuntimeConfig) -> str:
         [
             "# 项目蓝图索引\n\n",
             f"状态: {stage}\n",
-            f"工作目录: `{config.workspace_root}`\n",
-            f"运行时目录: `{root.relative_to(config.workspace_root)}`\n",
-            "维护方式: Sopify 托管自动区块，说明区块允许人工补充。\n\n",
+            "维护方式: Sopify 托管自动区块；本页只保留状态、当前目标、当前焦点与阅读入口。\n\n",
             "## 当前目标\n\n",
             "<!-- sopify:auto:goal:start -->\n",
             f"- 项目：`{project_name}`。\n",
             goal_block,
             "<!-- sopify:auto:goal:end -->\n\n",
-            "## 项目概览\n\n",
-            "<!-- sopify:auto:overview:start -->\n",
-            "- blueprint: 长期项目真相，默认入库\n",
-            "- plan: 按需创建的活动方案\n",
-            "- history: 收口后生成的历史归档\n",
-            "- replay: 可选回放能力\n",
-            "<!-- sopify:auto:overview:end -->\n\n",
-            "## 架构地图\n\n",
-            "<!-- sopify:auto:architecture:start -->\n",
-            "```text\n",
-            ".sopify-skills/\n",
-            "├── blueprint/\n",
-            "├── plan/\n",
-            "├── history/\n",
-            "├── state/\n",
-            "└── replay/\n",
-            "```\n",
-            "<!-- sopify:auto:architecture:end -->\n\n",
-            "## 关键契约\n\n",
-            "<!-- sopify:auto:contracts:start -->\n",
-            "- bootstrap 只创建最小长期知识骨架\n",
-            "- 深层 blueprint 文件在首次进入 plan 生命周期时补齐，或在 `kb_init: full` 下提前物化\n",
-            "- 仅在显式 `~go finalize` 收口时生成 history\n",
-            "<!-- sopify:auto:contracts:end -->\n\n",
             "## 当前焦点\n\n",
             "<!-- sopify:auto:focus:start -->\n",
             f"- 当前活动 plan：{'存在' if has_active_plan else '暂无'}。\n",
@@ -373,6 +354,28 @@ def render_blueprint_index(config: RuntimeConfig) -> str:
             "<!-- sopify:auto:read-next:end -->\n",
         ]
     )
+
+
+def _additional_blueprint_entries(config: RuntimeConfig) -> list[str]:
+    blueprint_root = config.runtime_root / "blueprint"
+    if not blueprint_root.exists():
+        return []
+    entries: list[str] = []
+    for path in sorted(blueprint_root.glob("*.md")):
+        if path.name in _STANDARD_BLUEPRINT_FILENAMES:
+            continue
+        title = _markdown_heading(path) or path.stem.replace("-", " ")
+        entries.append(f"- [{title}](./{path.name})")
+    return entries
+
+
+def _markdown_heading(path: Path) -> str | None:
+    try:
+        content = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return None
+    match = re.search(r"^#\s+(.+?)\s*$", content, re.MULTILINE)
+    return match.group(1).strip() if match else None
 
 
 def _latest_archive_hint(config: RuntimeConfig) -> str | None:

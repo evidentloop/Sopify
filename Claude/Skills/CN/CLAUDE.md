@@ -1,5 +1,5 @@
 <!-- bootstrap: lang=zh-CN; encoding=UTF-8 -->
-<!-- SOPIFY_VERSION: 2026-03-21.163146 -->
+<!-- SOPIFY_VERSION: 2026-03-21.203721 -->
 <!-- ARCHITECTURE: Adaptive Workflow + Layered Rules -->
 
 # Sopify (Sop AI) Skills - 自适应 AI 编程助手
@@ -220,7 +220,7 @@ workflow:
 ```
 .sopify-skills/
 ├── blueprint/               # 项目级长期蓝图，默认进入版本管理
-│   ├── README.md            # 纯索引页，只保留入口与状态
+│   ├── README.md            # 纯索引页，只保留状态/维护方式/当前目标/当前焦点/阅读入口
 │   ├── background.md
 │   ├── design.md
 │   └── tasks.md

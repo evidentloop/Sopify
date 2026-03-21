@@ -640,6 +640,26 @@ class RouterTests(unittest.TestCase):
                 DIRECT_EDIT_BLOCKED_RUNTIME_REQUIRED_REASON_CODE,
             )
 
+    def test_runtime_state_files_expose_request_observability(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+
+            run_runtime(
+                "~go plan 补 runtime gate 骨架",
+                workspace_root=workspace,
+                user_home=workspace / "home",
+            )
+
+            current_run_payload = json.loads((workspace / ".sopify-skills" / "state" / "current_run.json").read_text(encoding="utf-8"))
+            current_handoff_payload = json.loads((workspace / ".sopify-skills" / "state" / "current_handoff.json").read_text(encoding="utf-8"))
+
+            self.assertIn("补 runtime gate 骨架", current_run_payload["request_excerpt"])
+            self.assertTrue(current_run_payload["request_sha1"])
+            self.assertEqual(current_run_payload["observability"]["state_kind"], "current_run")
+            self.assertIn("补 runtime gate 骨架", current_handoff_payload["observability"]["request_excerpt"])
+            self.assertTrue(current_handoff_payload["observability"]["request_sha1"])
+            self.assertEqual(current_handoff_payload["observability"]["state_kind"], "current_handoff")
+
 
 class DecisionContractTests(unittest.TestCase):
     def test_decision_policy_keeps_current_planning_semantic_baseline(self) -> None:
@@ -2409,9 +2429,27 @@ class KnowledgeBaseBootstrapTests(unittest.TestCase):
             self.assertNotIn("wiki/overview.md", readme)
             self.assertNotIn("./background.md", readme)
             self.assertNotIn("../history/index.md", readme)
+            self.assertNotIn("工作目录:", readme)
+            self.assertNotIn("项目概览", readme)
+            self.assertNotIn("架构地图", readme)
+            self.assertNotIn("关键契约", readme)
             self.assertFalse((workspace / ".sopify-skills" / "blueprint" / "background.md").exists())
             self.assertFalse((workspace / ".sopify-skills" / "history").exists())
             self.assertFalse((workspace / ".sopify-skills" / "wiki").exists())
+
+    def test_progressive_bootstrap_materializes_feedback_log_for_explicit_preferences(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            (workspace / "package.json").write_text('{"name":"sample-app"}', encoding="utf-8")
+            preferences_path = workspace / ".sopify-skills" / "user" / "preferences.md"
+            preferences_path.parent.mkdir(parents=True, exist_ok=True)
+            preferences_path.write_text("# 用户长期偏好\n\n- 保持严格。\n", encoding="utf-8")
+            config = load_runtime_config(workspace)
+
+            artifact = bootstrap_kb(config)
+
+            self.assertIn(".sopify-skills/user/feedback.jsonl", artifact.files)
+            self.assertTrue((workspace / ".sopify-skills" / "user" / "feedback.jsonl").exists())
 
     def test_full_bootstrap_creates_extended_kb_files(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -2437,6 +2475,12 @@ class KnowledgeBaseBootstrapTests(unittest.TestCase):
             readme = (workspace / ".sopify-skills" / "blueprint" / "README.md").read_text(encoding="utf-8")
             self.assertIn("状态: L1 blueprint-ready", readme)
             self.assertIn("./background.md", readme)
+            self.assertNotIn("工作目录:", readme)
+            self.assertNotIn("项目概览", readme)
+            self.assertNotIn("架构地图", readme)
+            self.assertNotIn("关键契约", readme)
+            tasks_text = (workspace / ".sopify-skills" / "blueprint" / "tasks.md").read_text(encoding="utf-8")
+            self.assertNotIn("[x]", tasks_text)
             self.assertFalse((workspace / ".sopify-skills" / "history").exists())
             self.assertFalse((workspace / ".sopify-skills" / "wiki").exists())
 
@@ -2486,6 +2530,26 @@ class KnowledgeBaseBootstrapTests(unittest.TestCase):
             readme = (blueprint_root / "README.md").read_text(encoding="utf-8")
             self.assertIn("最近归档为 `../history/2026-03/20260320_kb_layout_v2`", readme)
             self.assertIn("最近归档：`../history/2026-03/20260320_kb_layout_v2`", readme)
+
+    def test_blueprint_index_lists_additional_long_lived_blueprint_docs(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            (workspace / "package.json").write_text('{"name":"sample-app"}', encoding="utf-8")
+            config = load_runtime_config(workspace)
+
+            bootstrap_kb(config)
+            blueprint_root = workspace / ".sopify-skills" / "blueprint"
+            for filename in ("background.md", "design.md", "tasks.md"):
+                (blueprint_root / filename).write_text(f"# {filename}\n", encoding="utf-8")
+            (blueprint_root / "skill-standards-refactor.md").write_text(
+                "# Skill 标准对齐蓝图\n\n长期专题文档。\n",
+                encoding="utf-8",
+            )
+
+            ensure_blueprint_index(config)
+
+            readme = (blueprint_root / "README.md").read_text(encoding="utf-8")
+            self.assertIn("[Skill 标准对齐蓝图](./skill-standards-refactor.md)", readme)
 
     def test_real_project_bootstrap_creates_blueprint_index(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -2715,6 +2779,8 @@ class PreferencesPreloadTests(unittest.TestCase):
             self.assertTrue(result.injected)
             self.assertEqual(result.plan_directory, ".sopify-skills")
             self.assertEqual(Path(result.preferences_path), preferences_path.resolve())
+            self.assertEqual(Path(result.feedback_path), (workspace / ".sopify-skills" / "user" / "feedback.jsonl").resolve())
+            self.assertFalse(result.feedback_present)
             self.assertIn("[Long-Term User Preferences]", result.injection_text)
             self.assertIn("保持严格。", result.injection_text)
 
@@ -2731,6 +2797,8 @@ class PreferencesPreloadTests(unittest.TestCase):
             self.assertEqual(result.status, "loaded")
             self.assertEqual(result.plan_directory, ".runtime")
             self.assertEqual(Path(result.preferences_path), preferences_path.resolve())
+            self.assertEqual(Path(result.feedback_path), (workspace / ".runtime" / "user" / "feedback.jsonl").resolve())
+            self.assertFalse(result.feedback_present)
             self.assertIn("Be concise.", result.injection_text)
 
     def test_preload_preferences_reports_missing_without_injection(self) -> None:
@@ -2743,6 +2811,7 @@ class PreferencesPreloadTests(unittest.TestCase):
             self.assertFalse(result.injected)
             self.assertEqual(result.injection_text, "")
             self.assertIsNone(result.error_code)
+            self.assertFalse(result.feedback_present)
 
     def test_preload_preferences_reports_invalid_utf8(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -4064,6 +4133,10 @@ class EngineIntegrationTests(unittest.TestCase):
                 manifest["runtime_first_hints"]["entry_guard_reason_code"],
                 "direct_edit_blocked_runtime_required",
             )
+            self.assertEqual(manifest["runtime_first_hints"]["required_entry"], "scripts/runtime_gate.py")
+            self.assertEqual(manifest["runtime_first_hints"]["required_subcommand"], "enter")
+            self.assertEqual(manifest["runtime_first_hints"]["direct_entry_block_error_code"], "runtime_gate_required")
+            self.assertEqual(manifest["runtime_first_hints"]["debug_bypass_flag"], "--allow-direct-entry")
             self.assertIn(".sopify-skills/plan/", manifest["runtime_first_hints"]["protected_path_prefixes"])
             self.assertIn("蓝图", manifest["runtime_first_hints"]["process_semantic_keywords"])
             self.assertIn("contract", manifest["runtime_first_hints"]["tradeoff_keywords"])
@@ -4550,6 +4623,12 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertIn("scripts/runtime_gate.py enter", blocked.stdout)
             self.assertIn("direct_edit_blocked_runtime_required", blocked.stdout)
             self.assertFalse((workspace / ".sopify-skills" / "state" / "current_handoff.json").exists())
+            receipt_payload = json.loads((workspace / ".sopify-skills" / "state" / "current_gate_receipt.json").read_text(encoding="utf-8"))
+            self.assertEqual(receipt_payload["error_code"], "runtime_gate_required")
+            self.assertEqual(receipt_payload["required_entry"], "scripts/runtime_gate.py")
+            self.assertEqual(receipt_payload["required_subcommand"], "enter")
+            self.assertEqual(receipt_payload["observability"]["ingress_mode"], "default_runtime_entry_blocked")
+            self.assertEqual(receipt_payload["trigger_evidence"]["direct_edit_guard_kind"], "protected_plan_asset")
 
             allowed = subprocess.run(
                 [

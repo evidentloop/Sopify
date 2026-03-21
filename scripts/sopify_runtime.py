@@ -14,8 +14,10 @@ if str(REPO_ROOT) not in sys.path:
 from runtime.cli import build_runtime_parser, execute_runtime_cli
 from runtime.config import ConfigError, load_runtime_config
 from runtime.entry_guard import DIRECT_EDIT_BLOCKED_RUNTIME_REQUIRED_REASON_CODE
+from runtime.gate import CURRENT_GATE_RECEIPT_FILENAME, ERROR_VISIBLE_RETRY, GATE_SCHEMA_VERSION, write_gate_receipt
 from runtime.output import render_runtime_error
 from runtime.router import match_runtime_first_guard
+from runtime.state import iso_now, stable_request_sha1, summarize_request_text
 
 DIRECT_ENTRY_BLOCKED_ERROR_CODE = "runtime_gate_required"
 
@@ -36,31 +38,67 @@ def _render_direct_entry_block(
         f"[reason_code={DIRECT_EDIT_BLOCKED_RUNTIME_REQUIRED_REASON_CODE}, "
         f"guard_kind={guard.get('guard_kind', '<unknown>')}, request={request}]"
     )
-    if as_json:
-        print(
-            json.dumps(
-                {
-                    "status": "error",
-                    "error_code": DIRECT_ENTRY_BLOCKED_ERROR_CODE,
-                    "message": message,
-                    "required_entry": "scripts/runtime_gate.py",
-                    "entry_guard_reason_code": DIRECT_EDIT_BLOCKED_RUNTIME_REQUIRED_REASON_CODE,
-                    "trigger_evidence": {
-                        "direct_edit_guard_kind": guard.get("guard_kind"),
-                        "direct_edit_guard_trigger": guard.get("reason"),
-                    },
-                },
-                ensure_ascii=False,
-                indent=2,
-            )
-        )
-        return 2
-
     config = None
     try:
         config = load_runtime_config(workspace_root, global_config_path=global_config_path)
     except ConfigError:
         config = None
+
+    receipt_path = (
+        config.state_dir / CURRENT_GATE_RECEIPT_FILENAME
+        if config is not None
+        else workspace_root / ".sopify-skills" / "state" / CURRENT_GATE_RECEIPT_FILENAME
+    )
+    contract = {
+        "schema_version": GATE_SCHEMA_VERSION,
+        "status": "error",
+        "gate_passed": False,
+        "workspace_root": str(workspace_root),
+        "preflight": {},
+        "preferences": {
+            "status": "missing",
+            "injected": False,
+        },
+        "runtime": {
+            "route_name": "workflow",
+            "reason": guard.get("reason"),
+        },
+        "handoff": {},
+        "trigger_evidence": {
+            "entry_guard_reason_code": DIRECT_EDIT_BLOCKED_RUNTIME_REQUIRED_REASON_CODE,
+            "direct_edit_guard_kind": guard.get("guard_kind"),
+            "direct_edit_guard_trigger": guard.get("reason"),
+        },
+        "observability": {
+            "receipt_kind": "direct_entry_block",
+            "ingress_mode": "default_runtime_entry_blocked",
+            "written_at": iso_now(),
+            "request_excerpt": summarize_request_text(request),
+            "request_sha1": stable_request_sha1(request),
+            "guard_kind": guard.get("guard_kind"),
+        },
+        "allowed_response_mode": ERROR_VISIBLE_RETRY,
+        "evidence": {
+            "manifest_found": (workspace_root / ".sopify-runtime" / "manifest.json").is_file(),
+            "handoff_found": False,
+            "strict_runtime_entry": False,
+            "handoff_source_kind": "missing",
+            "current_request_produced_handoff": False,
+            "persisted_handoff_matches_current_request": False,
+        },
+        "error_code": DIRECT_ENTRY_BLOCKED_ERROR_CODE,
+        "message": message,
+        "required_entry": "scripts/runtime_gate.py",
+        "required_subcommand": "enter",
+        "debug_bypass_flag": "--allow-direct-entry",
+        "entry_guard_reason_code": DIRECT_EDIT_BLOCKED_RUNTIME_REQUIRED_REASON_CODE,
+        "receipt_path": str(receipt_path),
+    }
+    write_gate_receipt(receipt_path, contract)
+    if as_json:
+        print(json.dumps(contract, ensure_ascii=False, indent=2))
+        return 2
+
     print(
         render_runtime_error(
             message,

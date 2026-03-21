@@ -367,6 +367,8 @@ def _develop_checkpoint_run_state(
         plan_id=context.current_plan.plan_id,
         plan_path=context.current_plan.path,
         execution_gate=context.current_run.execution_gate,
+        request_excerpt=context.current_run.request_excerpt,
+        request_sha1=context.current_run.request_sha1,
     )
 
 

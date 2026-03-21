@@ -1,5 +1,5 @@
 <!-- bootstrap: lang=en-US; encoding=UTF-8 -->
-<!-- SOPIFY_VERSION: 2026-03-21.163146 -->
+<!-- SOPIFY_VERSION: 2026-03-21.203721 -->
 <!-- ARCHITECTURE: Adaptive Workflow + Layered Rules -->
 
 # Sopify (Sop AI) Skills - Adaptive AI Programming Assistant
@@ -220,7 +220,7 @@ Complex: Files > 5, architectural changes, new features
 ```
 .sopify-skills/
 ├── blueprint/               # Project-level long-lived blueprint, tracked by default
-│   ├── README.md            # Pure index page with entry-level status only
+│   ├── README.md            # Pure index page with status/maintenance/current-goal/current-focus/read-next only
 │   ├── background.md
 │   ├── design.md
 │   └── tasks.md

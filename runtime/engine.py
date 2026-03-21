@@ -35,7 +35,16 @@ from .replay import ReplayWriter, build_compare_replay_event, build_decision_rep
 from .router import Router
 from .skill_registry import SkillRegistry
 from .skill_runner import SkillExecutionError, run_runtime_skill
-from .state import StateStore, iso_now, local_day_now, local_display_now, local_iso_now, local_timezone_name
+from .state import (
+    StateStore,
+    iso_now,
+    local_day_now,
+    local_display_now,
+    local_iso_now,
+    local_timezone_name,
+    stable_request_sha1,
+    summarize_request_text,
+)
 
 
 def run_runtime(
@@ -196,6 +205,8 @@ def run_runtime(
                                 plan_id=current_plan.plan_id,
                                 plan_path=current_plan.path,
                                 execution_gate=gate,
+                                request_excerpt=summarize_request_text(effective_route.request_text),
+                                request_sha1=stable_request_sha1(effective_route.request_text),
                             )
                         )
                         effective_route = _decision_pending_route(
@@ -231,6 +242,8 @@ def run_runtime(
                             plan_id=current_plan.plan_id,
                             plan_path=current_plan.path,
                             execution_gate=gate,
+                            request_excerpt=current_run.request_excerpt if current_run is not None else summarize_request_text(effective_route.request_text),
+                            request_sha1=current_run.request_sha1 if current_run is not None else stable_request_sha1(effective_route.request_text),
                         )
                     )
                     notes.extend(gate.notes)
@@ -401,6 +414,8 @@ def _make_run_state(
         plan_id=plan_artifact.plan_id,
         plan_path=plan_artifact.path,
         execution_gate=execution_gate,
+        request_excerpt=summarize_request_text(decision.request_text),
+        request_sha1=stable_request_sha1(decision.request_text),
     )
 
 
@@ -417,6 +432,8 @@ def _make_decision_run_state(decision: RouteDecision, decision_state: DecisionSt
         plan_id=None,
         plan_path=None,
         execution_gate=execution_gate,
+        request_excerpt=summarize_request_text(decision.request_text),
+        request_sha1=stable_request_sha1(decision.request_text),
     )
 
 
@@ -438,6 +455,8 @@ def _make_clarification_run_state(
         plan_id=None,
         plan_path=None,
         execution_gate=execution_gate,
+        request_excerpt=summarize_request_text(decision.request_text),
+        request_sha1=stable_request_sha1(decision.request_text),
     )
 
 
@@ -957,6 +976,8 @@ def _handle_execution_confirm(
                     plan_id=current_plan.plan_id,
                     plan_path=current_plan.path,
                     execution_gate=gate,
+                    request_excerpt=current_run.request_excerpt,
+                    request_sha1=current_run.request_sha1,
                 )
             )
             notes.extend(gate.notes)
@@ -1002,6 +1023,8 @@ def _handle_execution_confirm(
             plan_id=current_plan.plan_id,
             plan_path=current_plan.path,
             execution_gate=gate,
+            request_excerpt=current_run.request_excerpt,
+            request_sha1=current_run.request_sha1,
         )
     )
     notes.extend(gate.notes)
@@ -1123,6 +1146,8 @@ def _copy_run_state(
         plan_id=current_run.plan_id,
         plan_path=current_run.plan_path,
         execution_gate=next_execution_gate,
+        request_excerpt=current_run.request_excerpt,
+        request_sha1=current_run.request_sha1,
     )
 
 
@@ -1259,6 +1284,8 @@ def _apply_execution_gate_to_plan(
                     plan_id=plan_artifact.plan_id,
                     plan_path=plan_artifact.path,
                     execution_gate=gate,
+                    request_excerpt=summarize_request_text(decision.request_text),
+                    request_sha1=stable_request_sha1(decision.request_text),
                 )
             )
             notes.append(f"Execution gate requested a new decision: {gate_decision.decision_id}")
