@@ -98,11 +98,21 @@ Behavior summary:
 - `pre-commit` runs `scripts/release-preflight.sh` and then `scripts/release-sync.sh`.
 - Release-managed files are re-staged into the same commit when checks pass.
 - When `CHANGELOG.md -> [Unreleased]` is empty, `release-sync` auto-drafts grouped notes from the current staged files.
-- `commit-msg` only appends `Release-Sync`, `Release-Version`, and `Release-Date` trailers from the pre-commit handoff.
+- `commit-msg` appends `Co-authored-by` trailers for Claude and ChatGPT by default, and only appends `Release-Sync`, `Release-Version`, and `Release-Date` when the pre-commit handoff exists.
+
+AI attribution:
+
+- Default commit trailers:
+  - `Co-authored-by: Claude <claude@anthropic.com>`
+  - `Co-authored-by: ChatGPT <chatgpt@openai.com>`
+- Set `SOPIFY_DISABLE_AI_ATTRIBUTION=1` for a single commit when you need to skip the automatic AI attribution footers.
+- `SOPIFY_DISABLE_RELEASE_HOOK=1` disables the entire release hook chain and therefore also skips the default AI attribution trailers; use it only for maintainer/debug flows.
+- Repository-level AI collaborator acknowledgements live in [CONTRIBUTORS.md](./CONTRIBUTORS.md).
 
 Common environment toggles:
 
 - `SOPIFY_DISABLE_RELEASE_HOOK=1`
+- `SOPIFY_DISABLE_AI_ATTRIBUTION=1`
 - `SOPIFY_SKIP_RELEASE_PREFLIGHT=1`
 - `SOPIFY_AUTO_DRAFT_CHANGELOG=0`
 - `SOPIFY_RELEASE_HOOK_DRY_RUN=1`

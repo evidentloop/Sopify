@@ -126,6 +126,7 @@ def _init_release_hook_fixture(root: Path, *, missing_claude_targets: bool = Fal
         "scripts/check-skills-sync.sh",
         "scripts/check-version-consistency.sh",
         ".githooks/pre-commit",
+        ".githooks/commit-msg",
     ):
         _copy_script(relative, root)
 
@@ -161,6 +162,83 @@ def _init_release_hook_fixture(root: Path, *, missing_claude_targets: bool = Fal
 
 
 class ReleaseHookTests(unittest.TestCase):
+    def test_commit_msg_appends_default_ai_attribution_trailers(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            _init_release_hook_fixture(root)
+
+            message_file = root / "COMMIT_EDITMSG"
+            _write(message_file, "docs: update contribution guide\n")
+
+            completed = subprocess.run(
+                ["bash", str(root / ".githooks" / "commit-msg"), str(message_file)],
+                cwd=root,
+                capture_output=True,
+                text=True,
+                check=False,
+                env=_git_subprocess_env(),
+            )
+
+            self.assertEqual(completed.returncode, 0, msg=completed.stderr)
+            message = message_file.read_text(encoding="utf-8")
+            self.assertIn("Co-authored-by: Claude <claude@anthropic.com>", message)
+            self.assertIn("Co-authored-by: ChatGPT <chatgpt@openai.com>", message)
+            self.assertNotIn("Release-Sync:", message)
+
+    def test_commit_msg_respects_ai_attribution_disable_toggle(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            _init_release_hook_fixture(root)
+
+            message_file = root / "COMMIT_EDITMSG"
+            _write(message_file, "docs: update contribution guide\n")
+
+            completed = subprocess.run(
+                ["bash", str(root / ".githooks" / "commit-msg"), str(message_file)],
+                cwd=root,
+                capture_output=True,
+                text=True,
+                check=False,
+                env={**_git_subprocess_env(), "SOPIFY_DISABLE_AI_ATTRIBUTION": "1"},
+            )
+
+            self.assertEqual(completed.returncode, 0, msg=completed.stderr)
+            message = message_file.read_text(encoding="utf-8")
+            self.assertNotIn("Co-authored-by: Claude <claude@anthropic.com>", message)
+            self.assertNotIn("Co-authored-by: ChatGPT <chatgpt@openai.com>", message)
+
+    def test_commit_msg_does_not_duplicate_existing_ai_attribution_trailers(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            _init_release_hook_fixture(root)
+
+            message_file = root / "COMMIT_EDITMSG"
+            _write(
+                message_file,
+                textwrap.dedent(
+                    """\
+                    docs: update contribution guide
+
+                    Co-authored-by: Claude <claude@anthropic.com>
+                    Co-authored-by: ChatGPT <chatgpt@openai.com>
+                    """
+                ),
+            )
+
+            completed = subprocess.run(
+                ["bash", str(root / ".githooks" / "commit-msg"), str(message_file)],
+                cwd=root,
+                capture_output=True,
+                text=True,
+                check=False,
+                env=_git_subprocess_env(),
+            )
+
+            self.assertEqual(completed.returncode, 0, msg=completed.stderr)
+            message = message_file.read_text(encoding="utf-8")
+            self.assertEqual(message.count("Co-authored-by: Claude <claude@anthropic.com>"), 1)
+            self.assertEqual(message.count("Co-authored-by: ChatGPT <chatgpt@openai.com>"), 1)
+
     def test_release_draft_changelog_populates_empty_unreleased(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

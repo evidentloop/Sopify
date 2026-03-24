@@ -15,6 +15,28 @@ if [[ -z "$ROOT_DIR" || ! -d "$ROOT_DIR" ]]; then
   exit 0
 fi
 
+ensure_trailer_block() {
+  local file="$1"
+  shift
+  local missing=()
+  local line
+
+  for line in "$@"; do
+    if ! grep -Fqx "$line" "$file"; then
+      missing+=("$line")
+    fi
+  done
+
+  if [[ ${#missing[@]} -eq 0 ]]; then
+    return 0
+  fi
+
+  printf '\n' >>"$file"
+  for line in "${missing[@]}"; do
+    printf '%s\n' "$line" >>"$file"
+  done
+}
+
 upsert_trailer() {
   local file="$1"
   local key="$2"
@@ -49,6 +71,13 @@ upsert_trailer() {
 
   printf '\n%s: %s\n' "$key" "$value" >>"$file"
 }
+
+if [[ "${SOPIFY_DISABLE_AI_ATTRIBUTION:-0}" != "1" ]]; then
+  ensure_trailer_block \
+    "$MESSAGE_FILE" \
+    "Co-authored-by: Claude <claude@anthropic.com>" \
+    "Co-authored-by: ChatGPT <chatgpt@openai.com>"
+fi
 
 STATE_FILE="$(git -C "$ROOT_DIR" rev-parse --git-path .sopify-release-sync-state)"
 

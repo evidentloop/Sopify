@@ -6,6 +6,29 @@ This changelog is maintained manually (not auto-generated).
 
 ## [Unreleased]
 
+## [2026-03-24.174944] - 2026-03-24
+
+### Docs
+
+- Refined public documentation:
+  - `CONTRIBUTING.md`
+  - `CONTRIBUTING_CN.md`
+  - `README.md`
+  - `README_EN.md`
+
+### Tests
+
+- Updated automated coverage:
+  - `tests/test_release_hooks.py`
+
+### Changed
+
+- Updated project files:
+  - `.claude/settings.local.json`
+  - `.githooks/commit-msg`
+  - `.sopify-skills/blueprint/README.md`
+  - `CONTRIBUTORS.md`
+
 ## [2026-03-24.170253] - 2026-03-24
 
 ### Docs
