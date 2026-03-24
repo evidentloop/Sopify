@@ -4,6 +4,7 @@
 
 ## 索引
 
+- `2026-03-24` [`20260324_develop-quality-loop`](2026-03/20260324_develop-quality-loop/) - standard - 任务清单: develop-quality-loop
 - `2026-03-24` [`20260317_design_decision_confirmation`](2026-03/20260317_design_decision_confirmation/) - standard - 决策确认能力通用化（兼容现有接入链路）
 - `2026-03-24` [`20260320_helloagents_integration_enhancements`](2026-03/20260320_helloagents_integration_enhancements/) - standard - 借鉴 HelloAGENTS 的产品接入增强（`helloagents-integration-enhancements`）
 - `2026-03-24` [`20260323_models-tests-refactor`](2026-03/20260323_models-tests-refactor/) - standard - runtime models / tests 结构拆分与 bundle smoke 收敛

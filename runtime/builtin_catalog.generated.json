@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-03-19T10:32:14.131624+00:00",
+  "generated_at": "2026-03-24T14:07:30.902936+00:00",
   "schema_version": "1",
   "skills": [
     {
@@ -79,8 +79,8 @@
       ],
       "contract_version": "1",
       "descriptions": {
-        "en-US": "Detailed implementation-stage rules for code execution, validation, and KB sync.",
-        "zh-CN": "开发实施阶段详细规则；用于代码执行、验证与知识库同步。"
+        "en-US": "Detailed implementation-stage rules for code execution, task-level verification/review, and KB sync.",
+        "zh-CN": "开发实施阶段详细规则；用于代码执行、任务级验证/复审与知识库同步。"
       },
       "disallowed_tools": [],
       "entry_kind": null,

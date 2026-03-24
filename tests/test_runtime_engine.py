@@ -260,6 +260,10 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertEqual(result.route.route_name, "resume_active")
             self.assertEqual(result.recovered_context.current_run.stage, "executing")
             self.assertEqual(result.handoff.required_host_action, "continue_host_develop")
+            self.assertEqual(
+                result.handoff.artifacts["develop_quality_contract"]["verification_discovery_order"],
+                ["project_contract", "project_native", "not_configured"],
+            )
 
     def test_develop_checkpoint_helper_writes_decision_checkpoint_and_handoff(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -270,6 +274,7 @@ class EngineIntegrationTests(unittest.TestCase):
             inspected = inspect_develop_checkpoint_context(config=config)
             self.assertEqual(inspected["status"], "ready")
             self.assertEqual(inspected["required_host_action"], "continue_host_develop")
+            self.assertEqual(inspected["quality_contract"]["max_retry_count"], 1)
 
             submission = submit_develop_checkpoint(
                 {
@@ -302,6 +307,189 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertEqual(current_decision.phase, "develop")
             self.assertEqual(current_decision.resume_context["resume_after"], "continue_host_develop")
             self.assertEqual(store.get_current_handoff().artifacts["resume_context"]["working_summary"], "develop callback 已接入，需要确认认证边界。")
+
+    def test_develop_quality_report_updates_handoff_and_replay(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            _enter_active_develop_context(workspace)
+            config = load_runtime_config(workspace)
+
+            submission = submit_develop_quality_report(
+                {
+                    "schema_version": "1",
+                    "task_refs": ["2.1"],
+                    "changed_files": ["runtime/engine.py", "runtime/handoff.py"],
+                    "working_summary": "已把 develop 质量 contract 接到继续开发 handoff。",
+                    "verification_todo": ["补 develop replay 断言"],
+                    "quality_result": {
+                        "schema_version": "1",
+                        "verification_source": "project_native",
+                        "command": "python -m unittest tests.test_runtime_engine -v",
+                        "scope": "runtime/engine.py, runtime/handoff.py",
+                        "result": "passed",
+                        "retry_count": 0,
+                        "review_result": {
+                            "spec_compliance": {"status": "passed", "summary": "满足当前任务范围"},
+                            "code_quality": {"status": "passed", "summary": "修改面与任务规模匹配"},
+                        },
+                    },
+                },
+                config=config,
+            )
+
+            self.assertIsNone(submission.delegated_checkpoint)
+            self.assertEqual(submission.handoff.required_host_action, "continue_host_develop")
+            store = StateStore(config)
+            handoff = store.get_current_handoff()
+            self.assertEqual(handoff.artifacts["task_refs"], ["2.1"])
+            self.assertEqual(handoff.artifacts["verification_source"], "project_native")
+            self.assertEqual(handoff.artifacts["result"], "passed")
+            self.assertEqual(handoff.artifacts["retry_count"], 0)
+            self.assertEqual(handoff.artifacts["review_result"]["spec_compliance"]["status"], "passed")
+            self.assertIn("develop_quality_contract", handoff.artifacts)
+            session_text = (workspace / submission.replay_session_dir / "session.md").read_text(encoding="utf-8")
+            breakdown_text = (workspace / submission.replay_session_dir / "breakdown.md").read_text(encoding="utf-8")
+            self.assertIn("质量结果=passed", session_text)
+            self.assertIn("任务: 2.1", breakdown_text)
+
+    def test_develop_quality_report_requires_checkpoint_for_scope_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            _enter_active_develop_context(workspace)
+            config = load_runtime_config(workspace)
+
+            with self.assertRaisesRegex(DevelopCheckpointError, "requires checkpoint_kind"):
+                submit_develop_quality_report(
+                    {
+                        "schema_version": "1",
+                        "task_refs": ["3.1"],
+                        "changed_files": ["runtime/engine.py"],
+                        "working_summary": "当前改动已经超出原始范围。",
+                        "verification_todo": ["回到 plan review 重新整理任务"],
+                        "quality_result": {
+                            "schema_version": "1",
+                            "verification_source": "project_native",
+                            "command": "python -m unittest tests.test_runtime_engine -v",
+                            "scope": "runtime/engine.py",
+                            "result": "replan_required",
+                            "reason_code": "scope_changed",
+                            "retry_count": 1,
+                            "root_cause": "scope_or_design_mismatch",
+                            "review_result": {
+                                "spec_compliance": {"status": "failed", "summary": "用户反馈已超出当前 plan 边界"},
+                                "code_quality": {"status": "not_run", "summary": "等待新的范围决策"},
+                            },
+                        },
+                    },
+                    config=config,
+                )
+
+    def test_develop_quality_report_can_delegate_to_plan_review_checkpoint(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            _enter_active_develop_context(workspace)
+            config = load_runtime_config(workspace)
+
+            submission = submit_develop_quality_report(
+                {
+                    "schema_version": "1",
+                    "task_refs": ["3.1"],
+                    "changed_files": ["runtime/engine.py", "README.md"],
+                    "working_summary": "质量闭环确认当前改动已经超出原始范围。",
+                    "verification_todo": ["回到 plan review 重新整理任务"],
+                    "quality_result": {
+                        "schema_version": "1",
+                        "verification_source": "project_native",
+                        "command": "python -m unittest tests.test_runtime_engine -v",
+                        "scope": "runtime/engine.py, README.md",
+                        "result": "replan_required",
+                        "reason_code": "scope_changed",
+                        "retry_count": 1,
+                        "root_cause": "scope_or_design_mismatch",
+                        "review_result": {
+                            "spec_compliance": {"status": "failed", "summary": "已超出当前 plan 边界"},
+                            "code_quality": {"status": "not_run", "summary": "等待新的范围确认"},
+                        },
+                    },
+                    "checkpoint_kind": "decision",
+                    "question": "是否扩大本轮改动范围？",
+                    "summary": "质量闭环识别出 scope_or_design_mismatch，需要用户拍板。",
+                    "options": [
+                        {"id": "option_1", "title": "维持原范围", "summary": "回到 plan review", "recommended": True},
+                        {"id": "option_2", "title": "扩大范围", "summary": "进入新范围评审"},
+                    ],
+                },
+                config=config,
+            )
+
+            self.assertIsNotNone(submission.delegated_checkpoint)
+            self.assertEqual(submission.handoff.required_host_action, "confirm_decision")
+            store = StateStore(config)
+            handoff = store.get_current_handoff()
+            self.assertEqual(handoff.artifacts["result"], "replan_required")
+            self.assertEqual(handoff.artifacts["root_cause"], "scope_or_design_mismatch")
+            self.assertEqual(handoff.artifacts["resume_context"]["resume_after"], "review_or_execute_plan")
+            self.assertEqual(
+                handoff.artifacts["resume_context"]["develop_quality_result"]["result"],
+                "replan_required",
+            )
+
+    def test_develop_quality_result_is_carried_forward_after_decision_resume(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            _enter_active_develop_context(workspace)
+            config = load_runtime_config(workspace)
+
+            submit_develop_quality_report(
+                {
+                    "schema_version": "1",
+                    "task_refs": ["2.2"],
+                    "changed_files": ["runtime/engine.py"],
+                    "working_summary": "最近一次 develop task 已通过质量闭环。",
+                    "verification_todo": [],
+                    "quality_result": {
+                        "schema_version": "1",
+                        "verification_source": "project_native",
+                        "command": "python -m unittest tests.test_runtime_engine -v",
+                        "scope": "runtime/engine.py",
+                        "result": "passed",
+                        "retry_count": 0,
+                        "review_result": {
+                            "spec_compliance": {"status": "passed", "summary": "满足任务目标"},
+                            "code_quality": {"status": "passed", "summary": "代码风格一致"},
+                        },
+                    },
+                },
+                config=config,
+            )
+            submit_develop_checkpoint(
+                {
+                    "schema_version": "1",
+                    "checkpoint_kind": "decision",
+                    "question": "认证边界是否移动到 adapter 层？",
+                    "summary": "开发中已经形成两条可执行路径，需要用户拍板。",
+                    "options": [
+                        {"id": "option_1", "title": "保持现状", "summary": "边界继续留在当前层", "recommended": True},
+                        {"id": "option_2", "title": "移动边界", "summary": "把认证边界下推到 adapter 层"},
+                    ],
+                    "resume_context": {
+                        "active_run_stage": "executing",
+                        "current_plan_path": ".sopify-skills/plan/20260319_feature",
+                        "task_refs": ["2.2"],
+                        "changed_files": ["runtime/engine.py"],
+                        "working_summary": "认证边界待确认。",
+                        "verification_todo": [],
+                        "resume_after": "continue_host_develop",
+                    },
+                },
+                config=config,
+            )
+
+            resumed = run_runtime("1", workspace_root=workspace, user_home=workspace / "home")
+
+            self.assertEqual(resumed.handoff.required_host_action, "continue_host_develop")
+            self.assertEqual(resumed.handoff.artifacts["result"], "passed")
+            self.assertEqual(resumed.handoff.artifacts["task_refs"], ["2.2"])
 
     def test_develop_checkpoint_missing_kind_with_tradeoff_payload_emits_reason_code(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1472,6 +1660,7 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertTrue(manifest["capabilities"]["decision_checkpoint"])
             self.assertTrue(manifest["capabilities"]["decision_bridge"])
             self.assertTrue(manifest["capabilities"]["develop_checkpoint_callback"])
+            self.assertTrue(manifest["capabilities"]["develop_quality_feedback"])
             self.assertTrue(manifest["capabilities"]["develop_resume_context"])
             self.assertTrue(manifest["capabilities"]["execution_gate"])
             self.assertTrue(manifest["capabilities"]["plan_registry"])
@@ -1522,8 +1711,10 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertEqual(manifest["limits"]["decision_bridge_hosts"]["cli"]["select"], "interactive_select")
             self.assertEqual(manifest["limits"]["develop_checkpoint_entry"], "scripts/develop_checkpoint_runtime.py")
             self.assertEqual(manifest["limits"]["develop_checkpoint_hosts"]["cli"]["preferred_mode"], "structured_callback")
+            self.assertEqual(manifest["limits"]["develop_checkpoint_hosts"]["cli"]["submit_quality"], "json_payload")
             self.assertIn("working_summary", manifest["limits"]["develop_resume_context_required_fields"])
             self.assertIn("continue_host_develop", manifest["limits"]["develop_resume_after_actions"])
+            self.assertEqual(manifest["limits"]["develop_quality_contract_version"], "1")
             self.assertEqual(manifest["limits"]["plan_registry_entry"], "scripts/plan_registry_runtime.py")
             self.assertEqual(manifest["limits"]["plan_registry_hosts"]["cli"]["preferred_mode"], "inspect_only_summary")
             self.assertEqual(
@@ -1832,6 +2023,46 @@ class EngineIntegrationTests(unittest.TestCase):
             inspect_payload = json.loads(inspected.stdout)
             self.assertEqual(inspect_payload["status"], "ready")
             self.assertEqual(inspect_payload["required_host_action"], "continue_host_develop")
+            self.assertEqual(inspect_payload["quality_contract"]["max_retry_count"], 1)
+
+            quality_submitted = subprocess.run(
+                [
+                    sys.executable,
+                    str(helper_script),
+                    "--workspace-root",
+                    str(workspace),
+                    "submit-quality",
+                    "--payload-json",
+                    json.dumps(
+                        {
+                            "schema_version": "1",
+                            "task_refs": ["5.1"],
+                            "changed_files": ["runtime/develop_checkpoint.py"],
+                            "working_summary": "已记录 develop 质量结果。",
+                            "verification_todo": ["补 bundle helper 测试"],
+                            "quality_result": {
+                                "schema_version": "1",
+                                "verification_source": "project_native",
+                                "command": "python -m unittest tests.test_runtime_engine -v",
+                                "scope": "runtime/develop_checkpoint.py",
+                                "result": "passed",
+                                "retry_count": 0,
+                                "review_result": {
+                                    "spec_compliance": {"status": "passed", "summary": "满足当前任务范围"},
+                                    "code_quality": {"status": "passed", "summary": "修改面合理"},
+                                },
+                            },
+                        }
+                    ),
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(quality_submitted.returncode, 0, msg=quality_submitted.stderr)
+            quality_payload = json.loads(quality_submitted.stdout)
+            self.assertEqual(quality_payload["result"], "passed")
+            self.assertEqual(quality_payload["required_host_action"], "continue_host_develop")
 
             submitted = subprocess.run(
                 [

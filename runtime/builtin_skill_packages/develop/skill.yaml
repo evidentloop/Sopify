@@ -5,8 +5,8 @@ names:
   zh-CN: develop
   en-US: develop
 descriptions:
-  zh-CN: 开发实施阶段详细规则；用于代码执行、验证与知识库同步。
-  en-US: Detailed implementation-stage rules for code execution, validation, and KB sync.
+  zh-CN: 开发实施阶段详细规则；用于代码执行、任务级验证/复审与知识库同步。
+  en-US: Detailed implementation-stage rules for code execution, task-level verification/review, and KB sync.
 handoff_kind: develop
 contract_version: "1"
 supports_routes:

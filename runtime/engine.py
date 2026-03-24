@@ -620,6 +620,7 @@ def run_runtime(
     else:
         current_run = result_store.get_current_run() or recovered.current_run
         current_plan = plan_artifact or result_store.get_current_plan() or recovered.current_plan
+        previous_handoff = result_store.get_current_handoff()
         if effective_route.route_name == "finalize_active" and plan_artifact is not None:
             # Finalize clears active-flow state; only persist a completion handoff
             # when the archive transaction actually succeeded.
@@ -637,6 +638,7 @@ def run_runtime(
             current_clarification=result_store.get_current_clarification(),
             current_decision=result_store.get_current_decision(),
             notes=notes,
+            previous_handoff=previous_handoff,
         )
         if handoff is not None:
             if result_store is global_store:

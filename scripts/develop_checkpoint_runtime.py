@@ -21,6 +21,7 @@ from runtime.develop_checkpoint import (
     DevelopCheckpointError,
     inspect_develop_checkpoint_context,
     submit_develop_checkpoint,
+    submit_develop_quality_report,
 )
 
 
@@ -43,6 +44,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     submit_parser = subparsers.add_parser("submit", help="Write a structured develop callback payload.")
     submit_parser.add_argument("--payload-json", required=True, help="Structured develop callback payload as a JSON object.")
+
+    quality_parser = subparsers.add_parser(
+        "submit-quality",
+        help="Record a structured develop quality-loop payload and optionally delegate to a checkpoint.",
+    )
+    quality_parser.add_argument("--payload-json", required=True, help="Structured develop quality payload as a JSON object.")
     return parser
 
 
@@ -55,6 +62,8 @@ def main(argv: list[str] | None = None) -> int:
         config = load_runtime_config(workspace_root, global_config_path=args.global_config_path)
         if args.command == "inspect":
             payload = inspect_develop_checkpoint_context(config=config)
+        elif args.command == "submit-quality":
+            payload = _submit_quality(config=config, payload_json=args.payload_json)
         else:
             payload = _submit_callback(config=config, payload_json=args.payload_json)
     except (ConfigError, DevelopCheckpointError, ValueError, json.JSONDecodeError) as exc:
@@ -87,6 +96,27 @@ def _submit_callback(*, config, payload_json: str) -> dict[str, object]:
         "resume_after": submission.request.resume_context.get("resume_after")
         if isinstance(submission.request.resume_context, dict)
         else None,
+    }
+
+
+def _submit_quality(*, config, payload_json: str) -> dict[str, object]:
+    raw_payload = json.loads(payload_json)
+    if not isinstance(raw_payload, dict):
+        raise ValueError("payload-json must decode to an object")
+
+    submission = submit_develop_quality_report(raw_payload, config=config)
+    delegated_checkpoint = submission.delegated_checkpoint
+    checkpoint_kind = delegated_checkpoint.request.checkpoint_kind if delegated_checkpoint is not None else None
+
+    return {
+        "status": "written",
+        "result": submission.quality_result["result"],
+        "task_refs": list(submission.quality_context["task_refs"]),
+        "required_host_action": submission.handoff.required_host_action,
+        "route_name": submission.handoff.route_name,
+        "checkpoint_kind": checkpoint_kind,
+        "handoff_file": ".sopify-skills/state/current_handoff.json",
+        "replay_session_dir": submission.replay_session_dir,
     }
 
 

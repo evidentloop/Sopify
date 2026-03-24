@@ -152,6 +152,7 @@ def build_bundle_manifest(
             "clarification_checkpoint": True,
             "clarification_bridge": True,
             "develop_checkpoint_callback": True,
+            "develop_quality_feedback": True,
             "develop_resume_context": True,
             "execution_gate": True,
             "plan_registry": True,
@@ -239,10 +240,12 @@ def build_bundle_manifest(
                     "preferred_mode": "structured_callback",
                     "inspect": "json_contract",
                     "submit": "json_payload",
+                    "submit_quality": "json_payload",
                 },
             },
             "develop_resume_context_required_fields": list(DEVELOP_RESUME_CONTEXT_REQUIRED_FIELDS),
             "develop_resume_after_actions": list(DEVELOP_RESUME_AFTER_ACTIONS),
+            "develop_quality_contract_version": "1",
             "plan_registry_entry": PLAN_REGISTRY_ENTRY,
             "plan_registry_hosts": {
                 "cli": {

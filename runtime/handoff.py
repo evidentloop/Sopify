@@ -18,6 +18,7 @@ from .checkpoint_request import (
 )
 from .clarification import CURRENT_CLARIFICATION_RELATIVE_PATH, build_scope_clarification_form, clarification_submission_state_payload
 from .compare_decision import build_compare_decision_contract
+from .develop_quality import build_develop_quality_contract, carry_forward_develop_quality_artifacts
 from .decision_policy import has_tradeoff_checkpoint_signal
 from .decision import CURRENT_DECISION_RELATIVE_PATH
 from .entry_guard import build_entry_guard_contract
@@ -60,6 +61,7 @@ def build_runtime_handoff(
     current_clarification: Any | None,
     current_decision: Any | None,
     notes: Sequence[str],
+    previous_handoff: RuntimeHandoff | None = None,
 ) -> RuntimeHandoff | None:
     """Build the structured host handoff for an actionable route."""
     handoff_kind = _ROUTE_HANDOFF_KIND.get(decision.route_name)
@@ -92,6 +94,7 @@ def build_runtime_handoff(
         current_clarification=current_clarification,
         current_decision=current_decision,
         required_host_action=required_host_action,
+        previous_handoff=previous_handoff,
     )
     guard_reason_code = str(artifacts.get("entry_guard_reason_code") or "").strip()
     if guard_reason_code:
@@ -207,6 +210,7 @@ def _collect_handoff_artifacts(
     current_clarification: Any | None,
     current_decision: Any | None,
     required_host_action: str,
+    previous_handoff: RuntimeHandoff | None,
 ) -> Mapping[str, Any]:
     artifacts: dict[str, Any] = {}
     entry_guard = build_entry_guard_contract(required_host_action=required_host_action)
@@ -236,6 +240,15 @@ def _collect_handoff_artifacts(
         artifacts["execution_summary"] = execution_summary_payload.to_dict()
     if current_plan is not None and current_plan.files:
         artifacts["plan_files"] = list(current_plan.files)
+    if required_host_action == "continue_host_develop":
+        artifacts["develop_quality_contract"] = build_develop_quality_contract()
+        carry_forward_develop_quality_artifacts(artifacts, source=decision.artifacts)
+        if (
+            previous_handoff is not None
+            and current_plan is not None
+            and previous_handoff.plan_id == current_plan.plan_id
+        ):
+            carry_forward_develop_quality_artifacts(artifacts, source=previous_handoff.artifacts)
     if decision.route_name == "finalize_active" and current_plan is not None:
         if _is_plan_archived(config=config, plan_path=current_plan.path):
             artifacts["finalize_status"] = "completed"
@@ -379,6 +392,7 @@ def _attach_resume_context_artifacts(
     artifacts["resume_context"] = normalized
     if str(phase or "").strip() == "develop":
         artifacts["develop_resume_context"] = normalized
+        carry_forward_develop_quality_artifacts(artifacts, source=normalized)
 
 
 def _should_attach_execution_summary(*, decision: RouteDecision, current_run: RunState | None) -> bool:

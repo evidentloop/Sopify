@@ -140,6 +140,8 @@ knowledge_sync:
 - 当 `required_host_action == continue_host_develop` 时，宿主继续负责代码修改。
 - 若开发中再次出现用户拍板分叉，宿主必须调用 `scripts/develop_checkpoint_runtime.py` 回调 runtime。
 - payload 至少带上 `active_run_stage / current_plan_path / task_refs / changed_files / working_summary / verification_todo`。
+- 若只是回传最近一次 task 的质量结果而未触发用户分叉，宿主仍应通过同一个 helper 的 `submit-quality` 子命令上报结构化 develop 质量结果，而不是手写 `current_handoff.json`。
+- develop handoff 会暴露 `develop_quality_contract`，其 discovery order、result/root_cause 值域与两阶段复审字段是宿主继续开发时的单一事实源。
 
 ### Execution gate 与 execution confirm
 

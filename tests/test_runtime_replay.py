@@ -87,3 +87,50 @@ class ReplayWriterTests(unittest.TestCase):
         self.assertIn("已提供补充说明", joined)
         self.assertNotIn("token=secret", joined)
         self.assertNotIn("password=123", joined)
+
+    def test_develop_quality_replay_event_renders_summary_and_redacts(self) -> None:
+        event = build_develop_quality_replay_event(
+            ts=iso_now(),
+            payload={
+                "task_refs": ["2.1"],
+                "changed_files": ["runtime/engine.py"],
+                "working_summary": "password=secret 不应进入 replay。",
+                "verification_todo": ["补 token=secret 相关断言"],
+                "develop_quality_result": {
+                    "schema_version": "1",
+                    "verification_source": "project_native",
+                    "command": "pytest tests/test_runtime_engine.py -k token=secret",
+                    "scope": "runtime/engine.py",
+                    "result": "failed",
+                    "reason_code": "test_failed",
+                    "retry_count": 1,
+                    "root_cause": "logic_regression",
+                    "review_result": {
+                        "spec_compliance": {"status": "failed", "summary": "password=secret"},
+                        "code_quality": {"status": "passed", "summary": "结构仍然合理"},
+                    },
+                },
+            },
+            language="zh-CN",
+        )
+
+        self.assertEqual(event.phase, "develop")
+        self.assertEqual(event.action, "develop:quality_loop")
+        self.assertIn("质量结果=failed", event.key_output)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            config = load_runtime_config(workspace)
+            writer = ReplayWriter(config)
+            writer.append_event("run-quality", event)
+            writer.render_documents(
+                "run-quality",
+                run_state=None,
+                route=RouteDecision(route_name="resume_active", request_text="继续", reason="test"),
+                plan_artifact=None,
+                events=writer.load_events("run-quality"),
+            )
+            session_text = (config.replay_root / "run-quality" / "session.md").read_text(encoding="utf-8")
+            breakdown_text = (config.replay_root / "run-quality" / "breakdown.md").read_text(encoding="utf-8")
+            self.assertIn("<REDACTED>", session_text)
+            self.assertIn("<REDACTED>", breakdown_text)

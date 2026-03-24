@@ -21,9 +21,21 @@ from .checkpoint_request import (
     CheckpointRequestError,
     normalize_checkpoint_request,
 )
+from .develop_quality import (
+    DEVELOP_QUALITY_CONTEXT_FIELDS,
+    DEVELOP_QUALITY_SCHEMA_VERSION,
+    DevelopQualityError,
+    attach_develop_quality_artifacts,
+    build_develop_quality_contract,
+    extract_develop_quality_result,
+    normalize_develop_quality_context,
+    normalize_develop_quality_result,
+    requires_develop_checkpoint,
+)
 from .decision_policy import has_tradeoff_checkpoint_signal
 from .handoff import build_runtime_handoff
 from .models import PlanArtifact, RouteDecision, RunState, RuntimeConfig, RuntimeHandoff
+from .replay import ReplayWriter, build_develop_quality_replay_event
 from .state import StateStore, iso_now
 
 DEVELOP_CHECKPOINT_SCHEMA_VERSION = "1"
@@ -57,6 +69,18 @@ class DevelopCheckpointSubmission:
     handoff: RuntimeHandoff
 
 
+@dataclass(frozen=True)
+class DevelopQualitySubmission:
+    """Normalized develop quality-loop report written back into runtime state."""
+
+    quality_context: Mapping[str, Any]
+    quality_result: Mapping[str, Any]
+    run_state: RunState
+    handoff: RuntimeHandoff
+    replay_session_dir: str | None
+    delegated_checkpoint: DevelopCheckpointSubmission | None = None
+
+
 def inspect_develop_checkpoint_context(*, config: RuntimeConfig) -> Mapping[str, Any]:
     """Return the current develop context expected by the host callback entry."""
     context = load_active_develop_context(config=config)
@@ -80,6 +104,8 @@ def inspect_develop_checkpoint_context(*, config: RuntimeConfig) -> Mapping[str,
         },
         "required_resume_context_fields": list(DEVELOP_RESUME_CONTEXT_REQUIRED_FIELDS),
         "allowed_resume_after": list(DEVELOP_RESUME_AFTER_ACTIONS),
+        "quality_contract": build_develop_quality_contract(),
+        "quality_context_fields": list(DEVELOP_QUALITY_CONTEXT_FIELDS),
     }
 
 
@@ -160,6 +186,7 @@ def submit_develop_checkpoint(
             f"Develop checkpoint callback created: {request.checkpoint_id}",
             f"Develop checkpoint resume_after={develop_resume_after(request.resume_context)}",
         ),
+        previous_handoff=context.current_handoff,
     )
     if handoff is None:  # pragma: no cover - defensive guard
         raise DevelopCheckpointError("develop checkpoint callback could not build a runtime handoff")
@@ -172,6 +199,81 @@ def submit_develop_checkpoint(
         run_state=run_state,
         route=route,
         handoff=handoff,
+    )
+
+
+def submit_develop_quality_report(
+    raw_payload: Mapping[str, Any],
+    *,
+    config: RuntimeConfig,
+) -> DevelopQualitySubmission:
+    """Persist a structured develop quality-loop result for the active host flow."""
+    context = load_active_develop_context(config=config)
+    if not isinstance(raw_payload, Mapping):
+        raise DevelopCheckpointError("develop quality payload must be an object")
+
+    payload_version = str(raw_payload.get("schema_version") or DEVELOP_QUALITY_SCHEMA_VERSION).strip()
+    if payload_version != DEVELOP_QUALITY_SCHEMA_VERSION:
+        raise DevelopCheckpointError(
+            f"unsupported develop quality payload schema_version: {payload_version or '<missing>'}"
+        )
+
+    try:
+        quality_context = normalize_develop_quality_context(raw_payload)
+        raw_quality_result = raw_payload.get("quality_result")
+        if isinstance(raw_quality_result, Mapping):
+            quality_result = normalize_develop_quality_result(raw_quality_result)
+        else:
+            quality_result = normalize_develop_quality_result(raw_payload)
+    except DevelopQualityError as exc:
+        raise DevelopCheckpointError(str(exc)) from exc
+
+    if requires_develop_checkpoint(quality_result):
+        delegated = _submit_quality_checkpoint(
+            raw_payload,
+            context=context,
+            quality_context=quality_context,
+            quality_result=quality_result,
+            config=config,
+        )
+        replay_session_dir = _record_develop_quality_replay(
+            config=config,
+            context=context,
+            quality_context=quality_context,
+            quality_result=quality_result,
+            run_state=delegated.run_state,
+        )
+        return DevelopQualitySubmission(
+            quality_context=quality_context,
+            quality_result=quality_result,
+            run_state=delegated.run_state,
+            handoff=delegated.handoff,
+            replay_session_dir=replay_session_dir,
+            delegated_checkpoint=delegated,
+        )
+
+    state_store = context.state_store
+    run_state = _copy_run_state(context.current_run)
+    state_store.set_current_run(run_state)
+    handoff = _with_quality_handoff(
+        context.current_handoff,
+        quality_context=quality_context,
+        quality_result=quality_result,
+    )
+    state_store.set_current_handoff(handoff)
+    replay_session_dir = _record_develop_quality_replay(
+        config=config,
+        context=context,
+        quality_context=quality_context,
+        quality_result=quality_result,
+        run_state=run_state,
+    )
+    return DevelopQualitySubmission(
+        quality_context=quality_context,
+        quality_result=quality_result,
+        run_state=run_state,
+        handoff=handoff,
+        replay_session_dir=replay_session_dir,
     )
 
 
@@ -306,6 +408,19 @@ def _normalize_resume_context(
     if context.current_run.execution_gate is not None:
         normalized.setdefault("execution_gate", context.current_run.execution_gate.to_dict())
 
+    raw_quality_result = raw_payload.get("quality_result")
+    if isinstance(raw_quality_result, Mapping):
+        try:
+            normalized["develop_quality_result"] = normalize_develop_quality_result(raw_quality_result)
+        except DevelopQualityError as exc:
+            raise DevelopCheckpointError(str(exc)) from exc
+    else:
+        inherited_quality_result = extract_develop_quality_result(context.current_handoff.artifacts)
+        if inherited_quality_result is not None:
+            # Preserve the latest stable quality summary across user-facing
+            # develop checkpoints so resume-active handoffs do not lose it.
+            normalized["develop_quality_result"] = inherited_quality_result
+
     for list_field in ("task_refs", "changed_files", "verification_todo"):
         if list_field in normalized:
             normalized[list_field] = list(_normalize_string_list(normalized.get(list_field)))
@@ -321,6 +436,39 @@ def _normalize_resume_context(
     resume_after = develop_resume_after(normalized)
     normalized["resume_after"] = resume_after
     return normalized
+
+
+def _submit_quality_checkpoint(
+    raw_payload: Mapping[str, Any],
+    *,
+    context: ActiveDevelopContext,
+    quality_context: Mapping[str, Any],
+    quality_result: Mapping[str, Any],
+    config: RuntimeConfig,
+) -> DevelopCheckpointSubmission:
+    checkpoint_kind = str(raw_payload.get("checkpoint_kind") or "").strip()
+    if checkpoint_kind not in DEVELOP_CHECKPOINT_ALLOWED_KINDS:
+        raise DevelopCheckpointError(
+            "develop quality replan_required requires checkpoint_kind=decision|clarification so runtime can route through develop_checkpoint"
+        )
+
+    checkpoint_payload = {
+        key: value
+        for key, value in raw_payload.items()
+        if key not in {"task_refs", "changed_files", "working_summary", "verification_todo", "quality_result"}
+    }
+    resume_context = dict(checkpoint_payload.get("resume_context") or {})
+    resume_context.setdefault("task_refs", list(quality_context["task_refs"]))
+    resume_context.setdefault("changed_files", list(quality_context["changed_files"]))
+    resume_context.setdefault("working_summary", quality_context["working_summary"])
+    resume_context.setdefault("verification_todo", list(quality_context["verification_todo"]))
+    resume_context.setdefault("resume_after", "review_or_execute_plan")
+    resume_context["develop_quality_result"] = quality_result
+    checkpoint_payload["resume_context"] = resume_context
+    checkpoint_payload["quality_result"] = quality_result
+    checkpoint_payload.setdefault("summary", quality_context["working_summary"])
+    checkpoint_payload.setdefault("request_text", context.current_run.request_excerpt or context.current_plan.summary)
+    return submit_develop_checkpoint(checkpoint_payload, config=config)
 
 
 def _develop_checkpoint_route(*, request: CheckpointRequest, current_plan: PlanArtifact) -> RouteDecision:
@@ -342,6 +490,82 @@ def _develop_checkpoint_route(*, request: CheckpointRequest, current_plan: PlanA
         capture_mode=request.capture_mode,
         active_run_action="inspect_decision" if route_name == "decision_pending" else "inspect_clarification",
     )
+
+
+def _with_quality_handoff(
+    current_handoff: RuntimeHandoff,
+    *,
+    quality_context: Mapping[str, Any],
+    quality_result: Mapping[str, Any],
+) -> RuntimeHandoff:
+    artifacts = dict(current_handoff.artifacts)
+    artifacts["develop_quality_contract"] = build_develop_quality_contract()
+    attach_develop_quality_artifacts(
+        artifacts,
+        quality_result=quality_result,
+        quality_context=quality_context,
+    )
+
+    notes = tuple(
+        dict.fromkeys(
+            (
+                *current_handoff.notes,
+                f"Develop quality result recorded: {quality_result['result']}",
+            )
+        )
+    )
+    observability = dict(current_handoff.observability)
+    observability["develop_quality_result"] = quality_result["result"]
+    observability["updated_at"] = iso_now()
+    return RuntimeHandoff(
+        schema_version=current_handoff.schema_version,
+        route_name=current_handoff.route_name,
+        run_id=current_handoff.run_id,
+        plan_id=current_handoff.plan_id,
+        plan_path=current_handoff.plan_path,
+        handoff_kind=current_handoff.handoff_kind,
+        required_host_action=current_handoff.required_host_action,
+        recommended_skill_ids=current_handoff.recommended_skill_ids,
+        artifacts=artifacts,
+        notes=notes,
+        observability=observability,
+    )
+
+
+def _record_develop_quality_replay(
+    *,
+    config: RuntimeConfig,
+    context: ActiveDevelopContext,
+    quality_context: Mapping[str, Any],
+    quality_result: Mapping[str, Any],
+    run_state: RunState | None = None,
+) -> str:
+    payload = dict(quality_context)
+    payload["develop_quality_result"] = quality_result
+    writer = ReplayWriter(config)
+    event = build_develop_quality_replay_event(
+        ts=iso_now(),
+        payload=payload,
+        language=config.language,
+    )
+    run_state = run_state or context.current_run
+    session_dir = writer.append_event(run_state.run_id, event)
+    writer.render_documents(
+        run_state.run_id,
+        run_state=run_state,
+        route=RouteDecision(
+            route_name="resume_active",
+            request_text=quality_context["working_summary"],
+            reason="Develop quality result recorded",
+            complexity="medium",
+            candidate_skill_ids=("develop",),
+            should_recover_context=True,
+            should_create_plan=False,
+        ),
+        plan_artifact=context.current_plan,
+        events=writer.load_events(run_state.run_id),
+    )
+    return str(session_dir.relative_to(config.workspace_root))
 
 
 def _develop_checkpoint_run_state(
@@ -369,6 +593,27 @@ def _develop_checkpoint_run_state(
         execution_gate=context.current_run.execution_gate,
         request_excerpt=context.current_run.request_excerpt,
         request_sha1=context.current_run.request_sha1,
+    )
+
+
+def _copy_run_state(current_run: RunState) -> RunState:
+    """Keep coarse execution truth stable while refreshing the updated timestamp."""
+    return RunState(
+        run_id=current_run.run_id,
+        status=current_run.status,
+        stage=current_run.stage,
+        route_name=current_run.route_name,
+        title=current_run.title,
+        created_at=current_run.created_at,
+        updated_at=iso_now(),
+        plan_id=current_run.plan_id,
+        plan_path=current_run.plan_path,
+        execution_gate=current_run.execution_gate,
+        request_excerpt=current_run.request_excerpt,
+        request_sha1=current_run.request_sha1,
+        owner_session_id=current_run.owner_session_id,
+        owner_host=current_run.owner_host,
+        owner_run_id=current_run.owner_run_id,
     )
 
 

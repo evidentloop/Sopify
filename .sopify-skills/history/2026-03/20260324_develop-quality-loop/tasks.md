@@ -2,13 +2,13 @@
 plan_id: 20260324_develop-quality-loop
 feature_key: develop-quality-loop
 level: standard
-lifecycle_state: active
+lifecycle_state: archived
 knowledge_sync:
   project: review
   background: review
   design: review
   tasks: review
-archive_ready: false
+archive_ready: true
 ---
 
 # 任务清单: develop-quality-loop
@@ -16,19 +16,19 @@ archive_ready: false
 ## Group 0 — Pre-flight 准入检查
 
 - [x] 0.1 上游 `20260320_helloagents_integration_enhancements` 已归档，原先的实施顺序前置依赖已满足
-- [ ] 0.2 在进入 Group 1 前，复核本 plan 是否已经达到 implementation-ready：执行范围、统一 contract 命名、首个落地切片与验证方式都已明确；若 runtime 仍停留在 `plan_generated` 且 `execution_gate.blocked=missing_info`，不得直接声称 ready-to-implement
+- [x] 0.2 在进入 Group 1 前，复核本 plan 是否已经达到 implementation-ready：执行范围、统一 contract 命名、首个落地切片与验证方式都已明确；本轮确认首个落地切片就是四套 develop 规则镜像 + `runtime/builtin_skill_packages/develop/skill.yaml`
 
 **Gate — Group 0 完成后：**
-- [ ] 0.G 仅当 0.2 通过后，才进入 Group 1 的实际实施
+- [x] 0.G 0.2 已通过，进入 Group 1 的实际实施
 
 ## Group 1 — 固化 v1 contract 与规则镜像
 
-- [ ] 1.1 在 `Codex/Skills/*/sopify/develop/references/develop-rules.md` 与 `Claude/Skills/*/sopify/develop/references/develop-rules.md` 中固化 `verify` contract 的最小字段、统一命名与写法边界：统一使用 `verification_source / command / scope / result / reason_code / retry_count / root_cause / review_result`，不再混用 `discovery_source / status / configured / discovered` 等别名，并明确 `.sopify-skills/project.md verify` 只作为后续长期约定落点
-- [ ] 1.2 在 `Codex/Skills/*/sopify/develop/references/develop-rules.md` 与 `Claude/Skills/*/sopify/develop/references/develop-rules.md` 中，把“验证修改正确性”改成显式质量循环：验证发现、验证执行、一次重试、根因分类、两阶段复审，并用简短镜像说明固化“无验证证据不算完成”及少量高频逃逸路径（如 overbuild / underbuild / “应该没问题”）
-- [ ] 1.3 复核 `runtime/builtin_skill_packages/develop/skill.yaml` 的描述与 contract version 是否仍与新规则一致
+- [x] 1.1 在 `Codex/Skills/*/sopify/develop/references/develop-rules.md` 与 `Claude/Skills/*/sopify/develop/references/develop-rules.md` 中固化 `verify` contract 的最小字段、统一命名与写法边界：统一使用 `verification_source / command / scope / result / reason_code / retry_count / root_cause / review_result`，不再混用 `discovery_source / status / configured / discovered` 等别名，并明确 `.sopify-skills/project.md verify` 只作为后续长期约定落点
+- [x] 1.2 在 `Codex/Skills/*/sopify/develop/references/develop-rules.md` 与 `Claude/Skills/*/sopify/develop/references/develop-rules.md` 中，把“验证修改正确性”改成显式质量循环：验证发现、验证执行、一次重试、根因分类、两阶段复审，并用简短镜像说明固化“无验证证据不算完成”及少量高频逃逸路径（如 overbuild / underbuild / “应该没问题”）
+- [x] 1.3 复核 `runtime/builtin_skill_packages/develop/skill.yaml` 的描述与 contract version 是否仍与新规则一致；本轮更新描述并保持 `contract_version: "1"`，避免 skill 元数据先于 runtime contract 升级
 
 **Gate — Group 1 完成后：**
-- [ ] 1.G develop 的文字规则已经存在单一口径，且显式包含验证发现顺序、统一 contract 命名、重试上限、根因分类、两阶段复审四节，不再依赖聊天上下文补充解释
+- [x] 1.G develop 的文字规则已经存在单一口径，且显式包含验证发现顺序、统一 contract 命名、重试上限、根因分类、两阶段复审四节，不再依赖聊天上下文补充解释
 
 验收标准:
 
@@ -38,13 +38,13 @@ archive_ready: false
 
 ## Group 2 — 接入 task-level 质量循环
 
-- [ ] 2.1 在 `runtime/engine.py` 中为 develop task loop 加入验证命令发现与执行挂点，不绕过现有 `execution_gate` / `develop_checkpoint` 主链，并把 `verification_source / command / result` 作为 task 完成前必须具备的 machine contract
-- [ ] 2.2 实现验证发现优先级：`.sopify-skills/project.md verify` > 项目原生脚本/配置 > `not_configured / skipped_with_reason`
-- [ ] 2.3 实现“最多一次重试”与结构化根因分类：`logic_regression` / `environment_or_dependency` / `missing_test_infra` / `scope_or_design_mismatch`，并要求失败/重试路径上必须存在 `root_cause`
-- [ ] 2.4 当失败本质是范围变化或设计分叉时，复用 `runtime/develop_checkpoint.py` 回到 `review_or_execute_plan` 或 `confirm_decision`，而不是继续盲修
+- [x] 2.1 在 `runtime/engine.py` 中为 develop task loop 加入验证命令发现与执行挂点，不绕过现有 `execution_gate` / `develop_checkpoint` 主链，并把 `verification_source / command / result` 作为 task 完成前必须具备的 machine contract；本轮通过 `continue_host_develop` handoff + quality helper 形成 host-owned task loop 挂点
+- [x] 2.2 实现验证发现优先级：`.sopify-skills/project.md verify` > 项目原生脚本/配置 > `not_configured / skipped_with_reason`
+- [x] 2.3 实现“最多一次重试”与结构化根因分类：`logic_regression` / `environment_or_dependency` / `missing_test_infra` / `scope_or_design_mismatch`，并要求失败/重试路径上必须存在 `root_cause`
+- [x] 2.4 当失败本质是范围变化或设计分叉时，复用 `runtime/develop_checkpoint.py` 回到 `review_or_execute_plan` 或 `confirm_decision`，而不是继续盲修
 
 **Gate — Group 2 完成后：**
-- [ ] 2.G develop loop 已能表达 `passed / retried / failed / skipped / replan_required` 等稳定结果，且不存在静默跳过与无限重试
+- [x] 2.G develop loop 已能表达 `passed / retried / failed / skipped / replan_required` 等稳定结果，且不存在静默跳过与无限重试
 
 验收标准:
 
@@ -54,13 +54,13 @@ archive_ready: false
 
 ## Group 3 — 两阶段复审与结果记录
 
-- [ ] 3.1 定义 `spec_compliance` 与 `code_quality` 两阶段复审的最小检查项，并同步到 develop 规则镜像
-- [ ] 3.2 扩展 `runtime/handoff.py` / `runtime/engine.py` 产出的 artifacts，使其至少包含最近一次 task 的 `verification_source / command / result / retry_count / root_cause / review_result`
-- [ ] 3.3 扩展 `runtime/replay.py` 的 develop 事件与 `session.md` / `breakdown.md` 渲染，让复盘能直接看到质量闭环结果
-- [ ] 3.4 复核 `runtime/state.py` 与 checkpoint `resume_context` 的最小字段，保证恢复链路能看到 `task_refs / working_summary / verification_todo / resume_after`
+- [x] 3.1 定义 `spec_compliance` 与 `code_quality` 两阶段复审的最小检查项，并同步到 develop 规则镜像
+- [x] 3.2 扩展 `runtime/handoff.py` / `runtime/engine.py` 产出的 artifacts，使其至少包含最近一次 task 的 `verification_source / command / result / retry_count / root_cause / review_result`
+- [x] 3.3 扩展 `runtime/replay.py` 的 develop 事件与 `session.md` / `breakdown.md` 渲染，让复盘能直接看到质量闭环结果
+- [x] 3.4 复核 `runtime/state.py` 与 checkpoint `resume_context` 的最小字段，保证恢复链路能看到 `task_refs / working_summary / verification_todo / resume_after`
 
 **Gate — Group 3 完成后：**
-- [ ] 3.G `current_handoff.json.artifacts` 已包含 `task_refs / verification_source / command / result / retry_count / root_cause / review_result`，`replay` 至少新增一条 develop 质量事件，且 checkpoint `resume_context` 保留 `verification_todo`
+- [x] 3.G `current_handoff.json.artifacts` 已包含 `task_refs / verification_source / command / result / retry_count / root_cause / review_result`，`replay` 至少新增一条 develop 质量事件，且 checkpoint `resume_context` 保留 `verification_todo`
 
 验收标准:
 
@@ -70,12 +70,12 @@ archive_ready: false
 
 ## Group 4 — 测试补齐
 
-- [ ] 4.1 在 `tests/test_runtime_engine.py` 中补 discovery priority、一次重试、根因分类、回退 plan review、无命令显式降级等行为测试
-- [ ] 4.2 在 `tests/test_runtime_replay.py` 中补 develop 质量事件渲染与脱敏测试
-- [ ] 4.3 若 summary / execution gate 可见面受影响，则补 `tests/test_runtime_summary.py` 与 `tests/test_runtime_execution_gate.py` 的 contract 断言
+- [x] 4.1 在 `tests/test_runtime_engine.py` 中补 discovery priority、一次重试、根因分类、回退 plan review、无命令显式降级等行为测试
+- [x] 4.2 在 `tests/test_runtime_replay.py` 中补 develop 质量事件渲染与脱敏测试
+- [-] 4.3 summary / execution gate 可见面本轮未新增 develop 质量字段，因此不单独补 `tests/test_runtime_summary.py` 与 `tests/test_runtime_execution_gate.py`
 
 **Gate — Group 4 完成后：**
-- [ ] 4.G 新质量循环由稳定测试覆盖，且不回归现有 `execution_gate` / `develop_checkpoint` / replay contract
+- [x] 4.G 新质量循环由稳定测试覆盖，且不回归现有 `execution_gate` / `develop_checkpoint` / replay contract；已使用 Python 3.11.13 执行 `tests.test_runtime_engine` 与 `tests.test_runtime_replay`
 
 验收标准:
 
@@ -85,8 +85,8 @@ archive_ready: false
 
 ## Group 5 — 文档与知识同步
 
-- [ ] 5.1 当 verify contract 稳定后，再把长期约定写入 `.sopify-skills/project.md`
-- [ ] 5.2 仅在 develop 质量 contract 成为长期项目规则时，更新 `.sopify-skills/blueprint/` 或 README 面向用户的说明
+- [x] 5.1 当 verify contract 稳定后，再把长期约定写入 `.sopify-skills/project.md`
+- [x] 5.2 仅在 develop 质量 contract 成为长期项目规则时，更新 `.sopify-skills/blueprint/` 或 README 面向用户的说明；本轮同步到 `blueprint/design.md` 的 develop callback 长期事实
 - [x] 5.3a 冻结 About / README `为什么选择 Sopify` 的顶层叙事口径：从“功能列表”切到“认知偏移 -> 机器可读协议 -> 可积累文本资产 -> cross-session continuity”的价值链，并确保不抢先承诺未落地行为
 
   5.3a 落版口径冻结：
@@ -105,7 +105,7 @@ archive_ready: false
 - [x] 5.3b 按 5.3a 的冻结口径实际更新 `README.md / README_EN.md`：完成副标题、Why 三段、“你会实际感受到什么”、“什么时候最有价值”、Quick Start 入口表迁移与 design rationale 清理，并在完成后回填验收
 
 **Gate — Group 5 完成后：**
-- [ ] 5.G 技能规则、runtime contract、测试与知识库同步口径一致，且 implementation order 未漂移
+- [x] 5.G 技能规则、runtime contract、测试与知识库同步口径一致，且 implementation order 未漂移
 
 验收标准:
 

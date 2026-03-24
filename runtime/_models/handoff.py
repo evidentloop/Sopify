@@ -162,6 +162,23 @@ class ReplayEvent:
             "metadata": _json_mapping(self.metadata),
         }
 
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> "ReplayEvent":
+        return cls(
+            ts=str(data.get("ts") or ""),
+            phase=str(data.get("phase") or ""),
+            intent=str(data.get("intent") or ""),
+            action=str(data.get("action") or ""),
+            key_output=str(data.get("key_output") or ""),
+            decision_reason=str(data.get("decision_reason") or ""),
+            result=str(data.get("result") or ""),
+            risk=str(data.get("risk") or ""),
+            alternatives=tuple(str(item) for item in (data.get("alternatives") or ()) if str(item).strip()),
+            highlights=tuple(str(item) for item in (data.get("highlights") or ()) if str(item).strip()),
+            artifacts=tuple(str(item) for item in (data.get("artifacts") or ()) if str(item).strip()),
+            metadata=_json_mapping(data.get("metadata")),
+        )
+
 
 @dataclass(frozen=True)
 class RuntimeResult:

@@ -8,6 +8,7 @@ import re
 from tempfile import NamedTemporaryFile
 from typing import Any, Iterable, Mapping, Optional
 
+from .develop_quality import DEVELOP_REVIEW_STAGES, extract_develop_quality_context, extract_develop_quality_result
 from .models import DecisionCheckpoint, DecisionOption, DecisionState, PlanArtifact, ReplayEvent, RouteDecision, RunState, RuntimeConfig
 
 _SENSITIVE_PATTERNS = (
@@ -47,6 +48,21 @@ class ReplayWriter:
         with events_path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
         return session_dir
+
+    def load_events(self, run_id: str) -> list[ReplayEvent]:
+        """Load the persisted replay timeline for re-rendering session documents."""
+        session_dir = self.ensure_session(run_id)
+        events_path = session_dir / "events.jsonl"
+        events: list[ReplayEvent] = []
+        for raw_line in events_path.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
+            if not line:
+                continue
+            payload = json.loads(line)
+            if not isinstance(payload, Mapping):
+                continue
+            events.append(ReplayEvent.from_dict(payload))
+        return events
 
     def render_documents(
         self,
@@ -222,6 +238,63 @@ def build_compare_replay_event(
     )
 
 
+def build_develop_quality_replay_event(
+    *,
+    ts: str,
+    payload: Mapping[str, Any],
+    language: str,
+) -> ReplayEvent:
+    """Build a replay event summarizing the latest develop quality-loop result."""
+    quality_result = extract_develop_quality_result(payload) or {}
+    quality_context = extract_develop_quality_context(payload) or {}
+    task_refs = tuple(str(item) for item in (quality_context.get("task_refs") or ()) if str(item).strip())
+    verification_source = str(quality_result.get("verification_source") or "")
+    command = str(quality_result.get("command") or "")
+    result = str(quality_result.get("result") or "")
+    root_cause = str(quality_result.get("root_cause") or "")
+    working_summary = str(quality_context.get("working_summary") or "")
+
+    command_label = command or _develop_quality_text(language, "not_configured")
+    review_result = quality_result.get("review_result") if isinstance(quality_result.get("review_result"), Mapping) else {}
+    highlights = [
+        _develop_quality_text(language, "tasks").format(tasks=", ".join(task_refs) if task_refs else _develop_quality_text(language, "missing")),
+        _develop_quality_text(language, "verification").format(
+            source=verification_source or _develop_quality_text(language, "missing"),
+            command=command_label,
+        ),
+    ]
+    if root_cause:
+        highlights.append(_develop_quality_text(language, "root_cause").format(root_cause=root_cause))
+    for stage in DEVELOP_REVIEW_STAGES:
+        stage_payload = review_result.get(stage) if isinstance(review_result, Mapping) else None
+        if isinstance(stage_payload, Mapping):
+            highlights.append(
+                _develop_quality_text(language, "review_stage").format(
+                    stage=stage,
+                    status=str(stage_payload.get("status") or _develop_quality_text(language, "missing")),
+                )
+            )
+
+    return ReplayEvent(
+        ts=ts,
+        phase="develop",
+        intent=", ".join(task_refs) if task_refs else working_summary or _develop_quality_text(language, "intent"),
+        action="develop:quality_loop",
+        key_output=_develop_quality_text(language, "key_output").format(
+            result=result or _develop_quality_text(language, "missing"),
+            summary=working_summary or _develop_quality_text(language, "no_summary"),
+        ),
+        decision_reason=_develop_quality_text(language, "decision_reason").format(
+            source=verification_source or _develop_quality_text(language, "missing"),
+            command=command_label,
+        ),
+        result=result or "recorded",
+        risk=root_cause,
+        highlights=tuple(highlights),
+        artifacts=tuple(str(item) for item in (quality_context.get("changed_files") or ()) if str(item).strip()),
+    )
+
+
 def _decision_highlights(
     decision_state: DecisionState,
     *,
@@ -285,6 +358,39 @@ def _selection_constraint_highlights(
                 )
             )
     return tuple(highlights)
+
+
+_DEVELOP_QUALITY_TEXT = {
+    "zh-CN": {
+        "intent": "develop 质量循环",
+        "key_output": "质量结果={result}；摘要={summary}",
+        "decision_reason": "验证来源={source}；命令={command}",
+        "tasks": "任务: {tasks}",
+        "verification": "验证: {source} / {command}",
+        "root_cause": "根因: {root_cause}",
+        "review_stage": "复审 {stage}: {status}",
+        "not_configured": "<未配置稳定命令>",
+        "missing": "<缺失>",
+        "no_summary": "<无摘要>",
+    },
+    "en-US": {
+        "intent": "develop quality loop",
+        "key_output": "quality result={result}; summary={summary}",
+        "decision_reason": "verification source={source}; command={command}",
+        "tasks": "tasks: {tasks}",
+        "verification": "verification: {source} / {command}",
+        "root_cause": "root cause: {root_cause}",
+        "review_stage": "review {stage}: {status}",
+        "not_configured": "<no stable command configured>",
+        "missing": "<missing>",
+        "no_summary": "<no summary>",
+    },
+}
+
+
+def _develop_quality_text(language: str, key: str) -> str:
+    table = _DEVELOP_QUALITY_TEXT.get(language, _DEVELOP_QUALITY_TEXT["en-US"])
+    return table[key]
 
 
 def _option_by_id(options: Iterable[DecisionOption], option_id: str | None) -> DecisionOption | None:

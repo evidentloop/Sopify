@@ -33,6 +33,8 @@ from runtime.clarification_bridge import (
 )
 from runtime.compare_decision import build_compare_decision_contract
 from runtime.develop_checkpoint import DevelopCheckpointError, inspect_develop_checkpoint_context, submit_develop_checkpoint
+from runtime.develop_checkpoint import submit_develop_quality_report
+from runtime.develop_quality import build_develop_quality_contract
 from runtime.decision import build_decision_state, build_execution_gate_decision_state, confirm_decision, response_from_submission
 from runtime.decision_bridge import (
     DecisionBridgeError,
@@ -69,7 +71,7 @@ from runtime.plan_orchestrator import (
     run_plan_loop,
 )
 from runtime.preferences import preload_preferences, preload_preferences_for_workspace
-from runtime.replay import ReplayWriter, build_decision_replay_event
+from runtime.replay import ReplayWriter, build_decision_replay_event, build_develop_quality_replay_event
 from runtime.router import Router
 from runtime.skill_registry import SkillRegistry
 from runtime.skill_runner import SkillExecutionError, run_runtime_skill

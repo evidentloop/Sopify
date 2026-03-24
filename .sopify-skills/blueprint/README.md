@@ -14,7 +14,7 @@
 
 <!-- sopify:auto:focus:start -->
 - 当前活动 plan：暂无。
-- history 归档：已可用；最近归档为 `../history/2026-03/20260320_helloagents_integration_enhancements`。
+- history 归档：已可用；最近归档为 `../history/2026-03/20260324_develop-quality-loop`。
 <!-- sopify:auto:focus:end -->
 
 ## 深入阅读入口
@@ -26,5 +26,5 @@
 - [蓝图任务](./tasks.md)
 - [Skill 标准对齐蓝图](./skill-standards-refactor.md)
 - [变更历史](../history/index.md)
-- 最近归档：`../history/2026-03/20260320_helloagents_integration_enhancements`
+- 最近归档：`../history/2026-03/20260324_develop-quality-loop`
 <!-- sopify:auto:read-next:end -->
