@@ -62,7 +62,7 @@ run_step "Sync skills" bash "$ROOT_DIR/scripts/sync-skills.sh"
 run_step "Check skills sync" bash "$ROOT_DIR/scripts/check-skills-sync.sh"
 run_step "Check version consistency" bash "$ROOT_DIR/scripts/check-version-consistency.sh"
 run_step "Check builtin catalog drift" check_builtin_catalog_drift
-run_step "Run runtime unit tests" python3 -m unittest "$ROOT_DIR/tests/test_runtime.py" "$ROOT_DIR/tests/test_installer.py" "$ROOT_DIR/tests/test_release_hooks.py"
+run_step "Run runtime unit tests" python3 -m unittest discover "$ROOT_DIR/tests" -v
 run_step "Run runtime smoke check" bash "$ROOT_DIR/scripts/check-runtime-smoke.sh"
 
 if [[ -f "$ROOT_DIR/scripts/check-skill-eval-gate.py" ]]; then

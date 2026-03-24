@@ -35,8 +35,10 @@ bash scripts/sync-runtime-assets.sh /path/to/project
 python3 /path/to/project/.sopify-runtime/scripts/sopify_runtime.py \
   --workspace-root /path/to/project "Refactor the database layer"
 
-# Optional: portable runtime checks in the target workspace
-python3 -m unittest /path/to/project/.sopify-runtime/tests/test_runtime.py
+# Optional: portable smoke checks in the target workspace
+python3 -m unittest discover \
+  -s /path/to/project/.sopify-runtime/tests \
+  -p 'test_runtime.py' -v
 bash /path/to/project/.sopify-runtime/scripts/check-runtime-smoke.sh
 ```
 
@@ -59,7 +61,7 @@ bash scripts/check-skills-sync.sh
 bash scripts/check-version-consistency.sh
 python3 scripts/generate-builtin-catalog.py
 python3 scripts/check-skill-eval-gate.py
-python3 -m unittest tests.test_runtime -v
+python3 -m unittest discover tests -v
 ```
 
 Repo-local runtime validation:

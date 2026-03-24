@@ -63,7 +63,7 @@ required_paths=(
   "$SCRIPTS_SRC/model_compare_runtime.py"
   "$SCRIPTS_SRC/check-runtime-smoke.sh"
   "$SCRIPTS_SRC/sync-runtime-assets.sh"
-  "$TESTS_SRC/test_runtime.py"
+  "$TESTS_SRC/test_bundle_smoke.py"
 )
 
 for path in "${required_paths[@]}"; do
@@ -77,7 +77,7 @@ mkdir -p "$BUNDLE_DIR"
 
 rsync -a --delete --exclude '__pycache__/' --exclude '*.pyc' "$RUNTIME_SRC/" "$BUNDLE_DIR/runtime/"
 
-mkdir -p "$BUNDLE_DIR/scripts" "$BUNDLE_DIR/tests"
+mkdir -p "$BUNDLE_DIR/scripts"
 rsync -a --delete --prune-empty-dirs \
   --include='sopify_runtime.py' \
   --include='runtime_gate.py' \
@@ -93,10 +93,11 @@ rsync -a --delete --prune-empty-dirs \
   --exclude='*' \
   "$SCRIPTS_SRC/" "$BUNDLE_DIR/scripts/"
 
-rsync -a --delete --prune-empty-dirs \
-  --include='test_runtime.py' \
-  --exclude='*' \
-  "$TESTS_SRC/" "$BUNDLE_DIR/tests/"
+rm -rf "$BUNDLE_DIR/tests"
+mkdir -p "$BUNDLE_DIR/tests"
+# Keep the stable bundle contract at tests/test_runtime.py even though the
+# repo-local source file is now test_bundle_smoke.py.
+install -m 0644 "$TESTS_SRC/test_bundle_smoke.py" "$BUNDLE_DIR/tests/test_runtime.py"
 
 # Generate the self-describing manifest after runtime assets have been copied into the bundle root.
 PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}" \
@@ -128,6 +129,6 @@ Launch examples:
   python3 $BUNDLE_DIR/scripts/sopify_runtime.py --allow-direct-entry --workspace-root $TARGET_ROOT "重构数据库层"
   python3 $BUNDLE_DIR/scripts/runtime_gate.py enter --workspace-root $TARGET_ROOT --request "重构数据库层"
   python3 $BUNDLE_DIR/scripts/go_plan_runtime.py --workspace-root $TARGET_ROOT "重构数据库层"
-  python3 -m unittest $BUNDLE_DIR/tests/test_runtime.py
+  python3 -m unittest discover -s $BUNDLE_DIR/tests -p 'test_runtime.py' -v
   bash $BUNDLE_DIR/scripts/check-runtime-smoke.sh
 EOF

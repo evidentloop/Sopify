@@ -81,6 +81,12 @@ _SUMMARY_TEXT = {
         "change_tasks_doc": "更新任务清单，补齐实施顺序与验收口径。",
         "change_blueprint_doc": "同步蓝图文档，收口长期口径。",
         "change_test_runtime": "补充或调整自动化测试，锁定运行时行为。",
+        "change_runtime_models_facade_with_names": "调整 runtime models facade: {names}。",
+        "change_runtime_models_facade": "调整 runtime models facade，固定公开 re-export surface。",
+        "change_runtime_models_internal_with_names": "调整 runtime 内部 models 模块: {names}。",
+        "change_runtime_models_internal": "调整 runtime 内部 models 模块，拆分契约实现边界。",
+        "change_runtime_bundle_smoke": "调整 bundle smoke 测试，保持对外测试路径兼容。",
+        "change_runtime_test_suite": "拆分 repo-local runtime 测试套件，收敛 discover 入口与共享 support。",
         "change_runtime_models_with_names": "扩展运行时模型契约: {names}。",
         "change_runtime_models": "扩展运行时模型契约，补齐结构化事实字段。",
         "change_runtime_output": "调整用户可见输出，补齐时间尾注与摘要渲染。",
@@ -121,6 +127,12 @@ _SUMMARY_TEXT = {
         "change_tasks_doc": "Updated the task list to clarify execution order and acceptance criteria.",
         "change_blueprint_doc": "Synchronized blueprint docs to keep the long-term contract aligned.",
         "change_test_runtime": "Added or adjusted automated tests to lock runtime behavior.",
+        "change_runtime_models_facade_with_names": "Adjusted the runtime models facade: {names}.",
+        "change_runtime_models_facade": "Adjusted the runtime models facade to lock the public re-export surface.",
+        "change_runtime_models_internal_with_names": "Adjusted internal runtime model modules: {names}.",
+        "change_runtime_models_internal": "Adjusted internal runtime model modules to split implementation boundaries.",
+        "change_runtime_bundle_smoke": "Adjusted the bundle smoke test while keeping the exported test path stable.",
+        "change_runtime_test_suite": "Split the repo-local runtime test suite and aligned it around discover plus shared support.",
         "change_runtime_models_with_names": "Extended runtime model contracts: {names}.",
         "change_runtime_models": "Extended runtime model contracts with additional structured fact fields.",
         "change_runtime_output": "Adjusted user-facing output to add timestamp tails and summary rendering.",
@@ -831,13 +843,20 @@ def _summarize_changed_file(*, workspace_root: Path, path: str, change_type: str
         return _summary_text(language, "change_tasks_doc")
     if normalized.startswith(".sopify-skills/blueprint/"):
         return _summary_text(language, "change_blueprint_doc")
-    if normalized.endswith("tests/test_runtime.py"):
-        return _summary_text(language, "change_test_runtime")
-    if normalized.endswith("runtime/models.py"):
+    if normalized == "runtime/models.py":
         names = _diff_symbol_excerpt(workspace_root=workspace_root, path=path)
         if names:
-            return _summary_text(language, "change_runtime_models_with_names", names=names)
-        return _summary_text(language, "change_runtime_models")
+            return _summary_text(language, "change_runtime_models_facade_with_names", names=names)
+        return _summary_text(language, "change_runtime_models_facade")
+    if normalized.startswith("runtime/_models/"):
+        names = _diff_symbol_excerpt(workspace_root=workspace_root, path=path)
+        if names:
+            return _summary_text(language, "change_runtime_models_internal_with_names", names=names)
+        return _summary_text(language, "change_runtime_models_internal")
+    if normalized == "tests/runtime_test_support.py" or re.match(r"^tests/test_runtime_[^/]+\.py$", normalized):
+        return _summary_text(language, "change_runtime_test_suite")
+    if normalized == "tests/test_bundle_smoke.py" or normalized == "tests/test_runtime.py" or normalized.endswith("/tests/test_runtime.py"):
+        return _summary_text(language, "change_runtime_bundle_smoke")
     if normalized.endswith("runtime/output.py"):
         return _summary_text(language, "change_runtime_output")
     if normalized.endswith("runtime/engine.py"):

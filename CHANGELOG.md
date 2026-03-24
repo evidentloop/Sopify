@@ -6,6 +6,61 @@ This changelog is maintained manually (not auto-generated).
 
 ## [Unreleased]
 
+## [2026-03-24.124504] - 2026-03-24
+
+### Docs
+
+- Refined public documentation:
+  - `CONTRIBUTING.md`
+  - `CONTRIBUTING_CN.md`
+
+### Runtime
+
+- Updated runtime internals:
+  - `runtime/_models/__init__.py`
+  - `runtime/_models/artifacts.py`
+  - `runtime/_models/core.py`
+  - `runtime/_models/decision.py`
+  - `runtime/_models/handoff.py`
+  - `runtime/_models/summary.py`
+  - `runtime/daily_summary.py`
+  - `runtime/models.py`
+
+### Scripts
+
+- Adjusted maintenance scripts:
+  - `scripts/release-preflight.sh`
+  - `scripts/sync-runtime-assets.sh`
+
+### Tests
+
+- Updated automated coverage:
+  - `tests/__init__.py`
+  - `tests/runtime_test_support.py`
+  - `tests/test_bundle_smoke.py`
+  - `tests/test_runtime.py`
+  - `tests/test_runtime_config.py`
+  - `tests/test_runtime_decision.py`
+  - `tests/test_runtime_engine.py`
+  - `tests/test_runtime_execution_gate.py`
+  - `tests/test_runtime_kb.py`
+  - `tests/test_runtime_knowledge_layout.py`
+  - `tests/test_runtime_plan_registry.py`
+  - `tests/test_runtime_plan_reuse.py`
+  - `tests/test_runtime_plan_scaffold.py`
+  - `tests/test_runtime_preferences.py`
+  - `tests/test_runtime_replay.py`
+  - `tests/test_runtime_router.py`
+  - `tests/test_runtime_skill_registry.py`
+  - `tests/test_runtime_skill_runner.py`
+  - `tests/test_runtime_summary.py`
+
+### Changed
+
+- Updated project files:
+  - `.sopify-skills/blueprint/README.md`
+  - `.sopify-skills/blueprint/design.md`
+
 ## [2026-03-23.193526] - 2026-03-23
 
 ### Docs

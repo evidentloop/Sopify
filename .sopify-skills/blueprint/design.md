@@ -36,6 +36,16 @@
 - 并发 review 使用不同 `session_id`；global execution truth 只补 soft ownership 观测字段，不引入 lease / heartbeat / takeover 锁
 - clarification / decision bridge 先读 session review state，再回退到 global execution truth，保证 develop 阶段生成的 checkpoint 仍可桥接
 
+## Runtime models 与测试结构约定
+
+- `runtime/models.py` 是稳定公开 facade；`from runtime.models import X` 继续作为对外兼容入口。
+- 具体实现收敛到 `runtime/_models/`，当前按 `core / decision / artifacts / summary / handoff` 分组，避免在公开路径下继续堆积单文件复杂度。
+- facade 必须维护显式 `__all__`，保证 `from runtime.models import *` 的 surface 仍然可控。
+- repo-local runtime 回归统一使用 `python3 -m unittest discover tests -v`，避免拆分后因手写文件列表漏测。
+- repo-local 共享测试 helper 固定收敛到 `tests/runtime_test_support.py`；`tests/test_runtime_*.py` 负责按主题拆分具体 `TestCase`。
+- bundle 对外继续保留 `.sopify-runtime/tests/test_runtime.py` 路径，但该文件只承担最小 smoke contract，不再复制 repo-local 全量 runtime 测试。
+- 需要对绝对路径下的 bundle smoke 做便携校验时，统一使用 `python3 -m unittest discover -s <bundle-tests-dir> -p 'test_runtime.py' -v`，避免 `unittest` 把绝对路径误当成模块名。
+
 ## Runtime gate ingress contract
 
 - `persisted_handoff` 继续是 runtime gate 的唯一正向机器证据；`runtime_result.handoff` 只用于诊断归因，不替代 persisted 成功证据。
