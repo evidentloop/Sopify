@@ -98,21 +98,17 @@ git config core.hooksPath .githooks
 - `pre-commit` 会先运行 `scripts/release-preflight.sh`，再运行 `scripts/release-sync.sh`
 - release-managed 文件会在检查通过后自动回到同一个 commit
 - 当 `CHANGELOG.md -> [Unreleased]` 为空时，`release-sync` 会根据当前 staged files 自动生成分组草稿
-- `commit-msg` 默认会为 Claude 与 ChatGPT 追加 `Co-authored-by` footer；只有存在 pre-commit handoff 时，才会继续追加 `Release-Sync`、`Release-Version`、`Release-Date`
+- `commit-msg` 只有在存在 pre-commit handoff 时，才会追加 `Release-Sync`、`Release-Version`、`Release-Date`
 
 AI attribution 说明：
 
-- 默认追加的 commit trailers：
-  - `Co-authored-by: Claude <claude@anthropic.com>`
-  - `Co-authored-by: ChatGPT <chatgpt@openai.com>`
-- 若某一次提交需要跳过这些 AI attribution footer，可在该次提交前设置 `SOPIFY_DISABLE_AI_ATTRIBUTION=1`
-- `SOPIFY_DISABLE_RELEASE_HOOK=1` 会关闭整条 release hook 链，因此也会一并跳过默认的 AI attribution；只建议在维护/调试场景使用
 - 仓库级 AI 协作声明见 [CONTRIBUTORS.md](./CONTRIBUTORS.md)
+- 仓库默认不再为 AI 助手追加标准 `Co-authored-by` trailer；除非你手动填写，否则 GitHub contributor attribution 会只归属于人类 commit author
+- `SOPIFY_DISABLE_RELEASE_HOOK=1` 会关闭整条 release hook 链；只建议在维护/调试场景使用
 
 常用环境变量：
 
 - `SOPIFY_DISABLE_RELEASE_HOOK=1`
-- `SOPIFY_DISABLE_AI_ATTRIBUTION=1`
 - `SOPIFY_SKIP_RELEASE_PREFLIGHT=1`
 - `SOPIFY_AUTO_DRAFT_CHANGELOG=0`
 - `SOPIFY_RELEASE_HOOK_DRY_RUN=1`

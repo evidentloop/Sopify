@@ -162,7 +162,7 @@ def _init_release_hook_fixture(root: Path, *, missing_claude_targets: bool = Fal
 
 
 class ReleaseHookTests(unittest.TestCase):
-    def test_commit_msg_appends_default_ai_attribution_trailers(self) -> None:
+    def test_commit_msg_leaves_message_unchanged_without_release_state(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             _init_release_hook_fixture(root)
@@ -181,33 +181,10 @@ class ReleaseHookTests(unittest.TestCase):
 
             self.assertEqual(completed.returncode, 0, msg=completed.stderr)
             message = message_file.read_text(encoding="utf-8")
-            self.assertIn("Co-authored-by: Claude <claude@anthropic.com>", message)
-            self.assertIn("Co-authored-by: ChatGPT <chatgpt@openai.com>", message)
+            self.assertEqual(message, "docs: update contribution guide\n")
             self.assertNotIn("Release-Sync:", message)
 
-    def test_commit_msg_respects_ai_attribution_disable_toggle(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            root = Path(temp_dir)
-            _init_release_hook_fixture(root)
-
-            message_file = root / "COMMIT_EDITMSG"
-            _write(message_file, "docs: update contribution guide\n")
-
-            completed = subprocess.run(
-                ["bash", str(root / ".githooks" / "commit-msg"), str(message_file)],
-                cwd=root,
-                capture_output=True,
-                text=True,
-                check=False,
-                env={**_git_subprocess_env(), "SOPIFY_DISABLE_AI_ATTRIBUTION": "1"},
-            )
-
-            self.assertEqual(completed.returncode, 0, msg=completed.stderr)
-            message = message_file.read_text(encoding="utf-8")
-            self.assertNotIn("Co-authored-by: Claude <claude@anthropic.com>", message)
-            self.assertNotIn("Co-authored-by: ChatGPT <chatgpt@openai.com>", message)
-
-    def test_commit_msg_does_not_duplicate_existing_ai_attribution_trailers(self) -> None:
+    def test_commit_msg_preserves_manual_coauthor_trailers_without_duplication(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             _init_release_hook_fixture(root)

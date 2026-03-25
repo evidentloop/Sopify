@@ -15,13 +15,8 @@ GitHub's automatic contributor graph only reflects commits tied to GitHub accoun
 
 ## Commit-Level Attribution
 
-This repository's `commit-msg` hook appends the following trailers by default:
+This repository no longer appends standard AI `Co-authored-by` trailers by default.
 
-```text
-Co-authored-by: Claude <claude@anthropic.com>
-Co-authored-by: ChatGPT <chatgpt@openai.com>
-```
+AI participation is acknowledged here at the repository level so GitHub's contributor graph remains tied to human commit authors unless a maintainer explicitly adds co-author trailers by hand.
 
-Set `SOPIFY_DISABLE_AI_ATTRIBUTION=1` for a single commit if you need to skip those trailers locally.
-
-Set `SOPIFY_DISABLE_RELEASE_HOOK=1` only for maintainer/debug scenarios. It disables the entire `commit-msg` hook, which also skips the default AI attribution trailers.
+Set `SOPIFY_DISABLE_RELEASE_HOOK=1` only for maintainer/debug scenarios. It disables the entire `commit-msg` hook.
