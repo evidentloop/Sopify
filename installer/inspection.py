@@ -21,7 +21,9 @@ CHECK_FAIL = "fail"
 CHECK_SKIP = "skip"
 STATUS_YES = "yes"
 STATUS_NO = "no"
+STATUS_NOT_REQUESTED = "not_requested"
 REASON_OK = "ok"
+REASON_WORKSPACE_NOT_REQUESTED = "WORKSPACE_NOT_REQUESTED"
 STATUS_READY_STATES = {"READY", "NEWER_THAN_GLOBAL"}
 STATUS_WARN_STATES = {"MISSING", "OUTDATED_COMPATIBLE"}
 
@@ -74,12 +76,17 @@ class HostInspection:
 
     def to_status_dict(self) -> dict[str, object]:
         configured = self.payload.status == CHECK_PASS
+        workspace_bundle_healthy = STATUS_NO
+        if self.workspace_bundle.reason_code == REASON_WORKSPACE_NOT_REQUESTED:
+            workspace_bundle_healthy = STATUS_NOT_REQUESTED
+        elif self.workspace_bundle.status == CHECK_PASS:
+            workspace_bundle_healthy = STATUS_YES
         return {
             **self.capability.to_dict(),
             "state": {
                 "installed": STATUS_YES if self.host_prompt.status == CHECK_PASS else STATUS_NO,
                 "configured": STATUS_YES if configured else STATUS_NO,
-                "workspace_bundle_healthy": STATUS_YES if self.workspace_bundle.status == CHECK_PASS else STATUS_NO,
+                "workspace_bundle_healthy": workspace_bundle_healthy,
             },
         }
 
@@ -97,7 +104,7 @@ class HostInspection:
 def inspect_all_hosts(
     *,
     home_root: Path,
-    workspace_root: Path,
+    workspace_root: Path | None,
     include_smoke: bool,
 ) -> tuple[HostInspection, ...]:
     """Collect shared inspection facts for every declared host."""
@@ -118,7 +125,7 @@ def inspect_host(
     *,
     registration: HostRegistration,
     home_root: Path,
-    workspace_root: Path,
+    workspace_root: Path | None,
     include_smoke: bool,
 ) -> HostInspection:
     """Inspect one registered host."""
@@ -168,9 +175,46 @@ def inspect_host(
                 reason_code=REASON_OK,
             ),
         )
-    bundle_manifest = _read_json(workspace_root / ".sopify-runtime" / "manifest.json")
     host_prompt = _inspect_host_prompt(adapter=adapter, capability=capability, home_root=home_root)
     payload = _inspect_payload(adapter=adapter, capability=capability, home_root=home_root)
+    if workspace_root is None:
+        workspace_bundle = InspectionCheck(
+            host_id=capability.host_id,
+            check_id="workspace_bundle_manifest",
+            status=CHECK_SKIP,
+            reason_code=REASON_WORKSPACE_NOT_REQUESTED,
+            recommendation="Workspace bootstrap was not requested. Trigger Sopify in a project workspace to bootstrap on demand, or reinstall with `--workspace <path>`.",
+        )
+        handoff_first = InspectionCheck(
+            host_id=capability.host_id,
+            check_id="workspace_handoff_first",
+            status=CHECK_SKIP,
+            reason_code=REASON_WORKSPACE_NOT_REQUESTED,
+            recommendation="Trigger Sopify in a project workspace to bootstrap on demand, or reinstall with `--workspace <path>`.",
+        )
+        preferences_preload = InspectionCheck(
+            host_id=capability.host_id,
+            check_id="workspace_preferences_preload",
+            status=CHECK_SKIP,
+            reason_code=REASON_WORKSPACE_NOT_REQUESTED,
+            recommendation="Trigger Sopify in a project workspace to bootstrap on demand, or reinstall with `--workspace <path>`.",
+        )
+        smoke = _inspect_smoke(
+            adapter=adapter,
+            capability=capability,
+            home_root=home_root,
+            include_smoke=include_smoke,
+        )
+        return HostInspection(
+            registration=registration,
+            host_prompt=host_prompt,
+            payload=payload,
+            workspace_bundle=workspace_bundle,
+            handoff_first=handoff_first,
+            preferences_preload=preferences_preload,
+            smoke=smoke,
+        )
+    bundle_manifest = _read_json(workspace_root / ".sopify-runtime" / "manifest.json")
     workspace_bundle = _inspect_workspace_bundle(
         adapter=adapter,
         capability=capability,
@@ -210,12 +254,25 @@ def inspect_host(
     )
 
 
-def inspect_workspace_state(workspace_root: Path) -> dict[str, object]:
+def inspect_workspace_state(workspace_root: Path | None) -> dict[str, object]:
     """Return a lightweight, static view of current workspace runtime state."""
+    if workspace_root is None:
+        return {
+            "requested": False,
+            "root": None,
+            "bootstrap_mode": "on_first_project_trigger",
+            "sopify_skills_present": None,
+            "active_plan": None,
+            "current_run_stage": None,
+            "pending_checkpoint": None,
+        }
     state_root = workspace_root / ".sopify-skills" / "state"
     current_run = _read_json(state_root / "current_run.json")
     current_handoff = _read_json(state_root / "current_handoff.json")
     return {
+        "requested": True,
+        "root": str(workspace_root),
+        "bootstrap_mode": "prewarmed",
         "sopify_skills_present": (workspace_root / ".sopify-skills").is_dir(),
         "active_plan": str(current_run.get("plan_path") or current_run.get("plan_id") or "") or None,
         "current_run_stage": current_run.get("stage"),
@@ -223,7 +280,7 @@ def inspect_workspace_state(workspace_root: Path) -> dict[str, object]:
     }
 
 
-def build_status_payload(*, home_root: Path, workspace_root: Path) -> dict[str, object]:
+def build_status_payload(*, home_root: Path, workspace_root: Path | None) -> dict[str, object]:
     """Build the machine contract for `sopify status`."""
     inspections = inspect_all_hosts(home_root=home_root, workspace_root=workspace_root, include_smoke=False)
     hosts = [inspection.to_status_dict() for inspection in inspections]
@@ -235,7 +292,7 @@ def build_status_payload(*, home_root: Path, workspace_root: Path) -> dict[str, 
     }
 
 
-def build_doctor_payload(*, home_root: Path, workspace_root: Path) -> dict[str, object]:
+def build_doctor_payload(*, home_root: Path, workspace_root: Path | None) -> dict[str, object]:
     """Build the machine contract for `sopify doctor`."""
     inspections = inspect_all_hosts(home_root=home_root, workspace_root=workspace_root, include_smoke=True)
     checks = [check.to_dict() for inspection in inspections for check in inspection.doctor_checks()]
@@ -265,15 +322,26 @@ def render_status_text(payload: dict[str, object]) -> str:
             )
         )
     workspace_state = payload["workspace_state"]
-    lines.extend(
-        [
-            "Workspace:",
-            f"  sopify_skills_present: {workspace_state['sopify_skills_present']}",
-            f"  active_plan: {workspace_state['active_plan'] or '(none)'}",
-            f"  current_run_stage: {workspace_state['current_run_stage'] or '(none)'}",
-            f"  pending_checkpoint: {workspace_state['pending_checkpoint'] or '(none)'}",
-        ]
-    )
+    lines.append("Workspace:")
+    if not workspace_state["requested"]:
+        lines.extend(
+            [
+                "  requested: no",
+                "  bootstrap_mode: on_first_project_trigger",
+                "  state: will bootstrap on first project trigger",
+            ]
+        )
+    else:
+        lines.extend(
+            [
+                "  requested: yes",
+                f"  root: {workspace_state['root']}",
+                f"  sopify_skills_present: {workspace_state['sopify_skills_present']}",
+                f"  active_plan: {workspace_state['active_plan'] or '(none)'}",
+                f"  current_run_stage: {workspace_state['current_run_stage'] or '(none)'}",
+                f"  pending_checkpoint: {workspace_state['pending_checkpoint'] or '(none)'}",
+            ]
+        )
     return "\n".join(lines)
 
 

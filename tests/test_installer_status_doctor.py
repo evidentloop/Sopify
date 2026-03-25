@@ -14,7 +14,7 @@ from installer.hosts import get_host_capability, iter_declared_hosts, iter_insta
 from installer.hosts.base import install_host_assets
 from installer.hosts.claude import CLAUDE_ADAPTER
 from installer.hosts.codex import CODEX_ADAPTER
-from installer.inspection import build_doctor_payload, build_status_payload
+from installer.inspection import build_doctor_payload, build_status_payload, render_status_text
 from installer.payload import install_global_payload, run_workspace_bootstrap
 from installer.validate import validate_host_install, validate_payload_install
 from scripts.sopify_doctor import main as doctor_main
@@ -68,6 +68,39 @@ class HostCapabilityRegistryTests(unittest.TestCase):
 
 
 class StatusDoctorContractTests(unittest.TestCase):
+    def test_status_payload_supports_workspace_not_requested(self) -> None:
+        with tempfile.TemporaryDirectory() as home_dir:
+            home_root = Path(home_dir)
+
+            install_host_assets(CODEX_ADAPTER, repo_root=REPO_ROOT, home_root=home_root, language_directory="CN")
+            install_global_payload(CODEX_ADAPTER, repo_root=REPO_ROOT, home_root=home_root)
+
+            payload = build_status_payload(home_root=home_root, workspace_root=None)
+
+            self.assertFalse(payload["workspace_state"]["requested"])
+            self.assertEqual(payload["workspace_state"]["bootstrap_mode"], "on_first_project_trigger")
+            self.assertEqual(payload["hosts"][0]["state"]["workspace_bundle_healthy"], "not_requested")
+            rendered = render_status_text(payload)
+            self.assertIn("requested: no", rendered)
+            self.assertIn("will bootstrap on first project trigger", rendered)
+
+    def test_doctor_payload_supports_workspace_not_requested(self) -> None:
+        with tempfile.TemporaryDirectory() as home_dir:
+            home_root = Path(home_dir)
+
+            install_host_assets(CODEX_ADAPTER, repo_root=REPO_ROOT, home_root=home_root, language_directory="CN")
+            install_global_payload(CODEX_ADAPTER, repo_root=REPO_ROOT, home_root=home_root)
+
+            payload = build_doctor_payload(home_root=home_root, workspace_root=None)
+
+            workspace_check = next(
+                check
+                for check in payload["checks"]
+                if check["host_id"] == "codex" and check["check_id"] == "workspace_bundle_manifest"
+            )
+            self.assertEqual(workspace_check["status"], "skip")
+            self.assertEqual(workspace_check["reason_code"], "WORKSPACE_NOT_REQUESTED")
+
     def test_status_json_contains_required_contract_and_workspace_state(self) -> None:
         with tempfile.TemporaryDirectory() as home_dir, tempfile.TemporaryDirectory() as workspace_dir:
             home_root = Path(home_dir)

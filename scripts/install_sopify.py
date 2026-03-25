@@ -11,6 +11,14 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from installer.distribution import (
+    DistributionError,
+    DistributionRequest,
+    DistributionSourceMetadata,
+    render_distribution_error,
+    render_distribution_result,
+    run_distribution_install,
+)
 from installer.hosts import get_host_adapter, iter_installable_hosts
 from installer.hosts.base import install_host_assets
 from installer.models import BootstrapResult, InstallError, InstallResult, LANGUAGE_DIRECTORY_MAP, parse_install_target
@@ -27,14 +35,22 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Install Sopify into a target workspace and host environment.")
     parser.add_argument(
         "--target",
-        required=True,
-        help=f"Install target in <host:lang> format. Supported: {supported_targets}",
+        default=None,
+        help=f"Install target in <host:lang> format. Required in non-interactive mode. Supported: {supported_targets}",
     )
     parser.add_argument(
         "--workspace",
         default=None,
         help="Optional workspace root to prewarm with `.sopify-runtime/`. If omitted, only the host prompt layer and global payload are installed.",
     )
+    parser.add_argument(
+        "--ref",
+        default=None,
+        help="Optional source ref override for remote install entrypoints. Not supported for repo-local installs.",
+    )
+    parser.add_argument("--source-channel", default="repo-local", help=argparse.SUPPRESS)
+    parser.add_argument("--source-resolved-ref", default="working-tree", help=argparse.SUPPRESS)
+    parser.add_argument("--source-asset-name", default="scripts/install_sopify.py", help=argparse.SUPPRESS)
     return parser
 
 
@@ -156,18 +172,34 @@ def render_result(result: InstallResult) -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    source_metadata = DistributionSourceMetadata(
+        resolved_ref=args.source_resolved_ref,
+        asset_name=args.source_asset_name,
+    )
+    request = DistributionRequest(
+        target=args.target,
+        workspace=args.workspace,
+        ref_override=args.ref,
+        interactive=sys.stdin.isatty() and sys.stdout.isatty(),
+        source_channel=args.source_channel,
+        source_metadata=source_metadata,
+    )
 
     try:
-        result = run_install(
-            target_value=args.target,
-            workspace_value=args.workspace,
+        report = run_distribution_install(
+            request=request,
             repo_root=REPO_ROOT,
+            home_root=None,
+            install_executor=run_install,
         )
+    except DistributionError as exc:
+        print(render_distribution_error(exc), file=sys.stderr)
+        return 1
     except InstallError as exc:
         print(f"Install failed: {exc}", file=sys.stderr)
         return 1
 
-    print(render_result(result))
+    print(render_distribution_result(report))
     return 0
 
 

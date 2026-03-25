@@ -49,6 +49,52 @@ Bundle rules:
 - The first host hop goes through `.sopify-runtime/scripts/runtime_gate.py enter`.
 - Clarification, decision, and develop checkpoint helpers are internal bridge helpers, not replacement main entries.
 
+### Installer Entry Points and Release Assets
+
+Current installer entry points are intentionally split by audience:
+
+- Repo-local / source install:
+
+```bash
+bash scripts/install-sopify.sh --target codex:zh-CN
+python3 scripts/install_sopify.py --target claude:en-US --workspace /path/to/project
+```
+
+- Dev / maintainer remote entry (`raw/main`, not for README first screen):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/sopify-ai/sopify/main/install.sh | \
+  bash -s -- --target codex:zh-CN
+```
+
+- Public stable entry (only after a public GitHub Release exists):
+
+```bash
+curl -fsSL https://github.com/sopify-ai/sopify/releases/latest/download/install.sh | \
+  bash -s -- --target codex:zh-CN
+```
+
+Contract:
+
+- Root `install.sh` / `install.ps1` stay thin. They only fetch the same-ref GitHub source archive and call `scripts/install_sopify.py`.
+- `main` branch root scripts keep dev defaults (`SOURCE_CHANNEL=dev`, `SOURCE_REF=main`).
+- Stable release assets are rendered from the root scripts for the selected release tag; do not hand-edit or upload the raw `main` files.
+- Distribution logic stays host-registry driven. README may keep the current supported host surface, but the installer entrypoint must not hardcode `codex` / `claude` branching.
+
+Release asset checklist:
+
+```bash
+TAG="2026-03-25.142231"
+OUT_DIR="$(mktemp -d)"
+python3 scripts/render-release-installers.py --release-tag "$TAG" --output-dir "$OUT_DIR"
+```
+
+Then:
+
+- Upload `$OUT_DIR/install.sh` and `$OUT_DIR/install.ps1` to the GitHub Release with the same tag.
+- Keep `README` first-screen install commands unchanged until that public stable release is visible at `releases/latest/download/install.sh`.
+- Post-release manual smoke is maintainer-only: confirm the latest release assets exist, the stable installer resolves the same tag, and the install output prints `source channel`, `resolved source ref`, and `asset name`.
+
 ## Validation Commands
 
 Run the minimum checks that match your change scope.
@@ -80,6 +126,7 @@ Documentation and release validation:
 ```bash
 python3 scripts/check-readme-links.py
 python3 -m unittest tests/test_release_hooks.py -v
+python3 -m unittest tests/test_distribution.py tests/test_installer_status_doctor.py -v
 bash scripts/check-version-consistency.sh
 ```
 

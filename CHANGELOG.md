@@ -6,6 +6,36 @@ This changelog is maintained manually (not auto-generated).
 
 ## [Unreleased]
 
+## [2026-03-25.165725] - 2026-03-25
+
+### Docs
+
+- Refined public documentation:
+  - `CONTRIBUTING.md`
+  - `CONTRIBUTING_CN.md`
+
+### Scripts
+
+- Adjusted maintenance scripts:
+  - `scripts/install-sopify.sh`
+  - `scripts/install_sopify.py`
+  - `scripts/render-release-installers.py`
+
+### Tests
+
+- Updated automated coverage:
+  - `tests/test_distribution.py`
+  - `tests/test_installer_status_doctor.py`
+
+### Changed
+
+- Updated project files:
+  - `.github/workflows/ci.yml`
+  - `install.ps1`
+  - `install.sh`
+  - `installer/distribution.py`
+  - `installer/inspection.py`
+
 ## [2026-03-25.142231] - 2026-03-25
 
 ### Docs

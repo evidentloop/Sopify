@@ -49,6 +49,52 @@ Bundle 规则：
 - 宿主第一跳统一走 `.sopify-runtime/scripts/runtime_gate.py enter`
 - clarification / decision / develop checkpoint helper 都是内部桥接 helper，不替代默认主入口
 
+### Installer 入口与 Release Asset
+
+当前 installer 入口按受众分层：
+
+- repo-local / 源码安装：
+
+```bash
+bash scripts/install-sopify.sh --target codex:zh-CN
+python3 scripts/install_sopify.py --target claude:en-US --workspace /path/to/project
+```
+
+- dev / maintainer 远程入口（`raw/main`，不进 README 首屏）：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/sopify-ai/sopify/main/install.sh | \
+  bash -s -- --target codex:zh-CN
+```
+
+- public stable 入口（只有在公开 GitHub Release 存在后才启用）：
+
+```bash
+curl -fsSL https://github.com/sopify-ai/sopify/releases/latest/download/install.sh | \
+  bash -s -- --target codex:zh-CN
+```
+
+约定：
+
+- root `install.sh` / `install.ps1` 必须保持 thin wrapper，只负责下载同 ref 的 GitHub source archive 并调用 `scripts/install_sopify.py`
+- `main` 分支里的 root 脚本保留 dev 默认值（`SOURCE_CHANNEL=dev`、`SOURCE_REF=main`）
+- stable release asset 必须由 root 脚本按 release tag 渲染后上传，不能直接上传 `main` 上的原文件
+- 分发层必须继续走 host registry，不允许在 installer 入口里硬编码 `codex` / `claude` 分支；README 只控制当前正式支持面的展示
+
+release asset 渲染 checklist：
+
+```bash
+TAG="2026-03-25.142231"
+OUT_DIR="$(mktemp -d)"
+python3 scripts/render-release-installers.py --release-tag "$TAG" --output-dir "$OUT_DIR"
+```
+
+然后：
+
+- 将 `$OUT_DIR/install.sh` 和 `$OUT_DIR/install.ps1` 上传到同 tag 的 GitHub Release
+- 在 `releases/latest/download/install.sh` 真正可访问之前，不要切 README 首屏安装命令
+- post-release manual smoke 只做维护者校验：确认 latest release asset 存在、stable installer 解析到同 tag，且输出里能看到 `source channel` / `resolved source ref` / `asset name`
+
 ## 校验命令
 
 按变更范围选择最小校验集。
@@ -80,6 +126,7 @@ bash scripts/check-runtime-smoke.sh
 ```bash
 python3 scripts/check-readme-links.py
 python3 -m unittest tests/test_release_hooks.py -v
+python3 -m unittest tests/test_distribution.py tests/test_installer_status_doctor.py -v
 bash scripts/check-version-consistency.sh
 ```
 

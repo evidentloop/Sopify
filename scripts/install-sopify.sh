@@ -8,4 +8,8 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 1
 fi
 
-exec python3 "$ROOT_DIR/scripts/install_sopify.py" "$@"
+exec python3 "$ROOT_DIR/scripts/install_sopify.py" \
+  --source-channel repo-local \
+  --source-resolved-ref working-tree \
+  --source-asset-name scripts/install-sopify.sh \
+  "$@"

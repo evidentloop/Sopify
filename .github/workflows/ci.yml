@@ -58,8 +58,8 @@ jobs:
               raise SystemExit(1)
           PY
 
-      - name: Run runtime unit tests
-        run: python3 -m unittest tests/test_runtime.py tests/test_installer.py
+      - name: Run runtime and installer unit tests
+        run: python3 -m unittest discover tests -v
 
       - name: Run runtime smoke check
         run: bash scripts/check-runtime-smoke.sh
