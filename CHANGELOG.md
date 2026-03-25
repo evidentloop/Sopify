@@ -6,6 +6,36 @@ This changelog is maintained manually (not auto-generated).
 
 ## [Unreleased]
 
+## [2026-03-25.182132] - 2026-03-25
+
+### Docs
+
+- Refined public documentation:
+  - `CONTRIBUTING.md`
+  - `CONTRIBUTING_CN.md`
+  - `README.md`
+  - `README.zh-CN.md`
+  - `README_EN.md`
+  - `docs/dev/release-process.md`
+
+### Scripts
+
+- Adjusted maintenance scripts:
+  - `scripts/check-readme-links.py`
+  - `scripts/check-version-consistency.sh`
+  - `scripts/release-sync.sh`
+
+### Tests
+
+- Updated automated coverage:
+  - `tests/test_check_readme_links.py`
+  - `tests/test_release_hooks.py`
+
+### Changed
+
+- Updated project files:
+  - `.githooks/pre-commit`
+
 ## [2026-03-25.165725] - 2026-03-25
 
 ### Docs

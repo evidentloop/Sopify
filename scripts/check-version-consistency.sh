@@ -3,8 +3,8 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-README_CN="$ROOT_DIR/README.md"
-README_EN="$ROOT_DIR/README_EN.md"
+README_PRIMARY="$ROOT_DIR/README.md"
+README_ZH="$ROOT_DIR/README.zh-CN.md"
 CHANGELOG="$ROOT_DIR/CHANGELOG.md"
 CODEX_CN="$ROOT_DIR/Codex/Skills/CN/AGENTS.md"
 CODEX_EN="$ROOT_DIR/Codex/Skills/EN/AGENTS.md"
@@ -16,7 +16,7 @@ usage() {
 Usage: scripts/check-version-consistency.sh
 
 Validate version consistency across:
-  - README.md / README_EN.md version badges
+  - README.md / README.zh-CN.md version badges
   - Latest released version in CHANGELOG.md
   - SOPIFY_VERSION headers in Codex/Claude CN/EN files
 
@@ -32,8 +32,8 @@ if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
 fi
 
 required_files=(
-  "$README_CN"
-  "$README_EN"
+  "$README_PRIMARY"
+  "$README_ZH"
   "$CHANGELOG"
   "$CODEX_CN"
   "$CODEX_EN"
@@ -95,19 +95,19 @@ parse_release_line() {
   return 1
 }
 
-readme_cn_version="$(extract_badge_version "$README_CN" || true)"
-readme_en_version="$(extract_badge_version "$README_EN" || true)"
+readme_primary_version="$(extract_badge_version "$README_PRIMARY" || true)"
+readme_zh_version="$(extract_badge_version "$README_ZH" || true)"
 
-if [[ -z "$readme_cn_version" ]]; then
+if [[ -z "$readme_primary_version" ]]; then
   add_error "README.md: failed to parse version badge."
 fi
 
-if [[ -z "$readme_en_version" ]]; then
-  add_error "README_EN.md: failed to parse version badge."
+if [[ -z "$readme_zh_version" ]]; then
+  add_error "README.zh-CN.md: failed to parse version badge."
 fi
 
-if [[ -n "$readme_cn_version" && -n "$readme_en_version" && "$readme_cn_version" != "$readme_en_version" ]]; then
-  add_error "README badge mismatch: README.md=$readme_cn_version, README_EN.md=$readme_en_version."
+if [[ -n "$readme_primary_version" && -n "$readme_zh_version" && "$readme_primary_version" != "$readme_zh_version" ]]; then
+  add_error "README badge mismatch: README.md=$readme_primary_version, README.zh-CN.md=$readme_zh_version."
 fi
 
 latest_release_line="$(extract_latest_release_line)"
@@ -154,8 +154,8 @@ for version in "${header_versions[@]}"; do
   fi
 done
 
-if [[ -n "${changelog_version:-}" && -n "$readme_cn_version" && "$changelog_version" != "$readme_cn_version" ]]; then
-  add_error "Version mismatch: CHANGELOG latest=$changelog_version, README badge=$readme_cn_version."
+if [[ -n "${changelog_version:-}" && -n "$readme_primary_version" && "$changelog_version" != "$readme_primary_version" ]]; then
+  add_error "Version mismatch: CHANGELOG latest=$changelog_version, README badge=$readme_primary_version."
 fi
 
 if [[ -n "${changelog_version:-}" && -n "$first_header_version" && "$changelog_version" != "$first_header_version" ]]; then
@@ -173,5 +173,5 @@ fi
 echo "Version consistency check passed:"
 echo "  - Version: ${changelog_version:-$first_header_version}"
 echo "  - Date: ${changelog_date:-N/A}"
-echo "  - README badge: $readme_cn_version"
+echo "  - README badge: $readme_primary_version"
 echo "  - SOPIFY_VERSION: $first_header_version"

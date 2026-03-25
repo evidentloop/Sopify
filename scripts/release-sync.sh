@@ -3,8 +3,8 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-README_CN="$ROOT_DIR/README.md"
-README_EN="$ROOT_DIR/README_EN.md"
+README_PRIMARY="$ROOT_DIR/README.md"
+README_ZH="$ROOT_DIR/README.zh-CN.md"
 CHANGELOG="$ROOT_DIR/CHANGELOG.md"
 CODEX_CN="$ROOT_DIR/Codex/Skills/CN/AGENTS.md"
 CODEX_EN="$ROOT_DIR/Codex/Skills/EN/AGENTS.md"
@@ -15,7 +15,7 @@ usage() {
 Usage: scripts/release-sync.sh <version> [date]
 
 Synchronize release version across key files:
-  1) README.md / README_EN.md version badge
+  1) README.md / README.zh-CN.md version badge
   2) CHANGELOG.md:
      - move current [Unreleased] content into
        ## [<version>] - <date>
@@ -66,8 +66,8 @@ if [[ ! "$RELEASE_DATE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
 fi
 
 required_files=(
-  "$README_CN"
-  "$README_EN"
+  "$README_PRIMARY"
+  "$README_ZH"
   "$CHANGELOG"
   "$CODEX_CN"
   "$CODEX_EN"
@@ -277,8 +277,8 @@ echo "Starting release sync..."
 echo "  - Version: $VERSION"
 echo "  - Date: $RELEASE_DATE"
 
-require_single_match "$README_CN" 'img\.shields\.io/badge/version-.*-orange\.svg' "README CN version badge"
-require_single_match "$README_EN" 'img\.shields\.io/badge/version-.*-orange\.svg' "README EN version badge"
+require_single_match "$README_PRIMARY" 'img\.shields\.io/badge/version-.*-orange\.svg' "README primary version badge"
+require_single_match "$README_ZH" 'img\.shields\.io/badge/version-.*-orange\.svg' "README zh-CN version badge"
 require_single_match "$CODEX_CN" '^<!-- SOPIFY_VERSION: .* -->$' "Codex CN SOPIFY_VERSION"
 require_single_match "$CODEX_EN" '^<!-- SOPIFY_VERSION: .* -->$' "Codex EN SOPIFY_VERSION"
 
@@ -289,8 +289,8 @@ fi
 
 ensure_unreleased_content_ready
 
-update_readme_badge "$README_CN"
-update_readme_badge "$README_EN"
+update_readme_badge "$README_PRIMARY"
+update_readme_badge "$README_ZH"
 
 promote_unreleased_to_release "$CHANGELOG"
 

@@ -6,7 +6,7 @@ Thanks for your interest in contributing to Sopify.
 
 - Open an issue first for non-trivial changes so scope and ownership are clear.
 - Keep pull requests focused; one feature or fix per PR is preferred.
-- Update both `README.md` and `README_EN.md` when user-facing behavior changes.
+- Update both `README.md` and `README.zh-CN.md` when user-facing behavior changes.
 - Update `CHANGELOG.md` manually when user-visible behavior or maintainer rules change.
 
 ## Prompt-layer and Skill Authoring

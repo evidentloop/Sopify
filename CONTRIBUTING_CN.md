@@ -6,7 +6,7 @@
 
 - 非 trivial 改动请先开 issue，对齐范围和责任边界。
 - PR 保持聚焦，尽量做到“一次一个功能或修复”。
-- 用户可见行为变更时，同步更新 `README.md` 和 `README_EN.md`。
+- 用户可见行为变更时，同步更新 `README.md` 和 `README.zh-CN.md`。
 - 用户可见行为或维护规则变化时，手动更新 `CHANGELOG.md`。
 
 ## Prompt 层与 Skill Authoring

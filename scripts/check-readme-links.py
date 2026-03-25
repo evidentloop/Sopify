@@ -9,7 +9,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-README_FILES = (ROOT / "README.md", ROOT / "README_EN.md")
+README_FILES = (ROOT / "README.md", ROOT / "README.zh-CN.md")
 WORKFLOW_DOC_FILES = (
     ROOT / "docs/how-sopify-works.md",
     ROOT / "docs/how-sopify-works.en.md",
@@ -32,19 +32,6 @@ MARKDOWN_SUFFIXES = {".md", ".markdown"}
 # Lock public-doc structure so CN/EN drift is caught by CI instead of by readers.
 EXPECTED_LEVEL2_SECTIONS = {
     README_FILES[0]: (
-        "为什么选择 Sopify？",
-        "快速开始",
-        "配置说明",
-        "命令参考",
-        "多模型对比",
-        "子 Skills",
-        "目录结构",
-        "常见问题",
-        "版本历史",
-        "许可证",
-        "贡献",
-    ),
-    README_FILES[1]: (
         "Why Sopify?",
         "Quick Start",
         "Configuration",
@@ -56,6 +43,19 @@ EXPECTED_LEVEL2_SECTIONS = {
         "Version History",
         "License",
         "Contributing",
+    ),
+    README_FILES[1]: (
+        "为什么选择 Sopify？",
+        "快速开始",
+        "配置说明",
+        "命令参考",
+        "多模型对比",
+        "子 Skills",
+        "目录结构",
+        "常见问题",
+        "版本历史",
+        "许可证",
+        "贡献",
     ),
     WORKFLOW_DOC_FILES[0]: (
         "设计来源：Harness Engineering",
@@ -184,12 +184,12 @@ def check_internal_anchor_links(path: Path) -> list[str]:
 
 def check_language_switch_links() -> list[str]:
     errors: list[str] = []
-    cn_links = iter_links(README_FILES[0])
-    en_links = iter_links(README_FILES[1])
-    if "./README_EN.md" not in cn_links:
-        errors.append("README.md: missing language switch link to ./README_EN.md")
-    if "./README.md" not in en_links:
-        errors.append("README_EN.md: missing language switch link to ./README.md")
+    primary_links = iter_links(README_FILES[0])
+    zh_links = iter_links(README_FILES[1])
+    if "./README.zh-CN.md" not in primary_links:
+        errors.append("README.md: missing language switch link to ./README.zh-CN.md")
+    if "./README.md" not in zh_links:
+        errors.append("README.zh-CN.md: missing language switch link to ./README.md")
     return errors
 
 

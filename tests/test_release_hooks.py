@@ -132,8 +132,8 @@ def _init_release_hook_fixture(root: Path, *, missing_claude_targets: bool = Fal
 
     old_version = "2026-03-20.183348"
     old_date = "2026-03-20"
-    _write(root / "README.md", _minimal_readme(old_version, english=False))
-    _write(root / "README_EN.md", _minimal_readme(old_version, english=True))
+    _write(root / "README.md", _minimal_readme(old_version, english=True))
+    _write(root / "README.zh-CN.md", _minimal_readme(old_version, english=False))
     _write(root / "CHANGELOG.md", _minimal_changelog(old_version, old_date))
 
     _write(root / "Codex/Skills/CN/AGENTS.md", _minimal_agents(old_version, claude=False, english=False))

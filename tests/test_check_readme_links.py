@@ -71,15 +71,15 @@ def _minimal_agents(version: str, *, claude: bool, english: bool) -> str:
 
 
 def _configure_module(module, root: Path) -> None:
-    readme_sections_cn = module.EXPECTED_LEVEL2_SECTIONS[module.README_FILES[0]]
-    readme_sections_en = module.EXPECTED_LEVEL2_SECTIONS[module.README_FILES[1]]
+    readme_sections_primary = module.EXPECTED_LEVEL2_SECTIONS[module.README_FILES[0]]
+    readme_sections_zh = module.EXPECTED_LEVEL2_SECTIONS[module.README_FILES[1]]
     workflow_sections_cn = module.EXPECTED_LEVEL2_SECTIONS[module.WORKFLOW_DOC_FILES[0]]
     workflow_sections_en = module.EXPECTED_LEVEL2_SECTIONS[module.WORKFLOW_DOC_FILES[1]]
     contributing_sections_cn = module.EXPECTED_LEVEL2_SECTIONS[module.CONTRIBUTING_FILES[0]]
     contributing_sections_en = module.EXPECTED_LEVEL2_SECTIONS[module.CONTRIBUTING_FILES[1]]
 
     module.ROOT = root
-    module.README_FILES = (root / "README.md", root / "README_EN.md")
+    module.README_FILES = (root / "README.md", root / "README.zh-CN.md")
     module.WORKFLOW_DOC_FILES = (
         root / "docs/how-sopify-works.md",
         root / "docs/how-sopify-works.en.md",
@@ -95,8 +95,8 @@ def _configure_module(module, root: Path) -> None:
         root / "Claude/Skills/EN/CLAUDE.md",
     )
     module.EXPECTED_LEVEL2_SECTIONS = {
-        module.README_FILES[0]: readme_sections_cn,
-        module.README_FILES[1]: readme_sections_en,
+        module.README_FILES[0]: readme_sections_primary,
+        module.README_FILES[1]: readme_sections_zh,
         module.WORKFLOW_DOC_FILES[0]: workflow_sections_cn,
         module.WORKFLOW_DOC_FILES[1]: workflow_sections_en,
         module.CONTRIBUTING_FILES[0]: contributing_sections_cn,
@@ -104,18 +104,18 @@ def _configure_module(module, root: Path) -> None:
     }
 
 
-def _init_fixture(root: Path, module, *, broken_workflow_link: bool = False, reorder_readme_en: bool = False) -> None:
+def _init_fixture(root: Path, module, *, broken_workflow_link: bool = False, reorder_readme_zh: bool = False) -> None:
     _configure_module(module, root)
 
-    readme_cn_sections = module.EXPECTED_LEVEL2_SECTIONS[module.README_FILES[0]]
-    readme_en_sections = list(module.EXPECTED_LEVEL2_SECTIONS[module.README_FILES[1]])
+    readme_primary_sections = module.EXPECTED_LEVEL2_SECTIONS[module.README_FILES[0]]
+    readme_zh_sections = list(module.EXPECTED_LEVEL2_SECTIONS[module.README_FILES[1]])
     workflow_cn_sections = module.EXPECTED_LEVEL2_SECTIONS[module.WORKFLOW_DOC_FILES[0]]
     workflow_en_sections = module.EXPECTED_LEVEL2_SECTIONS[module.WORKFLOW_DOC_FILES[1]]
     contributing_cn_sections = module.EXPECTED_LEVEL2_SECTIONS[module.CONTRIBUTING_FILES[0]]
     contributing_en_sections = module.EXPECTED_LEVEL2_SECTIONS[module.CONTRIBUTING_FILES[1]]
 
-    if reorder_readme_en:
-        readme_en_sections[1], readme_en_sections[2] = readme_en_sections[2], readme_en_sections[1]
+    if reorder_readme_zh:
+        readme_zh_sections[1], readme_zh_sections[2] = readme_zh_sections[2], readme_zh_sections[1]
 
     for relative in (
         "LICENSE",
@@ -134,24 +134,10 @@ def _init_fixture(root: Path, module, *, broken_workflow_link: bool = False, reo
     _write(
         root / "README.md",
         _readme_with_sections(
-            "Sopify 技能",
-            readme_cn_sections,
-            anchor="#版本历史",
-            switch_target="./README_EN.md",
-            extra_links=(
-                "[贡献](./CONTRIBUTING_CN.md)",
-                "[工作流说明](./docs/how-sopify-works.md)",
-                "[许可证](./LICENSE)",
-            ),
-        ),
-    )
-    _write(
-        root / "README_EN.md",
-        _readme_with_sections(
             "Sopify Skills",
-            tuple(readme_en_sections),
+            readme_primary_sections,
             anchor="#version-history",
-            switch_target="./README.md",
+            switch_target="./README.zh-CN.md",
             extra_links=(
                 "[Contributing](./CONTRIBUTING.md)",
                 "[How Sopify Works](./docs/how-sopify-works.en.md)",
@@ -159,9 +145,23 @@ def _init_fixture(root: Path, module, *, broken_workflow_link: bool = False, reo
             ),
         ),
     )
+    _write(
+        root / "README.zh-CN.md",
+        _readme_with_sections(
+            "Sopify 技能",
+            tuple(readme_zh_sections),
+            anchor="#版本历史",
+            switch_target="./README.md",
+            extra_links=(
+                "[贡献](./CONTRIBUTING_CN.md)",
+                "[工作流说明](./docs/how-sopify-works.md)",
+                "[许可证](./LICENSE)",
+            ),
+        ),
+    )
 
-    cn_workflow_links = ("[返回 README](../README.md#版本历史)",)
-    en_workflow_links = ("[Back to README](../README_EN.md#version-history)",)
+    cn_workflow_links = ("[返回 README](../README.zh-CN.md#版本历史)",)
+    en_workflow_links = ("[Back to README](../README.md#version-history)",)
     if broken_workflow_link:
         en_workflow_links = en_workflow_links + ("[Broken](../docs/missing.md)",)
 
@@ -222,14 +222,14 @@ class CheckReadmeLinksTests(unittest.TestCase):
         module = _load_module()
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            _init_fixture(root, module, reorder_readme_en=True)
+            _init_fixture(root, module, reorder_readme_zh=True)
 
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
                 exit_code = module.main()
 
             self.assertEqual(exit_code, 1)
-            self.assertIn("README_EN.md: level-2 section 2", stdout.getvalue())
+            self.assertIn("README.zh-CN.md: level-2 section 2", stdout.getvalue())
 
     def test_main_checks_workflow_doc_relative_links(self) -> None:
         module = _load_module()

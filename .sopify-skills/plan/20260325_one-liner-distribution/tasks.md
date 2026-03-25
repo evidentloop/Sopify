@@ -75,23 +75,23 @@ plan_status: in_progress
 
 ## Group 4 — 首个 stable release 与 README 收口
 
-- [ ] 4.1（用户任务）在 README 首屏切换 stable one-liner 之前，先发布第一个 public stable release，使 `releases/latest/download/install.sh` / `install.ps1` 可用
-- [ ] 4.1a（用户任务）确认当前 remote 指向 `sopify-ai/sopify`，并将本轮 one-liner-distribution 实现推送到目标分支
-- [ ] 4.1b（用户任务）运行 `bash scripts/check-version-consistency.sh`，确认将要公开发布的 build version / tag
-- [ ] 4.1c（用户任务）运行 `python3 scripts/render-release-installers.py --release-tag "$TAG" --output-dir "$OUT_DIR"`，渲染 stable `install.sh` / `install.ps1` asset
-- [ ] 4.1d（用户任务）在 GitHub `sopify-ai/sopify` 创建同 tag 的 public Release，并上传 `$OUT_DIR/install.sh` 与 `$OUT_DIR/install.ps1`
-- [ ] 4.1e（用户任务）手动验证 `releases/latest/download/install.sh` / `install.ps1` 可访问，且 stable 安装输出展示 `source channel / resolved source ref / asset name`
-- [ ] 4.1f（用户任务）只有在 4.1e 验证通过后，才切 `README.md` / `README_EN.md` 首屏安装入口到 stable one-liner
-- [ ] 4.2 在 `README.md` 的安装章节首屏提供 official stable one-liner（GitHub Releases latest asset），主命令不带 `--workspace`，并保留 inspect-first 变体
-- [ ] 4.3 在 `README_EN.md` 中同步英文 stable 入口与 inspect-first 变体，主命令不带 `--workspace`
-- [ ] 4.4 inspect-first 明确下载与 stable one-liner 同一份 release asset，而不是另一套脚本来源
+- [x] 4.1（用户任务）在 README 首屏切换 stable one-liner 之前，先发布第一个 public stable release，使 `releases/latest/download/install.sh` / `install.ps1` 可用
+- [x] 4.1a（用户任务）确认当前 remote 指向 `sopify-ai/sopify`，并将本轮 one-liner-distribution 实现推送到目标分支
+- [x] 4.1b（用户任务）运行 `bash scripts/check-version-consistency.sh`，确认将要公开发布的 build version / tag
+- [x] 4.1c（用户任务）运行 `python3 scripts/render-release-installers.py --release-tag "$TAG" --output-dir "$OUT_DIR"`，渲染 stable `install.sh` / `install.ps1` asset
+- [x] 4.1d（用户任务）在 GitHub `sopify-ai/sopify` 创建同 tag 的 public Release，并上传 `$OUT_DIR/install.sh` 与 `$OUT_DIR/install.ps1`
+- [x] 4.1e（用户任务）手动验证 `releases/latest/download/install.sh` / `install.ps1` 可访问，且 stable 安装输出展示 `source channel / resolved source ref / asset name`
+- [x] 4.1f（用户任务）只有在 4.1e 验证通过后，才切 `README.md` / `README.zh-CN.md` 首屏安装入口到 stable one-liner
+- [x] 4.2 在 `README.md` 的安装章节首屏提供 official stable one-liner（GitHub Releases latest asset），主命令不带 `--workspace`，并保留 inspect-first 变体
+- [x] 4.3 在 `README.zh-CN.md` 中同步中文 stable 入口与 inspect-first 变体，主命令不带 `--workspace`
+- [x] 4.4 inspect-first 明确下载与 stable one-liner 同一份 release asset，而不是另一套脚本来源
 - [x] 4.5 `raw/main` dev 入口只出现在 `CONTRIBUTING*` 或维护者文档，不进入 README 首屏
-- [ ] 4.6 将当前 repo-local `scripts/install-sopify.sh` 入口下沉为开发者/源码安装路径，不再占用首屏主入口
-- [ ] 4.7 让 Quick Start 与 status/doctor 说明对齐，明确 `--workspace` 是高级 prewarm 用法、默认首次项目触发会自动 bootstrap
+- [x] 4.6 将当前 repo-local `scripts/install-sopify.sh` 入口下沉为开发者/源码安装路径，不再占用首屏主入口
+- [x] 4.7 让 Quick Start 与 status/doctor 说明对齐，明确 `--workspace` 是高级 prewarm 用法、默认首次项目触发会自动 bootstrap
 - [x] 4.8 更新 `CONTRIBUTING.md` / `CONTRIBUTING_CN.md`：明确 `raw/main` dev 入口、repo-local 安装路径、stable/dev 分层与 release asset 渲染约定
 
 **Gate — Group 4 完成后：**
-- [ ] 4.G 新用户从 README 首屏即可完成安装、验证与首次触发，不必先理解仓库内部结构，且 stable URL 不是悬空入口
+- [x] 4.G 新用户从 README 首屏即可完成安装、验证与首次触发，不必先理解仓库内部结构，且 stable URL 不是悬空入口
 
 验收标准:
 
