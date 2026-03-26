@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from tests.runtime_test_support import *
+from runtime.checkpoint_request import checkpoint_request_from_plan_proposal_state
 
 
 class DecisionContractTests(unittest.TestCase):
@@ -379,6 +380,45 @@ class DecisionContractTests(unittest.TestCase):
             self.assertEqual(materialized.clarification_state.clarification_id, clarification_state.clarification_id)
             self.assertEqual(materialized.clarification_state.missing_facts, clarification_state.missing_facts)
 
+    def test_checkpoint_request_roundtrip_preserves_confirmed_decision_in_plan_proposal(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            config = load_runtime_config(workspace)
+            pending = run_runtime(
+                "payload 放 host root 还是 workspace/.sopify-runtime",
+                workspace_root=workspace,
+                user_home=workspace / "home",
+            )
+
+            self.assertEqual(pending.route.route_name, "decision_pending")
+            confirmed = confirm_decision(
+                pending.recovered_context.current_decision,
+                option_id="option_1",
+                source="text",
+                raw_input="1",
+            )
+            StateStore(config).set_current_decision(confirmed)
+
+            proposal_result = run_runtime("继续", workspace_root=workspace, user_home=workspace / "home")
+
+            self.assertEqual(proposal_result.route.route_name, "plan_proposal_pending")
+            proposal_state = proposal_result.recovered_context.current_plan_proposal
+            self.assertTrue(proposal_state.confirmed_decision)
+
+            request = checkpoint_request_from_plan_proposal_state(proposal_state)
+            materialized = materialize_checkpoint_request(request.to_dict(), config=config)
+
+            self.assertEqual(materialized.required_host_action, "confirm_plan_package")
+            self.assertTrue(materialized.plan_proposal_state.confirmed_decision)
+            self.assertEqual(
+                materialized.plan_proposal_state.confirmed_decision["decision_id"],
+                confirmed.decision_id,
+            )
+            self.assertEqual(
+                materialized.plan_proposal_state.confirmed_decision["status"],
+                "confirmed",
+            )
+
     def test_materialize_checkpoint_request_rejects_invalid_decision_contract(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
@@ -612,6 +652,7 @@ class DecisionContractTests(unittest.TestCase):
                 run_id="run-missing-checkpoint",
                 current_run=None,
                 current_plan=None,
+                current_plan_proposal=None,
                 kb_artifact=None,
                 replay_session_dir=None,
                 skill_result={

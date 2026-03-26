@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from hashlib import sha1
 from pathlib import Path
 import re
@@ -45,7 +46,14 @@ from .plan_registry import (
 from .plan_scaffold import (
     create_plan_scaffold,
     find_plan_by_request_reference,
+    reserve_plan_identity,
     request_explicitly_wants_new_plan,
+)
+from .plan_proposal import (
+    build_plan_proposal_state,
+    confirmed_decision_from_proposal,
+    merge_plan_proposal_request,
+    refresh_plan_proposal_state,
 )
 from .replay import ReplayWriter, build_compare_replay_event, build_decision_replay_event
 from .router import Router
@@ -73,6 +81,15 @@ _GLOBAL_EXECUTION_ROUTES = frozenset({"execution_confirm_pending", "resume_activ
 # Only stable review checkpoints may be promoted into the global execution
 # truth consumed by execution-confirm, resume, and finalize.
 _PROMOTABLE_REVIEW_STAGES = frozenset({"plan_generated", "ready_for_execution", "execution_confirm_pending", "develop_pending"})
+
+
+@dataclass(frozen=True)
+class _PlanSelection:
+    """Describe whether planning should reuse an existing plan or create a new one."""
+
+    action: str
+    plan_artifact: PlanArtifact | None = None
+    reason_note: str = ""
 
 
 def _recovery_store_for_route(
@@ -342,6 +359,16 @@ def run_runtime(
         notes.append(f"Superseded pending decision checkpoint: {stale_state.decision_id}")
         current_decision = None
 
+    current_plan_proposal = review_store.get_current_plan_proposal()
+    if (
+        current_plan_proposal is not None
+        and effective_route.route_name in {"plan_only", "workflow", "light_iterate"}
+        and effective_route.route_name != "plan_proposal_pending"
+    ):
+        review_store.clear_current_plan_proposal()
+        notes.append(f"Superseded pending plan proposal: {current_plan_proposal.checkpoint_id}")
+        current_plan_proposal = None
+
     canceled_store: StateStore | None = None
     if effective_route.route_name == "cancel_active":
         canceled_store, cancel_notes = _handle_cancel_active(
@@ -377,6 +404,14 @@ def run_runtime(
             kb_artifact=kb_artifact,
         )
         notes.extend(decision_notes)
+    elif effective_route.route_name == "plan_proposal_pending":
+        effective_route, plan_artifact, proposal_notes, kb_artifact = _handle_plan_proposal_pending(
+            effective_route,
+            state_store=review_store,
+            config=config,
+            kb_artifact=kb_artifact,
+        )
+        notes.extend(proposal_notes)
     elif effective_route.route_name == "execution_confirm_pending":
         execution_store, execution_recovered, promotion_notes = _resolve_execution_state_store(
             effective_route,
@@ -394,7 +429,7 @@ def run_runtime(
         )
         recovered = execution_recovered
         notes.extend(execution_confirm_notes)
-    elif effective_route.should_create_plan:
+    elif effective_route.route_name in {"plan_only", "workflow", "light_iterate"}:
         effective_route, plan_artifact, planning_notes, kb_artifact = _advance_planning_route(
             effective_route,
             state_store=review_store,
@@ -632,6 +667,7 @@ def run_runtime(
             run_id=(current_run.run_id if current_run is not None else _make_run_id(effective_route.request_text)),
             current_run=current_run,
             current_plan=current_plan,
+            current_plan_proposal=result_store.get_current_plan_proposal(),
             kb_artifact=kb_artifact,
             replay_session_dir=replay_session_dir,
             skill_result=skill_result,
@@ -801,10 +837,39 @@ def _make_clarification_run_state(
     )
 
 
+def _make_plan_proposal_run_state(
+    decision: RouteDecision,
+    proposal_state,
+) -> RunState:
+    now = iso_now()
+    return RunState(
+        run_id=_make_run_id(proposal_state.request_text or decision.request_text),
+        status="active",
+        stage="plan_proposal_pending",
+        route_name=proposal_state.resume_route or decision.route_name,
+        title=proposal_state.analysis_summary or proposal_state.proposed_path,
+        created_at=proposal_state.created_at or now,
+        updated_at=now,
+        plan_id=proposal_state.reserved_plan_id,
+        plan_path=proposal_state.proposed_path,
+        execution_gate=None,
+        request_excerpt=summarize_request_text(proposal_state.request_text or decision.request_text),
+        request_sha1=stable_request_sha1(proposal_state.request_text or decision.request_text),
+        owner_session_id="",
+        owner_host="",
+        owner_run_id="",
+    )
+
+
 def _make_run_id(request_text: str) -> str:
     timestamp = iso_now().replace(":", "").replace("-", "")[:15]
     digest = sha1(request_text.encode("utf-8")).hexdigest()[:6]
     return f"{timestamp}_{digest}"
+
+
+def _make_plan_proposal_id(request_text: str) -> str:
+    digest = sha1(request_text.encode("utf-8")).hexdigest()[:8]
+    return f"plan_proposal_{digest}"
 
 
 def _find_skill(skills: tuple[SkillMeta, ...], skill_id: str) -> SkillMeta | None:
@@ -815,7 +880,7 @@ def _find_skill(skills: tuple[SkillMeta, ...], skill_id: str) -> SkillMeta | Non
 
 
 def _phase_for_route(decision: RouteDecision) -> str:
-    if decision.route_name in {"plan_only", "workflow", "light_iterate", "clarification_pending", "clarification_resume", "decision_pending", "decision_resume"}:
+    if decision.route_name in {"plan_only", "workflow", "light_iterate", "plan_proposal_pending", "clarification_pending", "clarification_resume", "decision_pending", "decision_resume"}:
         return "design"
     if decision.route_name in {"execution_confirm_pending", "resume_active", "exec_plan", "quick_fix"}:
         return "develop"
@@ -871,7 +936,7 @@ def _activation_target(
         if current_decision is not None and current_decision.phase == "develop":
             return ("develop", "开发实施")
         return ("design", "方案设计")
-    if decision.route_name in {"plan_only", "workflow", "light_iterate"}:
+    if decision.route_name in {"plan_only", "workflow", "light_iterate", "plan_proposal_pending"}:
         return ("design", "方案设计")
     return ("consult", "咨询问答")
 
@@ -939,7 +1004,7 @@ def _handle_clarification_resume(
         plan_level=current_clarification.requested_plan_level,
         candidate_skill_ids=current_clarification.candidate_skill_ids,
         should_recover_context=False,
-        should_create_plan=True,
+        plan_package_policy=current_clarification.plan_package_policy,
         capture_mode=current_clarification.capture_mode,
         artifacts={"planning_resume_source": "clarification"},
     )
@@ -1059,7 +1124,7 @@ def _handle_decision_resume(
             plan_level=current_decision.requested_plan_level,
             candidate_skill_ids=current_decision.candidate_skill_ids,
             should_recover_context=False,
-            should_create_plan=True,
+            plan_package_policy=current_decision.plan_package_policy,
             capture_mode=current_decision.capture_mode,
         ),
         state_store=state_store,
@@ -1128,6 +1193,153 @@ def _resume_from_develop_clarification(
             active_run_action="resume",
         ),
         current_plan,
+        notes,
+        kb_artifact,
+    )
+
+
+def _handle_plan_proposal_pending(
+    decision: RouteDecision,
+    *,
+    state_store: StateStore,
+    config: RuntimeConfig,
+    kb_artifact: KbArtifact | None,
+) -> tuple[RouteDecision, PlanArtifact | None, list[str], KbArtifact | None]:
+    proposal_state = state_store.get_current_plan_proposal()
+    notes: list[str] = []
+    if proposal_state is None:
+        return (
+            _plan_proposal_pending_route(
+                decision,
+                reason="No pending plan proposal was found",
+            ),
+            None,
+            ["No pending plan proposal to resume"],
+            kb_artifact,
+        )
+
+    action = decision.active_run_action or "inspect_plan_proposal"
+    if action == "inspect_plan_proposal":
+        state_store.set_current_run(_make_plan_proposal_run_state(decision, proposal_state))
+        notes.append("Plan proposal remains pending")
+        return (
+            _plan_proposal_pending_route(
+                decision,
+                reason="Plan proposal is still waiting for package confirmation",
+                active_run_action="inspect_plan_proposal",
+            ),
+            None,
+            notes,
+            kb_artifact,
+        )
+
+    if action == "confirm_plan_proposal":
+        confirmed_decision = confirmed_decision_from_proposal(proposal_state)
+        created = create_plan_scaffold(
+            proposal_state.request_text,
+            config=config,
+            level=proposal_state.proposed_level,
+            decision_state=confirmed_decision,
+            topic_key=proposal_state.topic_key,
+            plan_id=proposal_state.reserved_plan_id,
+        )
+        state_store.clear_current_plan_proposal()
+        state_store.set_current_plan(created)
+        kb_artifact = _merge_kb_artifacts(kb_artifact, ensure_blueprint_index(config), config=config)
+        notes.extend(
+            _created_plan_notes(
+                created,
+                config=config,
+                base_note=_created_plan_base_note(created.path, "after proposal confirmation"),
+            )
+        )
+        review_route, plan_artifact, gate_notes = _apply_execution_gate_to_plan(
+            _plan_review_route(
+                RouteDecision(
+                    route_name=proposal_state.resume_route or "workflow",
+                    request_text=proposal_state.request_text,
+                    reason="Plan proposal confirmed and materialized",
+                    complexity="complex" if proposal_state.proposed_level != "light" else "medium",
+                    plan_level=proposal_state.proposed_level,
+                    candidate_skill_ids=proposal_state.candidate_skill_ids,
+                    capture_mode=proposal_state.capture_mode,
+                ),
+                reason="Plan proposal confirmed and materialized for review",
+                plan_level=proposal_state.proposed_level,
+            ),
+            plan_artifact=created,
+            state_store=state_store,
+            config=config,
+            decision_context=confirmed_decision,
+        )
+        notes.extend(gate_notes)
+        return (review_route, plan_artifact, notes, kb_artifact)
+
+    if action == "revise_plan_proposal":
+        merged_request = merge_plan_proposal_request(proposal_state, decision.request_text)
+        next_topic_key, next_plan_id, next_path = reserve_plan_identity(
+            merged_request,
+            config=config,
+        )
+        if next_topic_key != proposal_state.topic_key or next_plan_id != proposal_state.reserved_plan_id or next_path != proposal_state.proposed_path:
+            state_store.clear_current_plan_proposal()
+            notes.append(f"Exited proposal {proposal_state.checkpoint_id} because revision requires a new proposal identity")
+            resumed_route = RouteDecision(
+                route_name=proposal_state.resume_route or "workflow",
+                request_text=merged_request,
+                reason="Revision feedback requires a new proposal identity, so planning restarted",
+                complexity="complex" if proposal_state.proposed_level != "light" else "medium",
+                plan_level=proposal_state.proposed_level,
+                candidate_skill_ids=proposal_state.candidate_skill_ids,
+                should_recover_context=False,
+                plan_package_policy="confirm",
+                capture_mode=proposal_state.capture_mode,
+            )
+            routed_decision, plan_artifact, planning_notes, kb_artifact = _advance_planning_route(
+                resumed_route,
+                state_store=state_store,
+                config=config,
+                kb_artifact=kb_artifact,
+                confirmed_decision=confirmed_decision_from_proposal(proposal_state),
+            )
+            notes.extend(planning_notes)
+            return (routed_decision, plan_artifact, notes, kb_artifact)
+
+        refreshed = refresh_plan_proposal_state(
+            proposal_state,
+            request_text=merged_request,
+            proposed_level=proposal_state.proposed_level,
+        )
+        state_store.set_current_plan_proposal(refreshed)
+        state_store.set_current_run(_make_plan_proposal_run_state(decision, refreshed))
+        notes.append(f"Refreshed plan proposal {refreshed.checkpoint_id} without drifting path or identity")
+        return (
+            _plan_proposal_pending_route(
+                RouteDecision(
+                    route_name=proposal_state.resume_route or "workflow",
+                    request_text=merged_request,
+                    reason="Plan proposal revised and is waiting for package confirmation",
+                    complexity="complex" if proposal_state.proposed_level != "light" else "medium",
+                    plan_level=proposal_state.proposed_level,
+                    candidate_skill_ids=proposal_state.candidate_skill_ids,
+                    capture_mode=proposal_state.capture_mode,
+                ),
+                reason="Plan proposal revised and is waiting for package confirmation",
+                active_run_action="inspect_plan_proposal",
+            ),
+            None,
+            notes,
+            kb_artifact,
+        )
+
+    state_store.set_current_run(_make_plan_proposal_run_state(decision, proposal_state))
+    notes.append(f"Unsupported proposal action fell back to inspect: {action}")
+    return (
+        _plan_proposal_pending_route(
+            decision,
+            reason="Plan proposal is still waiting for package confirmation",
+        ),
+        None,
         notes,
         kb_artifact,
     )
@@ -1217,7 +1429,7 @@ def _resume_from_active_plan_binding_decision(
         plan_level=current_decision.requested_plan_level,
         candidate_skill_ids=current_decision.candidate_skill_ids or ("design", "develop"),
         should_recover_context=False,
-        should_create_plan=True,
+        plan_package_policy=current_decision.plan_package_policy,
         capture_mode=current_decision.capture_mode,
         artifacts={
             "active_plan_binding_selection": selected_option_id,
@@ -1449,6 +1661,30 @@ def _decision_pending_route(decision: RouteDecision, *, reason: str) -> RouteDec
     )
 
 
+def _plan_proposal_pending_route(
+    decision: RouteDecision,
+    *,
+    reason: str,
+    active_run_action: str = "inspect_plan_proposal",
+) -> RouteDecision:
+    return RouteDecision(
+        route_name="plan_proposal_pending",
+        request_text=decision.request_text,
+        reason=reason,
+        command=decision.command,
+        complexity=decision.complexity,
+        plan_level=decision.plan_level,
+        candidate_skill_ids=decision.candidate_skill_ids or ("design",),
+        should_recover_context=True,
+        plan_package_policy="confirm",
+        should_create_plan=False,
+        capture_mode=decision.capture_mode,
+        runtime_skill_id=None,
+        active_run_action=active_run_action,
+        artifacts=decision.artifacts,
+    )
+
+
 def _execution_confirm_pending_route(
     decision: RouteDecision,
     *,
@@ -1508,6 +1744,43 @@ def _clarification_pending_route(decision: RouteDecision, *, reason: str) -> Rou
     )
 
 
+def _plan_review_route(
+    decision: RouteDecision,
+    *,
+    reason: str,
+    plan_level: str | None,
+) -> RouteDecision:
+    return RouteDecision(
+        route_name="plan_only",
+        request_text=decision.request_text,
+        reason=reason,
+        command=decision.command,
+        complexity=decision.complexity,
+        plan_level=plan_level,
+        candidate_skill_ids=decision.candidate_skill_ids or ("design", "develop"),
+        should_recover_context=False,
+        plan_package_policy="none",
+        should_create_plan=False,
+        capture_mode=decision.capture_mode,
+        runtime_skill_id=None,
+        artifacts=decision.artifacts,
+    )
+
+
+def _normalized_plan_package_policy(decision: RouteDecision) -> str:
+    """Fail closed for legacy or malformed planning routes that omit the new policy."""
+    policy = str(decision.plan_package_policy or "none").strip() or "none"
+    if policy != "none":
+        return policy
+    if decision.route_name == "plan_only":
+        return "immediate"
+    if decision.route_name in {"workflow", "light_iterate"}:
+        if request_explicitly_wants_new_plan(decision.request_text):
+            return "immediate"
+        return "confirm"
+    return policy
+
+
 def _resume_active_route(*, request_text: str, candidate_skill_ids: tuple[str, ...]) -> RouteDecision:
     return RouteDecision(
         route_name="resume_active",
@@ -1555,6 +1828,7 @@ def _advance_planning_route(
     confirmed_decision: DecisionState | None = None,
 ) -> tuple[RouteDecision, PlanArtifact | None, list[str], KbArtifact | None]:
     notes: list[str] = []
+    plan_package_policy = _normalized_plan_package_policy(decision)
     kb_artifact = _merge_kb_artifacts(kb_artifact, ensure_blueprint_scaffold(config), config=config)
 
     pending_clarification = _build_route_native_clarification_state(decision, config=config)
@@ -1664,20 +1938,85 @@ def _advance_planning_route(
         )
 
     level = decision.plan_level or _default_plan_level(decision)
-    plan_artifact, plan_notes = _select_plan_for_request(
+    selection = _resolve_plan_for_request(
         decision,
         state_store=state_store,
         config=config,
-        level=level,
         confirmed_decision=confirmed_decision,
     )
-    state_store.set_current_plan(plan_artifact)
+    if selection.action == "reuse_existing":
+        plan_artifact = selection.plan_artifact
+        if plan_artifact is None:
+            raise RuntimeError("Plan selection resolved to reuse_existing without an artifact")
+        state_store.clear_current_plan_proposal()
+        state_store.set_current_plan(plan_artifact)
+        if selection.reason_note:
+            notes.append(selection.reason_note)
+        routed_decision, plan_artifact, gate_notes = _apply_execution_gate_to_plan(
+            decision,
+            plan_artifact=plan_artifact,
+            state_store=state_store,
+            config=config,
+            decision_context=confirmed_decision,
+        )
+        notes.extend(gate_notes)
+        return (routed_decision, plan_artifact, notes, kb_artifact)
+
+    if plan_package_policy == "confirm":
+        topic_key, reserved_plan_id, proposed_path = reserve_plan_identity(
+            decision.request_text,
+            config=config,
+        )
+        proposal_state = build_plan_proposal_state(
+            decision,
+            request_text=decision.request_text,
+            proposed_level=level,
+            checkpoint_id=_make_plan_proposal_id(decision.request_text),
+            reserved_plan_id=reserved_plan_id,
+            topic_key=topic_key,
+            proposed_path=proposed_path,
+            confirmed_decision=confirmed_decision,
+        )
+        state_store.clear_current_plan()
+        state_store.set_current_plan_proposal(proposal_state)
+        state_store.set_current_run(_make_plan_proposal_run_state(decision, proposal_state))
+        if confirmed_decision is not None and confirmed_decision.status == "confirmed" and confirmed_decision.selection is not None:
+            _consume_current_decision(state_store, confirmed_decision)
+            notes.append(f"Decision consumed: {confirmed_decision.decision_id}")
+        staged_note = f"Plan proposal staged at {proposal_state.proposed_path}"
+        if selection.reason_note:
+            staged_note = f"{staged_note} {selection.reason_note}"
+        notes.append(staged_note)
+        return (
+            _plan_proposal_pending_route(
+                decision,
+                reason="Planning converged to a stable proposal and is waiting for package confirmation",
+            ),
+            None,
+            notes,
+            kb_artifact,
+        )
+
+    created = create_plan_scaffold(
+        decision.request_text,
+        config=config,
+        level=level,
+        decision_state=confirmed_decision,
+    )
+    state_store.clear_current_plan_proposal()
+    state_store.set_current_plan(created)
     kb_artifact = _merge_kb_artifacts(kb_artifact, ensure_blueprint_index(config), config=config)
-    notes.extend(plan_notes)
+    notes.extend(
+        _created_plan_notes(
+            created,
+            config=config,
+            base_note=_created_plan_base_note(created.path, selection.reason_note),
+        )
+    )
 
     routed_decision, plan_artifact, gate_notes = _apply_execution_gate_to_plan(
         decision,
-        plan_artifact=plan_artifact,
+        plan_artifact=created,
         state_store=state_store,
         config=config,
         decision_context=confirmed_decision,
@@ -1686,14 +2025,13 @@ def _advance_planning_route(
     return (routed_decision, plan_artifact, notes, kb_artifact)
 
 
-def _select_plan_for_request(
+def _resolve_plan_for_request(
     decision: RouteDecision,
     *,
     state_store: StateStore,
     config: RuntimeConfig,
-    level: str,
     confirmed_decision: DecisionState | None,
-) -> tuple[PlanArtifact, list[str]]:
+) -> _PlanSelection:
     current_plan = state_store.get_current_plan()
     active_plan_binding_selection = str(decision.artifacts.get("active_plan_binding_selection") or "").strip()
 
@@ -1701,85 +2039,78 @@ def _select_plan_for_request(
         if confirmed_decision.decision_type == ACTIVE_PLAN_BINDING_DECISION_TYPE:
             selected_option_id = confirmed_decision.selected_option_id or ""
             if selected_option_id == ACTIVE_PLAN_ATTACH_OPTION_ID and current_plan is not None:
-                return current_plan, [f"Attached the request back to active plan {current_plan.path} after decision confirmation"]
-            if selected_option_id == ACTIVE_PLAN_NEW_OPTION_ID or current_plan is None:
-                created = create_plan_scaffold(
-                    decision.request_text,
-                    config=config,
-                    level=level,
-                    decision_state=confirmed_decision,
+                return _PlanSelection(
+                    action="reuse_existing",
+                    plan_artifact=current_plan,
+                    reason_note=f"Attached the request back to active plan {current_plan.path} after decision confirmation",
                 )
-                return created, _created_plan_notes(
-                    created,
-                    config=config,
-                    base_note=f"Plan scaffold created at {created.path} after active-plan routing confirmation",
+            if selected_option_id == ACTIVE_PLAN_NEW_OPTION_ID or current_plan is None:
+                return _PlanSelection(
+                    action="create_new",
+                    reason_note="after active-plan routing confirmation",
                 )
 
         if current_plan is not None:
-            return current_plan, [f"Reused active plan {current_plan.path} after decision confirmation"]
-        created = create_plan_scaffold(
-            decision.request_text,
-            config=config,
-            level=level,
-            decision_state=confirmed_decision,
-        )
-        return created, _created_plan_notes(
-            created,
-            config=config,
-            base_note=f"Plan scaffold created at {created.path}",
+            return _PlanSelection(
+                action="reuse_existing",
+                plan_artifact=current_plan,
+                reason_note=f"Reused active plan {current_plan.path} after decision confirmation",
+            )
+        return _PlanSelection(
+            action="create_new",
+            reason_note="after decision confirmation",
         )
 
     explicit_new_plan = request_explicitly_wants_new_plan(decision.request_text)
     explicit_plan = find_plan_by_request_reference(decision.request_text, config=config)
 
     if active_plan_binding_selection == ACTIVE_PLAN_NEW_OPTION_ID:
-        created = create_plan_scaffold(
-            decision.request_text,
-            config=config,
-            level=level,
-            decision_state=None,
-        )
-        return created, _created_plan_notes(
-            created,
-            config=config,
-            base_note=f"Plan scaffold created at {created.path} (selected new-plan routing)",
+        return _PlanSelection(
+            action="create_new",
+            reason_note="(selected new-plan routing)",
         )
 
     if explicit_new_plan:
-        created = create_plan_scaffold(
-            decision.request_text,
-            config=config,
-            level=level,
-            decision_state=None,
-        )
-        return created, _created_plan_notes(
-            created,
-            config=config,
-            base_note=f"Plan scaffold created at {created.path} (explicit new-plan request)",
+        return _PlanSelection(
+            action="create_new",
+            reason_note="(explicit new-plan request)",
         )
 
     if explicit_plan is not None:
         if current_plan is not None and explicit_plan.plan_id == current_plan.plan_id:
-            return current_plan, [f"Reused active plan {current_plan.path} (explicit self-reference)"]
-        return explicit_plan, [f"Rebound planning context to existing plan {explicit_plan.path} (explicit plan reference)"]
+            return _PlanSelection(
+                action="reuse_existing",
+                plan_artifact=current_plan,
+                reason_note=f"Reused active plan {current_plan.path} (explicit self-reference)",
+            )
+        return _PlanSelection(
+            action="reuse_existing",
+            plan_artifact=explicit_plan,
+            reason_note=f"Rebound planning context to existing plan {explicit_plan.path} (explicit plan reference)",
+        )
 
     if current_plan is not None:
         if active_plan_binding_selection == ACTIVE_PLAN_ATTACH_OPTION_ID:
-            return current_plan, [f"Reused active plan {current_plan.path} (selected current-plan routing)"]
+            return _PlanSelection(
+                action="reuse_existing",
+                plan_artifact=current_plan,
+                reason_note=f"Reused active plan {current_plan.path} (selected current-plan routing)",
+            )
         if _request_anchors_current_plan(decision.request_text, current_plan=current_plan):
-            return current_plan, [f"Reused active plan {current_plan.path} (implicit current-plan anchor)"]
-        return current_plan, [f"Reused active plan {current_plan.path} under strict single-active-plan policy"]
+            return _PlanSelection(
+                action="reuse_existing",
+                plan_artifact=current_plan,
+                reason_note=f"Reused active plan {current_plan.path} (implicit current-plan anchor)",
+            )
+        return _PlanSelection(
+            action="reuse_existing",
+            plan_artifact=current_plan,
+            reason_note=f"Reused active plan {current_plan.path} under strict single-active-plan policy",
+        )
 
-    created = create_plan_scaffold(
-        decision.request_text,
-        config=config,
-        level=level,
-        decision_state=None,
-    )
-    return created, _created_plan_notes(
-        created,
-        config=config,
-        base_note=f"Plan scaffold created at {created.path}",
+    return _PlanSelection(
+        action="create_new",
+        reason_note="",
     )
 
 
@@ -1793,6 +2124,13 @@ def _created_plan_notes(created: PlanArtifact, *, config: RuntimeConfig, base_no
     if priority_note:
         notes.append(encode_priority_note_event(priority_note))
     return notes
+
+
+def _created_plan_base_note(plan_path: str, reason_note: str) -> str:
+    base = f"Plan scaffold created at {plan_path}"
+    if reason_note:
+        return f"{base} {reason_note}"
+    return base
 
 
 def _should_create_active_plan_binding_decision(
@@ -1863,6 +2201,11 @@ def _apply_execution_gate_to_plan(
     config: RuntimeConfig,
     decision_context: DecisionState | None,
 ) -> tuple[RouteDecision, PlanArtifact, list[str]]:
+    review_route = _plan_review_route(
+        decision,
+        reason="Plan materialized and is waiting for review before execution",
+        plan_level=plan_artifact.level,
+    )
     if str(decision.artifacts.get("active_plan_binding_selection") or "").strip() == ACTIVE_PLAN_ATTACH_OPTION_ID:
         gate = ExecutionGate(
             gate_status="blocked",
@@ -1873,18 +2216,10 @@ def _apply_execution_gate_to_plan(
         )
         state_store.set_current_run(
             _make_run_state(
-                RouteDecision(
-                    route_name="plan_only",
-                    request_text=decision.request_text,
+                _plan_review_route(
+                    decision,
                     reason="Attached request to the current plan and returned it to plan review",
-                    command=decision.command,
-                    complexity=decision.complexity,
                     plan_level=decision.plan_level or plan_artifact.level,
-                    candidate_skill_ids=decision.candidate_skill_ids,
-                    should_recover_context=False,
-                    should_create_plan=False,
-                    capture_mode=decision.capture_mode,
-                    artifacts=decision.artifacts,
                 ),
                 plan_artifact,
                 stage="plan_generated",
@@ -1892,18 +2227,10 @@ def _apply_execution_gate_to_plan(
             )
         )
         return (
-            RouteDecision(
-                route_name="plan_only",
-                request_text=decision.request_text,
+            _plan_review_route(
+                decision,
                 reason="Attached request to the current plan and returned it to plan review",
-                command=decision.command,
-                complexity=decision.complexity,
                 plan_level=decision.plan_level or plan_artifact.level,
-                candidate_skill_ids=decision.candidate_skill_ids,
-                should_recover_context=False,
-                should_create_plan=False,
-                capture_mode=decision.capture_mode,
-                artifacts=decision.artifacts,
             ),
             plan_artifact,
             list(gate.notes),
@@ -1957,35 +2284,14 @@ def _apply_execution_gate_to_plan(
     stage = "ready_for_execution" if gate.gate_status == "ready" else "plan_generated"
     state_store.set_current_run(
         _make_run_state(
-            decision,
+            review_route,
             plan_artifact,
             stage=stage,
             execution_gate=gate,
         )
     )
-    if gate.gate_status == "ready":
-        return (
-            _execution_confirm_pending_route(
-                decision,
-                reason="Plan passed the execution gate and is waiting for user confirmation",
-            ),
-            plan_artifact,
-            notes,
-        )
     return (
-        RouteDecision(
-            route_name=decision.route_name,
-            request_text=decision.request_text,
-            reason="Plan materialized and execution gate evaluated",
-            command=decision.command,
-            complexity=decision.complexity,
-            plan_level=decision.plan_level or plan_artifact.level,
-            candidate_skill_ids=decision.candidate_skill_ids,
-            should_recover_context=False,
-            should_create_plan=False,
-            capture_mode=decision.capture_mode,
-            artifacts=decision.artifacts,
-        ),
+        review_route,
         plan_artifact,
         notes,
     )

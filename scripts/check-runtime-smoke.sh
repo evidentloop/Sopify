@@ -50,19 +50,23 @@ if [[ ! -f "$MANIFEST_FILE" ]]; then
 fi
 
 # This smoke intentionally checks bundle completeness plus repo-local runtime
-# behavior. Gate-first host ordering belongs to future host-bridge smoke.
+# behavior. It targets the explicit plan-materialization path so the smoke can
+# keep validating immediate plan scaffold creation even though the default
+# workflow path now uses proposal-first confirmation. Gate-first host ordering
+# belongs to future host-bridge smoke.
+SMOKE_REQUEST="~go plan 重构数据库层"
 OUTPUT="$(
   python3 "$RUNTIME_ENTRY" \
     --allow-direct-entry \
     --workspace-root "$WORK_DIR" \
     --no-color \
-    "重构数据库层"
+    "$SMOKE_REQUEST"
 )"
 GATE_OUTPUT="$(
   python3 "$RUNTIME_GATE_ENTRY" \
     enter \
     --workspace-root "$WORK_DIR" \
-    --request "重构数据库层"
+    --request "$SMOKE_REQUEST"
 )"
 
 PLAN_DIR="$WORK_DIR/.sopify-skills/plan"

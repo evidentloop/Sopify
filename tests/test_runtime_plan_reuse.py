@@ -273,7 +273,7 @@ class PlanReuseRuntimeTests(unittest.TestCase):
             assert rebound is not None
             self.assertEqual(rebound.plan_id, second.plan_artifact.plan_id)
 
-    def test_new_plan_selection_preserves_workflow_route_after_binding_decision(self) -> None:
+    def test_new_plan_selection_preserves_workflow_resume_route_after_binding_decision(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
             config = load_runtime_config(workspace)
@@ -292,10 +292,22 @@ class PlanReuseRuntimeTests(unittest.TestCase):
                 workspace_root=workspace,
                 user_home=workspace / "home",
             )
+            third = run_runtime(
+                "继续",
+                workspace_root=workspace,
+                user_home=workspace / "home",
+            )
 
             self.assertEqual(first.route.route_name, "decision_pending")
-            self.assertEqual(second.route.route_name, "workflow")
-            self.assertIsNotNone(second.plan_artifact)
-            assert second.plan_artifact is not None
-            self.assertNotEqual(second.plan_artifact.plan_id, current_plan.plan_id)
-            self.assertEqual(second.handoff.required_host_action, "continue_host_workflow")
+            self.assertEqual(second.route.route_name, "plan_proposal_pending")
+            self.assertIsNone(second.plan_artifact)
+            self.assertIsNotNone(second.recovered_context.current_plan_proposal)
+            assert second.recovered_context.current_plan_proposal is not None
+            self.assertEqual(second.recovered_context.current_plan_proposal.resume_route, "workflow")
+            self.assertEqual(second.handoff.required_host_action, "confirm_plan_package")
+
+            self.assertEqual(third.route.route_name, "plan_only")
+            self.assertIsNotNone(third.plan_artifact)
+            assert third.plan_artifact is not None
+            self.assertNotEqual(third.plan_artifact.plan_id, current_plan.plan_id)
+            self.assertEqual(third.handoff.required_host_action, "review_or_execute_plan")

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from tests.runtime_test_support import *
+from runtime.engine import _advance_planning_route
 
 
 class EngineIntegrationTests(unittest.TestCase):
@@ -26,11 +27,16 @@ class EngineIntegrationTests(unittest.TestCase):
             session_b_store = StateStore(config, session_id="session-b")
             global_store = StateStore(config)
 
-            self.assertIsNotNone(session_a_store.get_current_plan())
-            self.assertIsNotNone(session_b_store.get_current_plan())
-            self.assertNotEqual(session_a_store.get_current_plan().plan_id, session_b_store.get_current_plan().plan_id)
-            self.assertTrue(session_a_store.current_plan_path.exists())
-            self.assertTrue(session_b_store.current_plan_path.exists())
+            self.assertIsNotNone(session_a_store.get_current_plan_proposal())
+            self.assertIsNotNone(session_b_store.get_current_plan_proposal())
+            self.assertNotEqual(
+                session_a_store.get_current_plan_proposal().reserved_plan_id,
+                session_b_store.get_current_plan_proposal().reserved_plan_id,
+            )
+            self.assertTrue(session_a_store.current_plan_proposal_path.exists())
+            self.assertTrue(session_b_store.current_plan_proposal_path.exists())
+            self.assertIsNone(session_a_store.get_current_plan())
+            self.assertIsNone(session_b_store.get_current_plan())
             self.assertIsNone(global_store.get_current_plan())
 
     def test_engine_enters_clarification_before_plan_materialization(self) -> None:
@@ -65,6 +71,110 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertIsNotNone(result.plan_artifact)
             self.assertFalse((workspace / ".sopify-skills" / "state" / "current_clarification.json").exists())
             self.assertTrue((workspace / result.plan_artifact.path / "tasks.md").exists())
+
+    def test_non_explicit_complex_request_enters_proposal_first_flow(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+
+            proposal = run_runtime("那你执行吧 逻辑严谨", workspace_root=workspace, user_home=workspace / "home")
+
+            self.assertEqual(proposal.route.route_name, "plan_proposal_pending")
+            self.assertIsNone(proposal.plan_artifact)
+            self.assertIsNotNone(proposal.recovered_context.current_plan_proposal)
+            self.assertNotEqual(
+                proposal.recovered_context.current_plan_proposal.analysis_summary,
+                proposal.recovered_context.current_plan_proposal.request_text,
+            )
+            self.assertIn("方案包", proposal.recovered_context.current_plan_proposal.analysis_summary)
+            self.assertEqual(proposal.handoff.required_host_action, "confirm_plan_package")
+            self.assertFalse((workspace / ".sopify-skills" / "state" / "current_plan.json").exists())
+            self.assertEqual(_plan_dir_count(workspace), 0)
+
+            confirmed = run_runtime("继续", workspace_root=workspace, user_home=workspace / "home")
+
+            self.assertEqual(confirmed.route.route_name, "plan_only")
+            self.assertIsNotNone(confirmed.plan_artifact)
+            self.assertFalse((workspace / ".sopify-skills" / "state" / "current_plan_proposal.json").exists())
+            self.assertEqual(_plan_dir_count(workspace), 1)
+            self.assertEqual(confirmed.handoff.required_host_action, "review_or_execute_plan")
+
+    def test_proposal_pending_keeps_finalize_and_compare_at_confirmation_checkpoint(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+
+            proposal = run_runtime("实现 runtime plugin bridge", workspace_root=workspace, user_home=workspace / "home")
+            checkpoint_id = proposal.recovered_context.current_plan_proposal.checkpoint_id
+
+            compare = run_runtime("~compare 方案对比", workspace_root=workspace, user_home=workspace / "home")
+            self.assertEqual(compare.route.route_name, "plan_proposal_pending")
+            self.assertIsNone(compare.plan_artifact)
+            self.assertEqual(compare.handoff.required_host_action, "confirm_plan_package")
+            self.assertEqual(compare.recovered_context.current_plan_proposal.checkpoint_id, checkpoint_id)
+
+            finalize = run_runtime("~go finalize", workspace_root=workspace, user_home=workspace / "home")
+            self.assertEqual(finalize.route.route_name, "plan_proposal_pending")
+            self.assertIsNone(finalize.plan_artifact)
+            self.assertEqual(finalize.handoff.required_host_action, "confirm_plan_package")
+            self.assertEqual(finalize.recovered_context.current_plan_proposal.checkpoint_id, checkpoint_id)
+            self.assertEqual(_plan_dir_count(workspace), 0)
+
+    def test_proposal_pending_question_does_not_mutate_request_text(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+
+            proposal = run_runtime("实现 runtime plugin bridge", workspace_root=workspace, user_home=workspace / "home")
+            original = proposal.recovered_context.current_plan_proposal
+
+            followup = run_runtime("为什么是这个方案？", workspace_root=workspace, user_home=workspace / "home")
+            updated = followup.recovered_context.current_plan_proposal
+
+            self.assertEqual(followup.route.route_name, "plan_proposal_pending")
+            self.assertEqual(followup.route.active_run_action, "inspect_plan_proposal")
+            self.assertEqual(updated.request_text, original.request_text)
+            self.assertEqual(updated.checkpoint_id, original.checkpoint_id)
+            self.assertEqual(updated.proposed_path, original.proposed_path)
+
+    def test_proposal_pending_explicit_revision_refreshes_request_text_without_drifting_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+
+            proposal = run_runtime("实现 runtime plugin bridge", workspace_root=workspace, user_home=workspace / "home")
+            original = proposal.recovered_context.current_plan_proposal
+
+            revised = run_runtime("把风险再展开一点", workspace_root=workspace, user_home=workspace / "home")
+            updated = revised.recovered_context.current_plan_proposal
+
+            self.assertEqual(revised.route.route_name, "plan_proposal_pending")
+            self.assertEqual(updated.checkpoint_id, original.checkpoint_id)
+            self.assertEqual(updated.proposed_path, original.proposed_path)
+            self.assertIn("修订意见", updated.request_text)
+            self.assertIn("把风险再展开一点", updated.request_text)
+
+    def test_advance_planning_route_fail_closed_when_workflow_policy_is_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            config = load_runtime_config(workspace)
+            store = StateStore(config)
+            store.ensure()
+
+            routed, plan_artifact, notes, _ = _advance_planning_route(
+                RouteDecision(
+                    route_name="workflow",
+                    request_text="实现 runtime plugin bridge",
+                    reason="legacy route payload without plan_package_policy",
+                    complexity="complex",
+                    plan_level="standard",
+                ),
+                state_store=store,
+                config=config,
+                kb_artifact=None,
+            )
+
+            self.assertEqual(routed.route_name, "plan_proposal_pending")
+            self.assertIsNone(plan_artifact)
+            self.assertIsNotNone(store.get_current_plan_proposal())
+            self.assertEqual(_plan_dir_count(workspace), 0)
+            self.assertTrue(any("Plan proposal staged at" in note for note in notes))
 
     def test_exec_plan_is_blocked_while_clarification_is_pending(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -225,7 +335,7 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertIsNone(global_store.get_current_run())
             self.assertIsNone(global_store.get_current_plan())
             self.assertIsNotNone(review_store.get_current_run())
-            self.assertIsNotNone(review_store.get_current_plan())
+            self.assertIsNotNone(review_store.get_current_plan_proposal())
             self.assertTrue(any("Global execution flow cleared; session review state preserved" in note for note in result.notes))
 
     def test_cancel_active_clears_only_session_review_when_global_execution_is_absent(self) -> None:
@@ -763,7 +873,9 @@ class EngineIntegrationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
 
-            first = run_runtime("实现 runtime plugin bridge", workspace_root=workspace, user_home=workspace / "home")
+            proposal = run_runtime("实现 runtime plugin bridge", workspace_root=workspace, user_home=workspace / "home")
+            self.assertEqual(proposal.route.route_name, "plan_proposal_pending")
+            first = run_runtime("继续", workspace_root=workspace, user_home=workspace / "home")
             self.assertIsNotNone(first.plan_artifact)
             self.assertEqual(first.plan_artifact.level, "full")
 
@@ -1051,12 +1163,12 @@ class EngineIntegrationTests(unittest.TestCase):
 
             resumed = run_runtime("继续", workspace_root=workspace, user_home=workspace / "home")
 
-            self.assertEqual(resumed.route.route_name, "execution_confirm_pending")
+            self.assertEqual(resumed.route.route_name, "plan_only")
             self.assertIsNotNone(resumed.plan_artifact)
             self.assertEqual(resumed.plan_artifact.path, plan_artifact.path)
             self.assertEqual(resumed.recovered_context.current_run.stage, "ready_for_execution")
             self.assertEqual(resumed.recovered_context.current_run.execution_gate.gate_status, "ready")
-            self.assertEqual(resumed.handoff.required_host_action, "confirm_execute")
+            self.assertEqual(resumed.handoff.required_host_action, "review_or_execute_plan")
             self.assertFalse((workspace / ".sopify-skills" / "state" / "current_decision.json").exists())
 
     def test_engine_handoff_contracts_cover_compare_and_replay(self) -> None:
@@ -1832,7 +1944,7 @@ class EngineIntegrationTests(unittest.TestCase):
                     "--workspace-root",
                     str(workspace),
                     "--request",
-                    "重构数据库层",
+                    "~go plan 重构数据库层",
                 ],
                 capture_output=True,
                 text=True,
@@ -1843,7 +1955,7 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertEqual(gate_payload["status"], "ready")
             self.assertTrue(gate_payload["gate_passed"])
             self.assertEqual(gate_payload["allowed_response_mode"], "normal_runtime_followup")
-            self.assertEqual(gate_payload["handoff"]["required_host_action"], "continue_host_workflow")
+            self.assertEqual(gate_payload["handoff"]["required_host_action"], "review_or_execute_plan")
             self.assertIn(".sopify-skills/plan/", completed.stdout)
             self.assertTrue((workspace / gate_payload["state"]["current_handoff_path"]).exists())
             self.assertTrue((workspace / ".sopify-skills" / "state" / "current_gate_receipt.json").exists())
@@ -1855,8 +1967,8 @@ class EngineIntegrationTests(unittest.TestCase):
             bundle_blueprint_readme = (workspace / ".sopify-skills" / "blueprint" / "README.md").read_text(
                 encoding="utf-8"
             )
-            self.assertIn("状态: L2 plan-active", bundle_blueprint_readme)
-            self.assertIn("当前活动方案目录：`../plan/`", bundle_blueprint_readme)
+            self.assertIn("状态: L1 blueprint-ready", bundle_blueprint_readme)
+            self.assertIn("当前活动 plan：暂无", bundle_blueprint_readme)
             self.assertNotIn("../history/index.md", bundle_blueprint_readme)
 
     def test_synced_runtime_bundle_supports_decision_checkpoint(self) -> None:

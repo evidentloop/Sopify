@@ -72,7 +72,7 @@
 3. 保留 `raw/main` 与 repo-local `scripts/install-sopify.sh` / `scripts/install_sopify.py` 作为 dev / maintainer 入口，不与官方 stable 入口混用。
 4. 为远程入口新增一个薄 distribution facade，复用当前 installer core，而不是复制安装逻辑。
 5. 默认把“安装后立刻给出 status / doctor 摘要 + resolved source metadata”做成用户第一感知。
-6. 在 README / README_EN 中把 stable one-liner 放到安装章节首屏，同时保留 inspect-first；`raw/main` 只进入维护者文档。
+6. 在 `README.md` / `README.zh-CN.md` 中把 stable one-liner 放到安装章节首屏，同时保留 inspect-first；`raw/main` 只进入维护者文档。
 
 ## 范围边界
 
@@ -98,7 +98,7 @@
    - v1 不新增自定义 release bundle 格式，只定义手动发布约定，不要求 CI 自动上传
 5. 安装与分发相关文档：
    - `README.md`
-   - `README_EN.md`
+   - `README.zh-CN.md`
    - `CONTRIBUTING.md`
    - `CONTRIBUTING_CN.md`
 6. 分发 smoke / contract 测试：

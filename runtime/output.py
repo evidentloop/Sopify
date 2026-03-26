@@ -8,6 +8,7 @@ import sys
 from .clarification import CURRENT_CLARIFICATION_RELATIVE_PATH
 from .decision import CURRENT_DECISION_RELATIVE_PATH
 from .handoff import CURRENT_HANDOFF_RELATIVE_PATH
+from .plan_proposal import CURRENT_PLAN_PROPOSAL_RELATIVE_PATH
 from .models import RuntimeResult
 from .plan_registry import extract_priority_note_event
 
@@ -15,6 +16,7 @@ _PHASE_LABELS = {
     "zh-CN": {
         "clarification_pending": "需求分析",
         "clarification_resume": "需求分析",
+        "plan_proposal_pending": "方案设计",
         "execution_confirm_pending": "开发实施",
         "plan_only": "方案设计",
         "workflow": "方案设计",
@@ -35,6 +37,7 @@ _PHASE_LABELS = {
     "en-US": {
         "clarification_pending": "Requirements Analysis",
         "clarification_resume": "Requirements Analysis",
+        "plan_proposal_pending": "Solution Design",
         "execution_confirm_pending": "Development",
         "plan_only": "Solution Design",
         "workflow": "Solution Design",
@@ -81,6 +84,7 @@ _LABELS = {
         "none": "无",
         "cleared": "已清理当前活跃流程",
         "clarification_handoff": "已进入澄清等待，当前请求仍缺进入规划所需的事实信息",
+        "plan_proposal_handoff": "已生成待确认的方案包 proposal，当前应先确认是否物化 plan 文件",
         "execution_confirm_handoff": "已进入执行前确认，当前应先由用户确认是否开始落代码",
         "workflow_handoff": "已生成方案骨架，后续开发仍需宿主继续",
         "light_handoff": "已生成 light 方案，后续改动仍需宿主继续",
@@ -100,6 +104,7 @@ _LABELS = {
         "gate_decision_status": "plan 已生成，但仍有阻塞性风险需要继续拍板",
         "next_retry": "检查输入、配置或运行时状态后重试",
         "next_answer_questions": "回复补充信息继续规划，或输入 取消 终止本轮设计",
+        "next_confirm_plan_package": "回复 继续 / next 确认生成方案包，回复 status 查看摘要，或直接回复修订意见",
         "next_confirm_execute": "回复 继续 / next / 开始 确认执行，或直接回复修改意见",
         "next_plan": "在宿主会话中继续评审或执行方案，或直接回复修改意见",
         "next_workflow": "在宿主会话中继续执行后续阶段，或显式使用 ~go plan 只规划",
@@ -119,6 +124,7 @@ _LABELS = {
         "handoff_review_or_execute_plan": "已写入 plan handoff，宿主可继续评审方案或执行",
         "handoff_continue_host_workflow": "已写入 workflow handoff，后续阶段需宿主继续",
         "handoff_answer_questions": "已写入 clarification handoff，宿主应先补齐缺失事实信息",
+        "handoff_confirm_plan_package": "已写入 plan-proposal handoff，宿主应先确认是否生成方案包",
         "handoff_confirm_execute": "已写入 execution-confirm handoff，宿主应先征求用户执行确认",
         "handoff_continue_host_develop": "已写入 develop handoff，后续开发需宿主继续",
         "handoff_continue_host_quick_fix": "已写入 quick-fix handoff，当前 runtime 未直接改代码",
@@ -154,6 +160,7 @@ _LABELS = {
         "none": "none",
         "cleared": "active flow cleared",
         "clarification_handoff": "Clarification is pending because the current request still lacks the minimum facts needed for planning",
+        "plan_proposal_handoff": "A plan-package proposal is pending; confirm package materialization before creating plan files",
         "execution_confirm_handoff": "Execution confirmation is pending; user confirmation is still required before implementation starts",
         "workflow_handoff": "Plan scaffold generated; downstream development still needs the host flow",
         "light_handoff": "Light plan generated; downstream changes still need the host flow",
@@ -173,6 +180,7 @@ _LABELS = {
         "gate_decision_status": "The plan was generated, but a blocking risk still needs a decision",
         "next_retry": "Check the input, config, or runtime state and retry",
         "next_answer_questions": "Reply with the missing facts to continue planning, or type cancel to stop this round",
+        "next_confirm_plan_package": "Reply with continue / next to create the plan package, status to inspect it, or send feedback to revise it",
         "next_confirm_execute": "Reply with continue / next / start to confirm execution, or send feedback to revise the plan",
         "next_plan": "Continue plan review or execution in the host session, or reply with feedback",
         "next_workflow": "Continue the downstream stages in the host session, or use ~go plan for planning only",
@@ -192,6 +200,7 @@ _LABELS = {
         "handoff_review_or_execute_plan": "plan handoff written; the host can review the plan or execute it",
         "handoff_continue_host_workflow": "workflow handoff written; downstream stages still need the host flow",
         "handoff_answer_questions": "clarification handoff written; the host should gather the missing factual details first",
+        "handoff_confirm_plan_package": "plan-proposal handoff written; the host should confirm package materialization first",
         "handoff_confirm_execute": "execution-confirm handoff written; the host should ask for user confirmation first",
         "handoff_continue_host_develop": "develop handoff written; downstream implementation still needs the host flow",
         "handoff_continue_host_quick_fix": "quick-fix handoff written; the runtime did not modify code directly",
@@ -309,6 +318,16 @@ def _core_lines(result: RuntimeResult, language: str) -> list[str]:
         _append_entry_guard_reason_line(lines, result=result, language=language)
         return lines
 
+    if route_name == "plan_proposal_pending" and result.recovered_context.current_plan_proposal is not None:
+        proposal = result.recovered_context.current_plan_proposal
+        lines = [
+            f"{labels['plan']}: {proposal.proposed_path or labels['missing']}",
+            f"{labels['summary']}: {proposal.analysis_summary or labels['missing']}",
+            f"{labels['task_count']}: {proposal.estimated_task_count}",
+        ]
+        _append_entry_guard_reason_line(lines, result=result, language=language)
+        return lines
+
     if route_name == "decision_pending" and result.recovered_context.current_decision is not None:
         current_decision = result.recovered_context.current_decision
         recommended = current_decision.recommended_option_id or labels["missing"]
@@ -420,6 +439,9 @@ def _collect_changes(result: RuntimeResult) -> list[str]:
     if result.recovered_context.current_clarification is not None and CURRENT_CLARIFICATION_RELATIVE_PATH not in seen:
         seen.add(CURRENT_CLARIFICATION_RELATIVE_PATH)
         ordered.append(CURRENT_CLARIFICATION_RELATIVE_PATH)
+    if result.recovered_context.current_plan_proposal is not None and CURRENT_PLAN_PROPOSAL_RELATIVE_PATH not in seen:
+        seen.add(CURRENT_PLAN_PROPOSAL_RELATIVE_PATH)
+        ordered.append(CURRENT_PLAN_PROPOSAL_RELATIVE_PATH)
     if result.recovered_context.current_decision is not None and CURRENT_DECISION_RELATIVE_PATH not in seen:
         seen.add(CURRENT_DECISION_RELATIVE_PATH)
         ordered.append(CURRENT_DECISION_RELATIVE_PATH)
@@ -437,6 +459,8 @@ def _next_hint(result: RuntimeResult, language: str) -> str:
         return labels["next_finalize_success"] if result.plan_artifact is not None else labels["next_finalize_retry"]
     if result.route.route_name == "clarification_pending":
         return labels["next_answer_questions"]
+    if result.route.route_name == "plan_proposal_pending":
+        return labels["next_confirm_plan_package"]
     if result.route.route_name == "decision_pending":
         return labels["next_decision"]
     if result.route.route_name == "summary":
@@ -454,7 +478,7 @@ def _status_symbol(result: RuntimeResult) -> str:
         return "✓" if result.plan_artifact is not None else "!"
     if route_name == "finalize_active":
         return "✓" if result.plan_artifact is not None else "!"
-    if route_name in {"clarification_pending", "execution_confirm_pending"}:
+    if route_name in {"clarification_pending", "plan_proposal_pending", "execution_confirm_pending"}:
         return "?"
     if route_name == "decision_pending":
         return "?"
@@ -492,6 +516,8 @@ def _status_message(result: RuntimeResult, language: str) -> str:
         return labels["light_handoff"]
     if route_name == "clarification_pending":
         return labels["clarification_handoff"]
+    if route_name == "plan_proposal_pending":
+        return labels["plan_proposal_handoff"]
     if route_name == "execution_confirm_pending":
         return labels["execution_confirm_handoff"]
     if route_name == "quick_fix":
@@ -534,6 +560,8 @@ def _handoff_next_hint(result: RuntimeResult, language: str) -> str:
         return labels["next_light_iterate"]
     if handoff.handoff_kind == "clarification":
         return labels["next_answer_questions"]
+    if handoff.required_host_action == "confirm_plan_package":
+        return labels["next_confirm_plan_package"]
     if handoff.handoff_kind == "execution_confirm":
         if handoff.required_host_action == "review_or_execute_plan":
             return labels["next_plan"]

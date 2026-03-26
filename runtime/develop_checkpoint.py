@@ -177,6 +177,7 @@ def submit_develop_checkpoint(
         run_id=run_state.run_id,
         current_run=run_state,
         current_plan=context.current_plan,
+        current_plan_proposal=None,
         kb_artifact=None,
         replay_session_dir=None,
         skill_result={"checkpoint_request": request.to_dict()},

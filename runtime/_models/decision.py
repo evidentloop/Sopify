@@ -290,6 +290,7 @@ class DecisionState:
     resume_route: Optional[str] = None
     request_text: str = ""
     requested_plan_level: Optional[str] = None
+    plan_package_policy: str = "none"
     capture_mode: str = "off"
     candidate_skill_ids: tuple[str, ...] = ()
     policy_id: str = ""
@@ -386,6 +387,7 @@ class DecisionState:
             "resume_route": self.resume_route,
             "request_text": self.request_text,
             "requested_plan_level": self.requested_plan_level,
+            "plan_package_policy": self.plan_package_policy,
             "capture_mode": self.capture_mode,
             "candidate_skill_ids": list(self.candidate_skill_ids),
             "policy_id": self.policy_id,
@@ -421,6 +423,7 @@ class DecisionState:
             resume_route=data.get("resume_route") or None,
             request_text=str(data.get("request_text") or ""),
             requested_plan_level=data.get("requested_plan_level") or None,
+            plan_package_policy=str(data.get("plan_package_policy") or "none"),
             capture_mode=str(data.get("capture_mode") or "off"),
             candidate_skill_ids=tuple(data.get("candidate_skill_ids") or ()),
             policy_id=str(data.get("policy_id") or ""),
@@ -449,6 +452,7 @@ class ClarificationState:
     resume_route: Optional[str] = None
     request_text: str = ""
     requested_plan_level: Optional[str] = None
+    plan_package_policy: str = "none"
     capture_mode: str = "off"
     candidate_skill_ids: tuple[str, ...] = ()
     resume_context: Mapping[str, Any] = field(default_factory=dict)
@@ -498,6 +502,7 @@ class ClarificationState:
             "resume_route": self.resume_route,
             "request_text": self.request_text,
             "requested_plan_level": self.requested_plan_level,
+            "plan_package_policy": self.plan_package_policy,
             "capture_mode": self.capture_mode,
             "candidate_skill_ids": list(self.candidate_skill_ids),
             "resume_context": _json_mapping(self.resume_context),
@@ -526,6 +531,7 @@ class ClarificationState:
             resume_route=data.get("resume_route") or None,
             request_text=str(data.get("request_text") or ""),
             requested_plan_level=data.get("requested_plan_level") or None,
+            plan_package_policy=str(data.get("plan_package_policy") or "none"),
             capture_mode=str(data.get("capture_mode") or "off"),
             candidate_skill_ids=tuple(data.get("candidate_skill_ids") or ()),
             resume_context=_json_mapping(data.get("resume_context")),

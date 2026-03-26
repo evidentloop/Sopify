@@ -58,7 +58,8 @@ class RouterTests(unittest.TestCase):
             route = router.classify("design 阶段现在怎么收口？", skills=skills)
 
             self.assertEqual(route.route_name, "workflow")
-            self.assertTrue(route.should_create_plan)
+            self.assertEqual(route.plan_package_policy, "confirm")
+            self.assertFalse(route.should_create_plan)
             self.assertEqual(
                 route.artifacts.get("entry_guard_reason_code"),
                 DIRECT_EDIT_BLOCKED_RUNTIME_REQUIRED_REASON_CODE,
@@ -116,6 +117,64 @@ class RouterTests(unittest.TestCase):
             self.assertEqual(route.route_name, "consult")
             self.assertTrue(route.should_recover_context)
             self.assertFalse(route.should_create_plan)
+
+    def test_plan_materialization_meta_debug_does_not_hijack_normal_issue_fix_request(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            config = load_runtime_config(workspace)
+            store = StateStore(config)
+            store.ensure()
+            router = Router(config, state_store=store)
+            skills = SkillRegistry(config, user_home=workspace / "home").discover()
+
+            route = router.classify("这是一个性能问题，需要优化数据库查询", skills=skills)
+
+            self.assertEqual(route.route_name, "workflow")
+            self.assertNotIn("meta-debug", route.reason)
+
+    def test_pending_plan_proposal_blocks_compare_and_finalize_as_inspect(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            config = load_runtime_config(workspace)
+            store = StateStore(config)
+            store.ensure()
+            router = Router(config, state_store=store)
+            skills = SkillRegistry(config, user_home=workspace / "home").discover()
+
+            run_runtime("实现 runtime plugin bridge", workspace_root=workspace, user_home=workspace / "home")
+
+            compare_route = router.classify("~compare 方案对比", skills=skills)
+            finalize_route = router.classify("~go finalize", skills=skills)
+
+            self.assertEqual(compare_route.route_name, "plan_proposal_pending")
+            self.assertEqual(compare_route.command, "~compare")
+            self.assertEqual(compare_route.active_run_action, "inspect_plan_proposal")
+            self.assertIn("before compare can continue", compare_route.reason)
+            self.assertEqual(finalize_route.route_name, "plan_proposal_pending")
+            self.assertEqual(finalize_route.command, "~go finalize")
+            self.assertEqual(finalize_route.active_run_action, "inspect_plan_proposal")
+            self.assertIn("before finalize_active can continue", finalize_route.reason)
+
+    def test_pending_plan_proposal_defaults_questions_to_inspect_and_explicit_edits_to_revise(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            config = load_runtime_config(workspace)
+            store = StateStore(config)
+            store.ensure()
+            router = Router(config, state_store=store)
+            skills = SkillRegistry(config, user_home=workspace / "home").discover()
+
+            run_runtime("实现 runtime plugin bridge", workspace_root=workspace, user_home=workspace / "home")
+
+            question_route = router.classify("为什么是这个方案？", skills=skills)
+            revise_route = router.classify("把 level 改成 standard", skills=skills)
+
+            self.assertEqual(question_route.route_name, "plan_proposal_pending")
+            self.assertEqual(question_route.active_run_action, "inspect_plan_proposal")
+            self.assertIn("waiting for package confirmation", question_route.reason)
+            self.assertEqual(revise_route.route_name, "plan_proposal_pending")
+            self.assertEqual(revise_route.active_run_action, "revise_plan_proposal")
+            self.assertIn("feedback", revise_route.reason)
 
     def test_ready_plan_routes_continue_and_exec_into_execution_confirm(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -6,6 +6,59 @@ This changelog is maintained manually (not auto-generated).
 
 ## [Unreleased]
 
+## [2026-03-26.175647] - 2026-03-26
+
+### Runtime
+
+- Updated runtime internals:
+  - `runtime/_models/core.py`
+  - `runtime/_models/decision.py`
+  - `runtime/_models/handoff.py`
+  - `runtime/_models/proposal.py`
+  - `runtime/checkpoint_materializer.py`
+  - `runtime/checkpoint_request.py`
+  - `runtime/clarification.py`
+  - `runtime/context_recovery.py`
+  - `runtime/decision.py`
+  - `runtime/develop_checkpoint.py`
+  - `runtime/engine.py`
+  - `runtime/entry_guard.py`
+  - `runtime/gate.py`
+  - `runtime/handoff.py`
+  - `runtime/manifest.py`
+  - `runtime/models.py`
+  - `runtime/output.py`
+  - `runtime/plan_orchestrator.py`
+  - `runtime/plan_proposal.py`
+  - `runtime/plan_scaffold.py`
+  - `runtime/router.py`
+  - `runtime/state.py`
+
+### Scripts
+
+- Adjusted maintenance scripts:
+  - `scripts/check-prompt-runtime-gate-smoke.py`
+  - `scripts/check-runtime-smoke.sh`
+  - `scripts/sync-runtime-assets.sh`
+
+### Skills
+
+- Synced prompt-layer skills:
+  - `Claude/Skills/CN/CLAUDE.md`
+  - `Claude/Skills/EN/CLAUDE.md`
+  - `Codex/Skills/CN/AGENTS.md`
+  - `Codex/Skills/EN/AGENTS.md`
+
+### Tests
+
+- Updated automated coverage:
+  - `tests/test_bundle_smoke.py`
+  - `tests/test_runtime_decision.py`
+  - `tests/test_runtime_engine.py`
+  - `tests/test_runtime_gate.py`
+  - `tests/test_runtime_plan_reuse.py`
+  - `tests/test_runtime_router.py`
+
 ## [2026-03-26.135542] - 2026-03-26
 
 ### Runtime

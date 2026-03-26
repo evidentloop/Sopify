@@ -34,6 +34,8 @@ def create_plan_scaffold(
     config: RuntimeConfig,
     level: str,
     decision_state: DecisionState | None = None,
+    topic_key: str | None = None,
+    plan_id: str | None = None,
 ) -> PlanArtifact:
     """Create a deterministic plan package scaffold.
 
@@ -49,9 +51,13 @@ def create_plan_scaffold(
         raise ValueError(f"Unsupported plan level: {level}")
 
     title = _derive_title(request_text)
-    topic_key = derive_topic_key(request_text)
-    plan_id = _make_plan_id(topic_key, plan_root=config.plan_root)
-    plan_dir = config.plan_root / plan_id
+    resolved_topic_key = str(topic_key or derive_topic_key(request_text)).strip()
+    resolved_plan_id = str(plan_id or _make_plan_id(resolved_topic_key, plan_root=config.plan_root)).strip()
+    if not resolved_topic_key:
+        raise ValueError("Plan topic_key cannot be empty")
+    if not resolved_plan_id:
+        raise ValueError("Plan id cannot be empty")
+    plan_dir = config.plan_root / resolved_plan_id
     plan_dir.mkdir(parents=True, exist_ok=False)
 
     summary = request_text.strip() or title
@@ -63,8 +69,8 @@ def create_plan_scaffold(
             _render_light_plan(
                 title,
                 summary,
-                plan_id=plan_id,
-                feature_key=topic_key,
+                plan_id=resolved_plan_id,
+                feature_key=resolved_topic_key,
                 decision_state=decision_state,
             ),
             encoding="utf-8",
@@ -79,8 +85,8 @@ def create_plan_scaffold(
         tasks.write_text(
             _render_tasks(
                 title,
-                plan_id=plan_id,
-                feature_key=topic_key,
+                plan_id=resolved_plan_id,
+                feature_key=resolved_topic_key,
                 level=level,
                 decision_state=decision_state,
             ),
@@ -101,14 +107,14 @@ def create_plan_scaffold(
             )
 
     artifact = PlanArtifact(
-        plan_id=plan_id,
+        plan_id=resolved_plan_id,
         title=title,
         summary=summary,
         level=level,
         path=str(plan_dir.relative_to(config.workspace_root)),
         files=tuple(files),
         created_at=iso_now(),
-        topic_key=topic_key,
+        topic_key=resolved_topic_key,
     )
     try:
         upsert_plan_entry(
@@ -120,6 +126,19 @@ def create_plan_scaffold(
         # Governance sync must not block core plan creation.
         pass
     return artifact
+
+
+def reserve_plan_identity(
+    request_text: str,
+    *,
+    config: RuntimeConfig,
+    topic_key: str | None = None,
+) -> tuple[str, str, str]:
+    """Reserve the stable identity/path that a future scaffold must reuse."""
+    resolved_topic_key = str(topic_key or derive_topic_key(request_text)).strip()
+    resolved_plan_id = _make_plan_id(resolved_topic_key, plan_root=config.plan_root)
+    proposed_path = str((config.plan_root / resolved_plan_id).relative_to(config.workspace_root))
+    return (resolved_topic_key, resolved_plan_id, proposed_path)
 
 
 def _derive_title(request_text: str) -> str:

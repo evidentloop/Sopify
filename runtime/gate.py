@@ -440,6 +440,7 @@ def _build_state_contract(*, store: StateStore) -> dict[str, Any]:
         "scope": store.scope,
         "state_root": store.relative_path(store.root),
         "current_plan_path": store.relative_path(store.current_plan_path),
+        "current_plan_proposal_path": store.relative_path(store.current_plan_proposal_path),
         "current_run_path": store.relative_path(store.current_run_path),
         "current_handoff_path": store.relative_path(store.current_handoff_path),
         "current_clarification_path": store.relative_path(store.current_clarification_path),

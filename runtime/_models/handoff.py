@@ -8,6 +8,7 @@ from typing import Any, Mapping, Optional
 from .artifacts import KbArtifact, PlanArtifact
 from .core import RouteDecision, RunState, SkillMeta, _json_mapping
 from .decision import ClarificationState, DecisionState
+from .proposal import PlanProposalState
 
 
 @dataclass(frozen=True)
@@ -17,6 +18,7 @@ class RecoveredContext:
     loaded_files: tuple[str, ...] = ()
     current_run: Optional[RunState] = None
     current_plan: Optional[PlanArtifact] = None
+    current_plan_proposal: Optional[PlanProposalState] = None
     current_clarification: Optional[ClarificationState] = None
     current_decision: Optional[DecisionState] = None
     last_route: Optional[RouteDecision] = None
@@ -31,6 +33,7 @@ class RecoveredContext:
             "loaded_files": list(self.loaded_files),
             "current_run": self.current_run.to_dict() if self.current_run else None,
             "current_plan": self.current_plan.to_dict() if self.current_plan else None,
+            "current_plan_proposal": self.current_plan_proposal.to_dict() if self.current_plan_proposal else None,
             "current_clarification": self.current_clarification.to_dict() if self.current_clarification else None,
             "current_decision": self.current_decision.to_dict() if self.current_decision else None,
             "last_route": self.last_route.to_dict() if self.last_route else None,

@@ -14,6 +14,7 @@ from .checkpoint_request import (
     checkpoint_request_from_clarification_state,
     checkpoint_request_from_decision_state,
     checkpoint_request_from_execution_confirm,
+    checkpoint_request_from_plan_proposal_state,
     normalize_checkpoint_request,
 )
 from .clarification import CURRENT_CLARIFICATION_RELATIVE_PATH, build_scope_clarification_form, clarification_submission_state_payload
@@ -23,6 +24,7 @@ from .decision_policy import has_tradeoff_checkpoint_signal
 from .decision import CURRENT_DECISION_RELATIVE_PATH
 from .entry_guard import build_entry_guard_contract
 from .execution_confirm import build_execution_summary
+from .plan_proposal import CURRENT_PLAN_PROPOSAL_RELATIVE_PATH
 from .models import KbArtifact, PlanArtifact, RouteDecision, RunState, RuntimeConfig, RuntimeHandoff
 
 HANDOFF_SCHEMA_VERSION = "1"
@@ -37,6 +39,7 @@ _ROUTE_HANDOFF_KIND = {
     "finalize_active": "finalize",
     "clarification_pending": "clarification",
     "clarification_resume": "clarification",
+    "plan_proposal_pending": "plan_proposal",
     "execution_confirm_pending": "execution_confirm",
     "resume_active": "develop",
     "exec_plan": "develop",
@@ -55,6 +58,7 @@ def build_runtime_handoff(
     run_id: str,
     current_run: RunState | None,
     current_plan: PlanArtifact | None,
+    current_plan_proposal: Any | None,
     kb_artifact: KbArtifact | None,
     replay_session_dir: str | None,
     skill_result: Mapping[str, Any] | None,
@@ -88,6 +92,7 @@ def build_runtime_handoff(
         decision=decision,
         current_run=current_run,
         current_plan=current_plan,
+        current_plan_proposal=current_plan_proposal,
         kb_artifact=kb_artifact,
         replay_session_dir=replay_session_dir,
         skill_result=skill_result,
@@ -173,6 +178,8 @@ def _required_host_action(
     route_name = decision.route_name
     if route_name == "plan_only":
         return "review_or_execute_plan"
+    if route_name == "plan_proposal_pending":
+        return "confirm_plan_package"
     if route_name in {"workflow", "light_iterate"}:
         return "continue_host_workflow"
     if route_name == "finalize_active":
@@ -204,6 +211,7 @@ def _collect_handoff_artifacts(
     decision: RouteDecision,
     current_run: RunState | None,
     current_plan: PlanArtifact | None,
+    current_plan_proposal: Any | None,
     kb_artifact: KbArtifact | None,
     replay_session_dir: str | None,
     skill_result: Mapping[str, Any] | None,
@@ -240,6 +248,15 @@ def _collect_handoff_artifacts(
         artifacts["execution_summary"] = execution_summary_payload.to_dict()
     if current_plan is not None and current_plan.files:
         artifacts["plan_files"] = list(current_plan.files)
+    if current_plan_proposal is not None:
+        artifacts["proposal_file"] = CURRENT_PLAN_PROPOSAL_RELATIVE_PATH
+        artifacts["proposal_checkpoint_id"] = getattr(current_plan_proposal, "checkpoint_id", None)
+        artifacts["proposal_status"] = "pending"
+        artifacts["proposal"] = current_plan_proposal.to_dict() if hasattr(current_plan_proposal, "to_dict") else {}
+        artifacts["checkpoint_request"] = checkpoint_request_from_plan_proposal_state(
+            current_plan_proposal,
+            source_route=decision.route_name,
+        ).to_dict()
     if required_host_action == "continue_host_develop":
         artifacts["develop_quality_contract"] = build_develop_quality_contract()
         carry_forward_develop_quality_artifacts(artifacts, source=decision.artifacts)

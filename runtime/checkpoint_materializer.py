@@ -8,7 +8,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .models import ClarificationState, DecisionCheckpoint, DecisionField, DecisionRecommendation, DecisionState, ExecutionSummary, RuntimeConfig
+from .models import (
+    ClarificationState,
+    DecisionCheckpoint,
+    DecisionField,
+    DecisionRecommendation,
+    DecisionState,
+    ExecutionSummary,
+    PlanProposalState,
+    RuntimeConfig,
+)
 from .state import iso_now
 from .checkpoint_request import CheckpointRequest, normalize_checkpoint_request
 
@@ -21,6 +30,7 @@ class CheckpointMaterialization:
     required_host_action: str
     clarification_state: ClarificationState | None = None
     decision_state: DecisionState | None = None
+    plan_proposal_state: PlanProposalState | None = None
     execution_summary: ExecutionSummary | None = None
 
 
@@ -42,6 +52,12 @@ def materialize_checkpoint_request(
             request=request,
             required_host_action="confirm_decision",
             decision_state=_materialize_decision_state(request),
+        )
+    if request.checkpoint_kind == "plan_proposal":
+        return CheckpointMaterialization(
+            request=request,
+            required_host_action="confirm_plan_package",
+            plan_proposal_state=_materialize_plan_proposal_state(request),
         )
     return CheckpointMaterialization(
         request=request,
@@ -65,6 +81,7 @@ def _materialize_clarification_state(request: CheckpointRequest) -> Clarificatio
         resume_route=request.resume_route or request.source_route,
         request_text=request.request_text,
         requested_plan_level=request.requested_plan_level,
+        plan_package_policy=request.plan_package_policy,
         capture_mode=request.capture_mode,
         candidate_skill_ids=request.candidate_skill_ids,
         resume_context=request.resume_context or {},
@@ -95,11 +112,35 @@ def _materialize_decision_state(request: CheckpointRequest) -> DecisionState:
         resume_route=request.resume_route or request.source_route,
         request_text=request.request_text,
         requested_plan_level=request.requested_plan_level,
+        plan_package_policy=request.plan_package_policy,
         capture_mode=request.capture_mode,
         candidate_skill_ids=request.candidate_skill_ids,
         policy_id=request.policy_id,
         trigger_reason=request.trigger_reason,
         resume_context=request.resume_context or {},
+        created_at=created_at,
+        updated_at=now,
+    )
+
+
+def _materialize_plan_proposal_state(request: CheckpointRequest) -> PlanProposalState:
+    now = request.updated_at or request.created_at or iso_now()
+    created_at = request.created_at or now
+    return PlanProposalState(
+        schema_version="1",
+        checkpoint_id=request.checkpoint_id,
+        reserved_plan_id=request.reserved_plan_id,
+        topic_key=request.feature_key or request.reserved_plan_id,
+        proposed_level=request.requested_plan_level or "standard",
+        proposed_path=request.proposed_path,
+        analysis_summary=request.summary or request.question,
+        estimated_task_count=request.estimated_task_count,
+        candidate_files=request.context_files,
+        request_text=request.request_text,
+        resume_route=request.resume_route or request.source_route,
+        capture_mode=request.capture_mode,
+        candidate_skill_ids=request.candidate_skill_ids,
+        confirmed_decision=dict(request.confirmed_decision or {}),
         created_at=created_at,
         updated_at=now,
     )

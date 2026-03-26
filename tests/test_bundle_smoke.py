@@ -15,6 +15,9 @@ from runtime.gate import enter_runtime_gate
 from scripts.model_compare_runtime import make_default_candidate
 
 
+SMOKE_REQUEST = "~go plan 重构数据库层"
+
+
 class BundleSmokeTests(unittest.TestCase):
     def test_import_runtime_entry(self) -> None:
         self.assertTrue(callable(run_runtime))
@@ -24,27 +27,30 @@ class BundleSmokeTests(unittest.TestCase):
             workspace = Path(temp_dir)
 
             result = run_runtime(
-                "重构数据库层",
+                SMOKE_REQUEST,
                 workspace_root=workspace,
                 user_home=workspace / "home",
             )
 
-            self.assertEqual(result.route.route_name, "workflow")
+            self.assertEqual(result.route.route_name, "plan_only")
             self.assertIsNotNone(result.plan_artifact)
             self.assertIsNotNone(result.handoff)
+            self.assertEqual(result.handoff.required_host_action, "review_or_execute_plan")
 
     def test_gate_available(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
 
             payload = enter_runtime_gate(
-                "重构数据库层",
+                SMOKE_REQUEST,
                 workspace_root=workspace,
                 user_home=workspace / "home",
             )
 
             self.assertEqual(payload["status"], "ready")
             self.assertTrue(payload["gate_passed"])
+            self.assertEqual(payload["runtime"]["route_name"], "plan_only")
+            self.assertEqual(payload["handoff"]["required_host_action"], "review_or_execute_plan")
             self.assertEqual(payload["allowed_response_mode"], "normal_runtime_followup")
 
     def test_config_available(self) -> None:

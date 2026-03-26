@@ -2,14 +2,14 @@
 plan_id: 20260325_one-liner-distribution
 feature_key: one-liner-distribution
 level: standard
-lifecycle_state: active
+lifecycle_state: archived
 knowledge_sync:
   project: review
   background: review
   design: review
   tasks: review
-archive_ready: false
-plan_status: in_progress
+archive_ready: true
+plan_status: completed
 ---
 
 # 任务清单: one-liner-distribution
@@ -136,5 +136,5 @@ plan_status: in_progress
 1. Group 1: 先抽 distribution facade，固定单一事实源
 2. Group 2: 先锁定 stable 来源模型，再补 `install.sh / install.ps1`
 3. Group 3: 再把 `status / doctor` 摘要接到安装结果中
-4. Group 4: 先发第一个 public stable release，再切 README / README_EN 首屏入口
+4. Group 4: 先发第一个 public stable release，再切 `README.md` / `README.zh-CN.md` 首屏入口
 5. Group 5: 用 smoke 与 contract tests 收口

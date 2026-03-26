@@ -278,13 +278,23 @@ class RuntimeGateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
 
-            first = enter_runtime_gate(
+            proposal = enter_runtime_gate(
                 "实现 runtime plugin bridge",
                 workspace_root=workspace,
                 user_home=workspace / "home",
             )
+            self.assertEqual(proposal["status"], "ready")
+            self.assertEqual(proposal["handoff"]["required_host_action"], "confirm_plan_package")
+            session_id = proposal["session_id"]
+
+            first = enter_runtime_gate(
+                "继续",
+                workspace_root=workspace,
+                session_id=session_id,
+                user_home=workspace / "home",
+            )
             self.assertEqual(first["status"], "ready")
-            session_id = first["session_id"]
+            self.assertEqual(first["handoff"]["required_host_action"], "review_or_execute_plan")
 
             result = enter_runtime_gate(
                 "~go finalize",
@@ -322,7 +332,8 @@ class RuntimeGateTests(unittest.TestCase):
             )
 
             self.assertEqual(result["status"], "ready")
-            self.assertEqual(result["runtime"]["route_name"], "workflow")
+            self.assertEqual(result["runtime"]["route_name"], "plan_proposal_pending")
+            self.assertEqual(result["handoff"]["required_host_action"], "confirm_plan_package")
             self.assertEqual(
                 result["trigger_evidence"]["entry_guard_reason_code"],
                 DIRECT_EDIT_BLOCKED_RUNTIME_REQUIRED_REASON_CODE,

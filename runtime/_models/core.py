@@ -10,6 +10,7 @@ DECISION_CONDITION_OPERATORS = ("equals", "not_equals", "in", "not_in")
 DECISION_FIELD_TYPES = ("select", "multi_select", "confirm", "input", "textarea")
 DECISION_SUBMISSION_STATUSES = ("empty", "draft", "collecting", "submitted", "confirmed", "cancelled", "timed_out")
 DECISION_STATE_STATUSES = ("pending", "collecting", "confirmed", "consumed", "cancelled", "timed_out", "stale")
+PLAN_PACKAGE_POLICIES = ("none", "confirm", "immediate")
 
 
 @dataclass(frozen=True)
@@ -115,11 +116,27 @@ class RouteDecision:
     plan_level: Optional[str] = None
     candidate_skill_ids: tuple[str, ...] = ()
     should_recover_context: bool = False
+    plan_package_policy: str = "none"
     should_create_plan: bool = False
     capture_mode: str = "off"
     runtime_skill_id: Optional[str] = None
     active_run_action: Optional[str] = None
     artifacts: Mapping[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        # `should_create_plan` remains as the compatibility projection for the
+        # old immediate-materialization path while new callers switch to the
+        # richer `plan_package_policy` contract.
+        derived_policy = self.plan_package_policy
+        if not str(derived_policy or "").strip():
+            derived_policy = "immediate" if self.should_create_plan else "none"
+        normalized_policy = _normalize_keyword(
+            derived_policy,
+            allowed=PLAN_PACKAGE_POLICIES,
+            default="none",
+        )
+        object.__setattr__(self, "plan_package_policy", normalized_policy)
+        object.__setattr__(self, "should_create_plan", normalized_policy == "immediate")
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -131,6 +148,7 @@ class RouteDecision:
             "plan_level": self.plan_level,
             "candidate_skill_ids": list(self.candidate_skill_ids),
             "should_recover_context": self.should_recover_context,
+            "plan_package_policy": self.plan_package_policy,
             "should_create_plan": self.should_create_plan,
             "capture_mode": self.capture_mode,
             "runtime_skill_id": self.runtime_skill_id,
@@ -149,6 +167,10 @@ class RouteDecision:
             plan_level=data.get("plan_level") or None,
             candidate_skill_ids=tuple(data.get("candidate_skill_ids") or ()),
             should_recover_context=bool(data.get("should_recover_context", False)),
+            plan_package_policy=str(
+                data.get("plan_package_policy")
+                or ("immediate" if bool(data.get("should_create_plan", False)) else "none")
+            ),
             should_create_plan=bool(data.get("should_create_plan", False)),
             capture_mode=str(data.get("capture_mode") or "off"),
             runtime_skill_id=data.get("runtime_skill_id") or None,

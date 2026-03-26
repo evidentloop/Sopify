@@ -10,6 +10,8 @@ from .clarification import has_submitted_clarification, parse_clarification_resp
 from .decision import has_submitted_decision, parse_decision_response
 from .entry_guard import DIRECT_EDIT_BLOCKED_RUNTIME_REQUIRED_REASON_CODE
 from .execution_confirm import parse_execution_confirm_response
+from .plan_scaffold import request_explicitly_wants_new_plan
+from .plan_proposal import parse_plan_proposal_response
 from .models import ClarificationState, DecisionState, RouteDecision, RuntimeConfig, SkillMeta
 from .skill_resolver import resolve_route_candidate_skills, resolve_runtime_skill_id
 from .state import StateStore
@@ -29,6 +31,7 @@ SUPPORTED_ROUTE_NAMES = (
     "quick_fix",
     "clarification_pending",
     "clarification_resume",
+    "plan_proposal_pending",
     "execution_confirm_pending",
     "resume_active",
     "exec_plan",
@@ -93,7 +96,7 @@ _QUESTION_PREFIXES = (
     "可以",
 )
 _FILE_REF_RE = re.compile(r"(?:[\w.-]+/)+[\w.-]+|[\w.-]+\.(?:ts|tsx|js|jsx|py|md|json|yaml|yml|vue|rs|go)")
-_PROCESS_FORCE_KEYWORDS_EN = ("plan", "design", "develop", "decision", "checkpoint", "handoff")
+_PROCESS_FORCE_KEYWORDS_EN = ("design", "develop", "decision", "checkpoint", "handoff")
 _PROCESS_FORCE_KEYWORDS_ZH = ("规划", "方案设计", "开发实施", "决策", "检查点", "交接", "门禁", "蓝图")
 _PROCESS_FORCE_PATTERNS = (
     re.compile(
@@ -133,6 +136,16 @@ _PLAN_META_REVIEW_ANCHORS = (
 )
 _PLAN_META_REVIEW_EDIT_PATTERNS = (
     re.compile(r"(整理|更新|同步|写入|落地|修改|实现|修复|补充|重写|合并|merge|edit|change|update)", re.IGNORECASE),
+)
+_PLAN_MATERIALIZATION_META_DEBUG_PATTERNS = (
+    re.compile(r"(为什么|为何|why).*(生成|创建|create).*(plan|方案)", re.IGNORECASE),
+    re.compile(r"(不要|别再|不要再|stop|don't).*(生成|创建|create).*(plan|方案)", re.IGNORECASE),
+    re.compile(r"(分析下|解释下|看看|review).*(命中|hit).*(guard|plan|方案)", re.IGNORECASE),
+)
+_EXPLICIT_PLAN_PACKAGE_PATTERNS = (
+    re.compile(r"(写到|写入|落到).*(background\.md|design\.md|tasks\.md)", re.IGNORECASE),
+    re.compile(r"(写到|写入|落到).*(\.sopify-skills/plan/)", re.IGNORECASE),
+    re.compile(r"(create|write).*(plan package|background\.md|design\.md|tasks\.md)", re.IGNORECASE),
 )
 _ANALYZE_CHALLENGE_A1_PATTERNS = (
     re.compile(r"(优化|统一).*(体验|职责)", re.IGNORECASE),
@@ -229,17 +242,20 @@ class Router:
         text = user_input.strip()
         review_active_run = self.state_store.get_current_run()
         review_current_plan = self.state_store.get_current_plan()
+        review_current_plan_proposal = self.state_store.get_current_plan_proposal()
         review_current_clarification = self.state_store.get_current_clarification()
         review_current_decision = self.state_store.get_current_decision()
 
         global_active_run = self.global_state_store.get_current_run()
         global_current_plan = self.global_state_store.get_current_plan()
+        global_current_plan_proposal = self.global_state_store.get_current_plan_proposal()
         global_current_clarification = self.global_state_store.get_current_clarification()
         global_current_decision = self.global_state_store.get_current_decision()
 
         # Review checkpoints stay session-first; execution truth stays global-first.
         current_clarification = review_current_clarification or global_current_clarification
         current_decision = review_current_decision or global_current_decision
+        current_plan_proposal = review_current_plan_proposal or global_current_plan_proposal
         execution_active_run = global_active_run or review_active_run
         execution_current_plan = global_current_plan or review_current_plan
         current_plan = review_current_plan or global_current_plan
@@ -258,6 +274,15 @@ class Router:
             )
             if pending_clarification is not None:
                 return self._with_capture(pending_clarification)
+
+        if current_plan_proposal is not None:
+            pending_plan_proposal = _classify_pending_plan_proposal(
+                text,
+                command_decision=command_decision,
+                skills=skills,
+            )
+            if pending_plan_proposal is not None:
+                return self._with_capture(pending_plan_proposal)
 
         if _contains_intent(text, _REPLAY_KEYWORDS):
             return RouteDecision(
@@ -347,6 +372,13 @@ class Router:
         if analyze_challenge_route is not None:
             return self._with_capture(analyze_challenge_route)
 
+        plan_meta_debug_route = _classify_plan_materialization_meta_debug(
+            text,
+            skills=skills,
+        )
+        if plan_meta_debug_route is not None:
+            return self._with_capture(plan_meta_debug_route)
+
         runtime_first_guard = match_runtime_first_guard(text)
         if runtime_first_guard is not None:
             return self._with_capture(
@@ -356,7 +388,7 @@ class Router:
                     reason=runtime_first_guard["reason"],
                     complexity="complex",
                     plan_level="standard",
-                    should_create_plan=True,
+                    plan_package_policy=_plan_package_policy_for_route("workflow", text),
                     candidate_skill_ids=_candidate_skills("workflow", skills, "analyze", "design", "develop"),
                     artifacts={
                         "entry_guard_reason_code": DIRECT_EDIT_BLOCKED_RUNTIME_REQUIRED_REASON_CODE,
@@ -393,7 +425,7 @@ class Router:
                     reason=signal.reason,
                     complexity=signal.level,
                     plan_level=signal.plan_level,
-                    should_create_plan=True,
+                    plan_package_policy=_plan_package_policy_for_route("light_iterate", text),
                     candidate_skill_ids=_candidate_skills("light_iterate", skills, "design", "develop"),
                 )
             )
@@ -404,7 +436,7 @@ class Router:
                 reason=signal.reason,
                 complexity=signal.level,
                 plan_level=signal.plan_level,
-                should_create_plan=True,
+                plan_package_policy=_plan_package_policy_for_route("workflow", text),
                 candidate_skill_ids=_candidate_skills("workflow", skills, "analyze", "design", "develop"),
             )
         )
@@ -423,6 +455,7 @@ class Router:
             plan_level=decision.plan_level,
             candidate_skill_ids=decision.candidate_skill_ids,
             should_recover_context=decision.should_recover_context,
+            plan_package_policy=decision.plan_package_policy,
             should_create_plan=decision.should_create_plan,
             capture_mode=capture_mode,
             runtime_skill_id=decision.runtime_skill_id,
@@ -466,7 +499,7 @@ def _classify_command(text: str, *, skills: Iterable[SkillMeta]) -> RouteDecisio
                 command=command,
                 complexity="complex",
                 plan_level="standard",
-                should_create_plan=True,
+                plan_package_policy="immediate",
                 candidate_skill_ids=_candidate_skills("plan_only", skills, "analyze", "design"),
             )
         if command == "~go exec":
@@ -488,7 +521,7 @@ def _classify_command(text: str, *, skills: Iterable[SkillMeta]) -> RouteDecisio
                 command=command,
                 complexity="complex",
                 plan_level="standard",
-                should_create_plan=True,
+                plan_package_policy=_plan_package_policy_for_route("workflow", request_text),
                 candidate_skill_ids=_candidate_skills("workflow", skills, "analyze", "design", "develop"),
             )
         if command == "~compare":
@@ -598,6 +631,57 @@ def _classify_pending_decision(
             active_run_action="decision_response",
         )
     return None
+
+
+def _classify_pending_plan_proposal(
+    text: str,
+    *,
+    command_decision: RouteDecision | None,
+    skills: Iterable[SkillMeta],
+) -> RouteDecision | None:
+    if command_decision is not None:
+        if command_decision.route_name in {"plan_only", "workflow", "light_iterate"}:
+            return None
+        return RouteDecision(
+            route_name="plan_proposal_pending",
+            request_text=text,
+            reason=f"Pending proposal confirmation must be resolved before {command_decision.route_name} can continue",
+            command=command_decision.command,
+            complexity="medium",
+            should_recover_context=True,
+            candidate_skill_ids=_candidate_skills("plan_proposal_pending", skills, "design"),
+            active_run_action="inspect_plan_proposal",
+        )
+
+    response = parse_plan_proposal_response(text)
+    if response.action == "cancel":
+        return RouteDecision(
+            route_name="cancel_active",
+            request_text=text,
+            reason="Pending plan proposal cancelled by user",
+            complexity="simple",
+            should_recover_context=True,
+            active_run_action="cancel",
+        )
+    action_to_reason = {
+        "confirm": "Received confirmation to materialize the proposed plan package",
+        "inspect": "Plan proposal is still waiting for package confirmation",
+        "revise": "Received plan-proposal feedback before package materialization",
+    }
+    action_to_active_run_action = {
+        "confirm": "confirm_plan_proposal",
+        "inspect": "inspect_plan_proposal",
+        "revise": "revise_plan_proposal",
+    }
+    return RouteDecision(
+        route_name="plan_proposal_pending",
+        request_text=text,
+        reason=action_to_reason.get(response.action, "Plan proposal is still pending"),
+        complexity="medium",
+        should_recover_context=True,
+        candidate_skill_ids=_candidate_skills("plan_proposal_pending", skills, "design"),
+        active_run_action=action_to_active_run_action.get(response.action, "inspect_plan_proposal"),
+    )
 
 
 def _classify_pending_clarification(
@@ -796,6 +880,23 @@ def _classify_analyze_challenge(
     )
 
 
+def _classify_plan_materialization_meta_debug(
+    text: str,
+    *,
+    skills: Iterable[SkillMeta],
+) -> RouteDecision | None:
+    if not any(pattern.search(text) is not None for pattern in _PLAN_MATERIALIZATION_META_DEBUG_PATTERNS):
+        return None
+    return RouteDecision(
+        route_name="consult",
+        request_text=text,
+        reason="Matched plan-materialization meta-debug intent and bypassed workflow routing",
+        complexity="simple",
+        should_recover_context=False,
+        candidate_skill_ids=_candidate_skills("consult", skills, "analyze"),
+    )
+
+
 def _is_consultation(text: str) -> bool:
     normalized = text.strip().lower()
     if not normalized:
@@ -813,6 +914,22 @@ def _is_protected_plan_asset_request(text: str) -> bool:
 
 def _has_process_semantic_intent(text: str) -> bool:
     return any(pattern.search(text) is not None for pattern in _PROCESS_FORCE_PATTERNS)
+
+
+def _plan_package_policy_for_route(route_name: str, request_text: str) -> str:
+    if route_name == "plan_only":
+        return "immediate"
+    if route_name not in {"workflow", "light_iterate"}:
+        return "none"
+    if _request_explicitly_materializes_plan(request_text):
+        return "immediate"
+    return "confirm"
+
+
+def _request_explicitly_materializes_plan(request_text: str) -> bool:
+    if request_explicitly_wants_new_plan(request_text):
+        return True
+    return any(pattern.search(request_text) is not None for pattern in _EXPLICIT_PLAN_PACKAGE_PATTERNS)
 
 
 def _has_tradeoff_or_contract_split(text: str) -> bool:

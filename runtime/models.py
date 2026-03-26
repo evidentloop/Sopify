@@ -17,6 +17,7 @@ from ._models.decision import (
     DecisionValidation,
 )
 from ._models.handoff import RecoveredContext, ReplayEvent, RuntimeHandoff, RuntimeResult, SkillActivation
+from ._models.proposal import PlanProposalState
 from ._models.summary import (
     DailySummaryArtifact,
     SummaryCodeChangeFact,
@@ -52,6 +53,7 @@ __all__ = [
     "ExecutionSummary",
     "KbArtifact",
     "PlanArtifact",
+    "PlanProposalState",
     "RecoveredContext",
     "ReplayEvent",
     "RouteDecision",

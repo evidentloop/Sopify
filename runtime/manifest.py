@@ -22,6 +22,7 @@ from .entry_guard import (
 from .clarification import CURRENT_CLARIFICATION_RELATIVE_PATH
 from .decision import CURRENT_DECISION_RELATIVE_PATH
 from .handoff import CURRENT_HANDOFF_RELATIVE_PATH
+from .plan_proposal import CURRENT_PLAN_PROPOSAL_RELATIVE_PATH
 from .knowledge_layout import CONTEXT_PROFILES, KB_LAYOUT_VERSION, KNOWLEDGE_PATHS
 from .preferences import PREFERENCES_PRELOAD_STATUSES
 from .router import SUPPORTED_ROUTE_NAMES, build_runtime_first_hints
@@ -167,6 +168,7 @@ def build_bundle_manifest(
             "writes_clarification_file": True,
             "writes_handoff_file": True,
             "writes_decision_file": True,
+            "writes_proposal_file": True,
             "runtime_skill_ids": list(runtime_skill_ids),
         },
         runtime_first_hints=build_runtime_first_hints(),
@@ -178,6 +180,7 @@ def build_bundle_manifest(
                 "quick_fix",
                 "clarification_pending",
                 "clarification_resume",
+                "plan_proposal_pending",
                 "execution_confirm_pending",
                 "resume_active",
                 "exec_plan",
@@ -213,6 +216,7 @@ def build_bundle_manifest(
             },
             "clarification_file": CURRENT_CLARIFICATION_RELATIVE_PATH,
             "decision_file": CURRENT_DECISION_RELATIVE_PATH,
+            "proposal_file": CURRENT_PLAN_PROPOSAL_RELATIVE_PATH,
             "clarification_bridge_entry": CLARIFICATION_BRIDGE_ENTRY,
             "clarification_bridge_hosts": {
                 "cli": {

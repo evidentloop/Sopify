@@ -20,12 +20,13 @@ from .models import (
     DecisionState,
     ExecutionSummary,
     PlanArtifact,
+    PlanProposalState,
     RouteDecision,
     RuntimeConfig,
 )
 
 CHECKPOINT_REQUEST_SCHEMA_VERSION = "1"
-CHECKPOINT_KINDS = ("clarification", "decision", "execution_confirm")
+CHECKPOINT_KINDS = ("clarification", "decision", "execution_confirm", "plan_proposal")
 CHECKPOINT_SOURCE_STAGES = ("analyze", "design", "develop", "compare", "replay", "consult", "custom")
 CHECKPOINT_REASON_MISSING_BUT_TRADEOFF_DETECTED = "checkpoint_request_missing_but_tradeoff_detected"
 DEVELOP_RESUME_CONTEXT_REQUIRED_FIELDS = (
@@ -75,8 +76,13 @@ class CheckpointRequest:
     resume_context: Optional[Mapping[str, Any]] = None
     request_text: str = ""
     requested_plan_level: Optional[str] = None
+    plan_package_policy: str = "none"
     capture_mode: str = "off"
     candidate_skill_ids: tuple[str, ...] = ()
+    confirmed_decision: Optional[Mapping[str, Any]] = None
+    proposed_path: str = ""
+    reserved_plan_id: str = ""
+    estimated_task_count: int = 0
     created_at: str = ""
     updated_at: str = ""
 
@@ -110,8 +116,13 @@ class CheckpointRequest:
             "resume_context": _json_mapping(self.resume_context),
             "request_text": self.request_text,
             "requested_plan_level": self.requested_plan_level,
+            "plan_package_policy": self.plan_package_policy,
             "capture_mode": self.capture_mode,
             "candidate_skill_ids": list(self.candidate_skill_ids),
+            "confirmed_decision": _json_mapping(self.confirmed_decision) if isinstance(self.confirmed_decision, Mapping) else None,
+            "proposed_path": self.proposed_path,
+            "reserved_plan_id": self.reserved_plan_id,
+            "estimated_task_count": self.estimated_task_count,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
         }
@@ -150,8 +161,13 @@ class CheckpointRequest:
             resume_context=_json_mapping(data.get("resume_context")) if isinstance(data.get("resume_context"), Mapping) else None,
             request_text=str(data.get("request_text") or ""),
             requested_plan_level=str(data.get("requested_plan_level") or "").strip() or None,
+            plan_package_policy=str(data.get("plan_package_policy") or "none"),
             capture_mode=str(data.get("capture_mode") or "off"),
             candidate_skill_ids=tuple(str(item) for item in (data.get("candidate_skill_ids") or ()) if str(item).strip()),
+            confirmed_decision=_json_mapping(data.get("confirmed_decision")) if isinstance(data.get("confirmed_decision"), Mapping) else None,
+            proposed_path=str(data.get("proposed_path") or ""),
+            reserved_plan_id=str(data.get("reserved_plan_id") or ""),
+            estimated_task_count=int(data.get("estimated_task_count") or 0),
             created_at=str(data.get("created_at") or ""),
             updated_at=str(data.get("updated_at") or ""),
         )
@@ -195,6 +211,7 @@ def checkpoint_request_from_decision_state(
             resume_route=decision_state.resume_route,
             request_text=decision_state.request_text,
             requested_plan_level=decision_state.requested_plan_level,
+            plan_package_policy=decision_state.plan_package_policy,
             capture_mode=decision_state.capture_mode,
             candidate_skill_ids=decision_state.candidate_skill_ids,
             resume_context=decision_state.resume_context,
@@ -236,6 +253,7 @@ def checkpoint_request_from_clarification_state(
             resume_route=clarification_state.resume_route,
             request_text=clarification_state.request_text,
             requested_plan_level=clarification_state.requested_plan_level,
+            plan_package_policy=clarification_state.plan_package_policy,
             capture_mode=clarification_state.capture_mode,
             candidate_skill_ids=clarification_state.candidate_skill_ids,
             resume_context=clarification_state.resume_context,
@@ -272,10 +290,46 @@ def checkpoint_request_from_execution_confirm(
             resume_route=decision.route_name,
             request_text=decision.request_text,
             requested_plan_level=current_plan.level,
+            plan_package_policy="none",
             capture_mode=decision.capture_mode,
             candidate_skill_ids=decision.candidate_skill_ids,
             created_at=current_plan.created_at,
             updated_at=current_plan.created_at,
+        )
+    )
+
+
+def checkpoint_request_from_plan_proposal_state(
+    proposal_state: PlanProposalState,
+    *,
+    source_route: Optional[str] = None,
+) -> CheckpointRequest:
+    """Project a pending plan proposal into the generic checkpoint schema."""
+    return normalize_checkpoint_request(
+        CheckpointRequest(
+            schema_version=CHECKPOINT_REQUEST_SCHEMA_VERSION,
+            checkpoint_kind="plan_proposal",
+            checkpoint_id=proposal_state.checkpoint_id,
+            source_stage="design",
+            source_route=source_route or proposal_state.resume_route or "workflow",
+            blocking=True,
+            feature_key=proposal_state.topic_key or proposal_state.reserved_plan_id,
+            question=proposal_state.analysis_summary or proposal_state.request_text,
+            summary=proposal_state.analysis_summary or proposal_state.request_text,
+            context_files=proposal_state.candidate_files,
+            resume_route=proposal_state.resume_route,
+            resume_action="confirm_plan_proposal",
+            request_text=proposal_state.request_text,
+            requested_plan_level=proposal_state.proposed_level,
+            plan_package_policy="confirm",
+            capture_mode=proposal_state.capture_mode,
+            candidate_skill_ids=proposal_state.candidate_skill_ids,
+            confirmed_decision=proposal_state.confirmed_decision or None,
+            proposed_path=proposal_state.proposed_path,
+            reserved_plan_id=proposal_state.reserved_plan_id,
+            estimated_task_count=proposal_state.estimated_task_count,
+            created_at=proposal_state.created_at,
+            updated_at=proposal_state.updated_at,
         )
     )
 
@@ -303,6 +357,8 @@ def _validate_checkpoint_request(request: CheckpointRequest) -> None:
         _validate_decision_request(request)
     elif request.checkpoint_kind == "clarification":
         _validate_clarification_request(request)
+    elif request.checkpoint_kind == "plan_proposal":
+        _validate_plan_proposal_request(request)
     else:
         _validate_execution_confirm_request(request)
 
@@ -331,6 +387,15 @@ def _validate_clarification_request(request: CheckpointRequest) -> None:
 def _validate_execution_confirm_request(request: CheckpointRequest) -> None:
     if request.execution_summary is None:
         raise CheckpointRequestError("execution_confirm checkpoint_request.execution_summary is required")
+
+
+def _validate_plan_proposal_request(request: CheckpointRequest) -> None:
+    if not request.summary.strip():
+        raise CheckpointRequestError("plan_proposal checkpoint_request.summary is required")
+    if not request.proposed_path.strip():
+        raise CheckpointRequestError("plan_proposal checkpoint_request.proposed_path is required")
+    if not request.reserved_plan_id.strip():
+        raise CheckpointRequestError("plan_proposal checkpoint_request.reserved_plan_id is required")
 
 
 def _validate_develop_resume_context(request: CheckpointRequest) -> None:
