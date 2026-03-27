@@ -21,6 +21,7 @@ CHECKPOINT_ONLY_ACTIONS = frozenset(ENTRY_GUARD_PENDING_ACTIONS)
 NORMAL_RUNTIME_FOLLOWUP = "normal_runtime_followup"
 CHECKPOINT_ONLY = "checkpoint_only"
 ERROR_VISIBLE_RETRY = "error_visible_retry"
+_RUNTIME_ONLY_STATE_CONFLICT_SOURCE_KIND = "current_request_runtime_only_state_conflict"
 
 
 def enter_runtime_gate(
@@ -70,20 +71,27 @@ def enter_runtime_gate(
 
         store = _store_for_route(
             config=config,
-            route_name=runtime_result.route.route_name,
+            runtime_result=runtime_result,
             session_id=resolved_session_id,
         )
         persisted_handoff = store.get_current_handoff()
         current_run = store.get_current_run()
         # Normalize from the in-memory runtime result when needed, but keep
         # persisted handoff as the only positive machine evidence.
-        handoff_source = persisted_handoff or runtime_result.handoff
+        handoff_source_kind = _handoff_source_kind(
+            persisted_handoff=persisted_handoff,
+            runtime_handoff=runtime_result.handoff,
+        )
+        handoff_source = _preferred_handoff_source(
+            persisted_handoff=persisted_handoff,
+            runtime_handoff=runtime_result.handoff,
+            handoff_source_kind=handoff_source_kind,
+        )
         contract["handoff"] = _normalize_handoff(handoff_source)
         contract["trigger_evidence"] = contract["handoff"].pop("_trigger_evidence", {})
 
         manifest_path = workspace / ".sopify-runtime" / "manifest.json"
         strict_runtime_entry = bool(contract["handoff"].pop("_strict_runtime_entry", False))
-        handoff_source_kind = _handoff_source_kind(persisted_handoff=persisted_handoff, runtime_handoff=runtime_result.handoff)
         persisted_matches_current = _persisted_handoff_matches_current_request(
             persisted_handoff=persisted_handoff,
             runtime_handoff=runtime_result.handoff,
@@ -91,7 +99,11 @@ def enter_runtime_gate(
         )
         contract["evidence"] = {
             "manifest_found": manifest_path.is_file(),
-            "handoff_found": persisted_handoff is not None,
+            "handoff_found": _handoff_found(
+                persisted_handoff=persisted_handoff,
+                runtime_handoff=runtime_result.handoff,
+                handoff_source_kind=handoff_source_kind,
+            ),
             "strict_runtime_entry": strict_runtime_entry,
             "handoff_source_kind": handoff_source_kind,
             "current_request_produced_handoff": runtime_result.handoff is not None,
@@ -269,6 +281,17 @@ def _evaluate_gate_evidence(
             "message": "Runtime gate is missing strict entry evidence from handoff.entry_guard.",
         }
 
+    if handoff_source_kind == _RUNTIME_ONLY_STATE_CONFLICT_SOURCE_KIND:
+        required_host_action = str(handoff.get("required_host_action") or "").strip()
+        allowed_response_mode = NORMAL_RUNTIME_FOLLOWUP
+        if required_host_action in CHECKPOINT_ONLY_ACTIONS:
+            allowed_response_mode = CHECKPOINT_ONLY
+        return {
+            "status": "ready",
+            "gate_passed": True,
+            "allowed_response_mode": allowed_response_mode,
+        }
+
     if handoff_source_kind == "current_request_not_persisted":
         return {
             "status": "error",
@@ -301,11 +324,16 @@ def _evaluate_gate_evidence(
 def _handoff_source_kind(*, persisted_handoff: Any, runtime_handoff: Any) -> str:
     if persisted_handoff is None and runtime_handoff is None:
         return "missing"
+    if _is_runtime_only_state_conflict_handoff(runtime_handoff):
+        return _RUNTIME_ONLY_STATE_CONFLICT_SOURCE_KIND
     if persisted_handoff is None and runtime_handoff is not None:
         return "current_request_not_persisted"
     if persisted_handoff is not None and runtime_handoff is None:
         return "reused_prior_state"
-    if getattr(persisted_handoff, "run_id", "") == getattr(runtime_handoff, "run_id", ""):
+    if _handoff_matches_runtime_result(
+        persisted_handoff=persisted_handoff,
+        runtime_handoff=runtime_handoff,
+    ):
         return "current_request_persisted"
     return "persisted_runtime_mismatch"
 
@@ -314,11 +342,44 @@ def _persisted_handoff_matches_current_request(*, persisted_handoff: Any, runtim
     if persisted_handoff is None:
         return False
     if runtime_handoff is not None:
-        return getattr(persisted_handoff, "run_id", "") == getattr(runtime_handoff, "run_id", "")
+        return _handoff_matches_runtime_result(
+            persisted_handoff=persisted_handoff,
+            runtime_handoff=runtime_handoff,
+        )
     observability = getattr(persisted_handoff, "observability", {})
     if not isinstance(observability, Mapping):
         return False
     return str(observability.get("request_sha1") or "") == request_sha1 and bool(request_sha1)
+
+
+def _preferred_handoff_source(*, persisted_handoff: Any, runtime_handoff: Any, handoff_source_kind: str) -> Any:
+    if handoff_source_kind in {"current_request_not_persisted", _RUNTIME_ONLY_STATE_CONFLICT_SOURCE_KIND}:
+        return runtime_handoff
+    return persisted_handoff or runtime_handoff
+
+
+def _handoff_found(*, persisted_handoff: Any, runtime_handoff: Any, handoff_source_kind: str) -> bool:
+    if persisted_handoff is not None:
+        return True
+    return handoff_source_kind == _RUNTIME_ONLY_STATE_CONFLICT_SOURCE_KIND and runtime_handoff is not None
+
+
+def _handoff_matches_runtime_result(*, persisted_handoff: Any, runtime_handoff: Any) -> bool:
+    if persisted_handoff is None or runtime_handoff is None:
+        return False
+    return (
+        getattr(persisted_handoff, "run_id", "") == getattr(runtime_handoff, "run_id", "")
+        and getattr(persisted_handoff, "route_name", "") == getattr(runtime_handoff, "route_name", "")
+        and getattr(persisted_handoff, "required_host_action", "") == getattr(runtime_handoff, "required_host_action", "")
+    )
+
+
+def _is_runtime_only_state_conflict_handoff(handoff: Any) -> bool:
+    return (
+        handoff is not None
+        and str(getattr(handoff, "route_name", "") or "").strip() == "state_conflict"
+        and str(getattr(handoff, "required_host_action", "") or "").strip() == "resolve_state_conflict"
+    )
 
 
 def _build_gate_observability(
@@ -463,12 +524,49 @@ def _resolve_session_id(session_id: str | None) -> str:
 def _store_for_route(
     *,
     config,
-    route_name: str,
+    runtime_result: Any,
     session_id: str,
 ) -> StateStore:
+    route = getattr(runtime_result, "route", None)
+    route_name = str(getattr(route, "route_name", "") or "").strip()
+    global_store = StateStore(config)
+    session_store = StateStore(config, session_id=session_id)
+
     if route_name in {"execution_confirm_pending", "resume_active", "exec_plan", "finalize_active"}:
-        return StateStore(config)
-    return StateStore(config, session_id=session_id)
+        return global_store
+
+    runtime_handoff = getattr(runtime_result, "handoff", None)
+    if runtime_handoff is not None:
+        if _handoff_matches_runtime_result(
+            persisted_handoff=global_store.get_current_handoff(),
+            runtime_handoff=runtime_handoff,
+        ):
+            return global_store
+        if _handoff_matches_runtime_result(
+            persisted_handoff=session_store.get_current_handoff(),
+            runtime_handoff=runtime_handoff,
+        ):
+            return session_store
+
+    recovered_context = getattr(runtime_result, "recovered_context", None)
+    current_decision = getattr(recovered_context, "current_decision", None)
+    current_clarification = getattr(recovered_context, "current_clarification", None)
+
+    if route_name == "state_conflict":
+        required_host_action = str(getattr(runtime_handoff, "required_host_action", "") or "").strip()
+        if required_host_action == "continue_host_workflow" and (
+            global_store.get_current_handoff() is not None or global_store.get_current_run() is not None
+        ):
+            return global_store
+
+    if route_name in {"decision_pending", "decision_resume"}:
+        phase = str(getattr(current_decision, "phase", "") or "").strip()
+        if phase in {"execution_gate", "develop"}:
+            return global_store
+    if route_name in {"clarification_pending", "clarification_resume"}:
+        if str(getattr(current_clarification, "phase", "") or "").strip() == "develop":
+            return global_store
+    return session_store
 
 
 def write_gate_receipt(path: Path, payload: Mapping[str, Any]) -> None:

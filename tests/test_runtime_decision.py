@@ -650,9 +650,8 @@ class DecisionContractTests(unittest.TestCase):
                 config=config,
                 decision=decision,
                 run_id="run-missing-checkpoint",
-                current_run=None,
+                resolved_context=RecoveredContext(),
                 current_plan=None,
-                current_plan_proposal=None,
                 kb_artifact=None,
                 replay_session_dir=None,
                 skill_result={
@@ -671,8 +670,6 @@ class DecisionContractTests(unittest.TestCase):
                         },
                     ]
                 },
-                current_clarification=None,
-                current_decision=None,
                 notes=("test",),
             )
 

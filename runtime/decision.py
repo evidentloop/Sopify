@@ -148,7 +148,10 @@ def build_execution_gate_decision_state(
         schema_version="2",
         decision_id=_execution_gate_decision_id(current_plan.plan_id, gate.blocking_reason),
         feature_key=current_plan.plan_id,
-        phase="design",
+        # Gate-generated checkpoints are execution-bound, so loader liveness must
+        # validate them against the active execution topology instead of treating
+        # them as session-local design forks.
+        phase="execution_gate",
         status="pending",
         decision_type=decision_type,
         question=question,

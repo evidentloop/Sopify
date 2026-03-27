@@ -32,6 +32,7 @@ _PHASE_LABELS = {
         "compare": "模型对比",
         "replay": "咨询问答",
         "consult": "咨询问答",
+        "state_conflict": "状态冲突",
         "default": "命令完成",
     },
     "en-US": {
@@ -53,6 +54,7 @@ _PHASE_LABELS = {
         "compare": "Model Compare",
         "replay": "Q&A",
         "consult": "Q&A",
+        "state_conflict": "State Conflict",
         "default": "Command Complete",
     },
 }
@@ -71,6 +73,8 @@ _LABELS = {
         "options": "选项",
         "decision": "决策",
         "handoff": "交接",
+        "conflict_code": "冲突码",
+        "quarantined": "隔离",
         "current_plan": "当前方案",
         "stage": "阶段",
         "task_count": "任务数",
@@ -133,6 +137,11 @@ _LABELS = {
         "handoff_review_compare_results": "已写入 compare handoff，可在宿主侧继续选择结果",
         "handoff_host_replay_bridge_required": "已写入 replay handoff，当前仍需 workflow-learning 专用链路",
         "handoff_continue_host_consult": "已写入 consult handoff，当前 runtime 不生成正文回答",
+        "handoff_resolve_state_conflict": "已检测到运行态冲突，当前需先放弃当前协商再继续",
+        "state_conflict_detected": "检测到运行态冲突",
+        "state_conflict_cleared": "已放弃当前协商并恢复到稳定主线",
+        "state_conflict_remaining": "冲突清理后仍有残留冲突，需继续检查",
+        "next_state_conflict": "回复 取消 / 强制取消 以放弃当前协商并脱困",
     },
     "en-US": {
         "plan": "Plan",
@@ -147,6 +156,8 @@ _LABELS = {
         "options": "Options",
         "decision": "Decision",
         "handoff": "Handoff",
+        "conflict_code": "Conflict Code",
+        "quarantined": "Quarantined",
         "current_plan": "Current Plan",
         "stage": "Stage",
         "task_count": "Task Count",
@@ -209,6 +220,11 @@ _LABELS = {
         "handoff_review_compare_results": "compare handoff written; candidate results are ready for host-side review",
         "handoff_host_replay_bridge_required": "replay handoff written; workflow-learning still needs its dedicated bridge",
         "handoff_continue_host_consult": "consult handoff written; the runtime does not generate a full answer body",
+        "handoff_resolve_state_conflict": "A runtime state conflict was detected; abandon the current negotiation before continuing",
+        "state_conflict_detected": "A runtime state conflict was detected",
+        "state_conflict_cleared": "The current negotiation was abandoned and the stable mainline was restored",
+        "state_conflict_remaining": "Conflict cleanup completed, but another conflict still requires inspection",
+        "next_state_conflict": "Reply with cancel / force cancel to abandon the current negotiation and recover",
     },
 }
 
@@ -356,6 +372,23 @@ def _core_lines(result: RuntimeResult, language: str) -> list[str]:
         _append_entry_guard_reason_line(lines, result=result, language=language)
         return lines
 
+    if route_name == "state_conflict":
+        conflict = _state_conflict_payload(result)
+        quarantined_items = _quarantined_items(result)
+        lines: list[str] = []
+        if result.route.active_run_action == "abort_conflict" and not conflict:
+            lines.append(f"{labels['summary']}: {labels['state_conflict_cleared']}")
+        else:
+            lines.extend(
+                [
+                    f"{labels['conflict_code']}: {str(conflict.get('code') or labels['missing'])}",
+                    f"{labels['reason']}: {str(conflict.get('message') or _diagnostic_reason(result))}",
+                ]
+            )
+        lines.append(f"{labels['quarantined']}: {len(quarantined_items)}")
+        _append_entry_guard_reason_line(lines, result=result, language=language)
+        return lines
+
     if route_name == "summary":
         if language == "en-US":
             return [f"{labels['summary']}: generated the detailed recap for today and the current workspace"]
@@ -463,6 +496,8 @@ def _next_hint(result: RuntimeResult, language: str) -> str:
         return labels["next_confirm_plan_package"]
     if result.route.route_name == "decision_pending":
         return labels["next_decision"]
+    if result.route.route_name == "state_conflict":
+        return labels["next_state_conflict"]
     if result.route.route_name == "summary":
         return labels["next_summary"]
     if result.route.route_name == "exec_plan":
@@ -482,6 +517,10 @@ def _status_symbol(result: RuntimeResult) -> str:
         return "?"
     if route_name == "decision_pending":
         return "?"
+    if route_name == "state_conflict":
+        if result.route.active_run_action == "abort_conflict" and not _state_conflict_payload(result):
+            return "✓"
+        return "!"
     if route_name == "cancel_active":
         return "✓"
     if route_name == "summary":
@@ -497,11 +536,15 @@ def _status_symbol(result: RuntimeResult) -> str:
 
 def _status_message(result: RuntimeResult, language: str) -> str:
     labels = _LABELS[language]
+    route_name = result.route.route_name
+    if route_name == "state_conflict":
+        if result.route.active_run_action == "abort_conflict":
+            return labels["state_conflict_remaining"] if _state_conflict_payload(result) else labels["state_conflict_cleared"]
+        return labels["handoff_resolve_state_conflict"]
     if result.handoff is not None:
         key = f"handoff_{result.handoff.required_host_action}"
         if key in labels:
             return labels[key]
-    route_name = result.route.route_name
     current_gate = _execution_gate(result)
     if current_gate is not None:
         if current_gate.gate_status == "ready":
@@ -552,6 +595,33 @@ def _handoff_next_hint(result: RuntimeResult, language: str) -> str:
     handoff = result.handoff
     if handoff is None:
         return labels["next_retry"]
+    required_host_action = str(handoff.required_host_action or "").strip()
+    if required_host_action == "review_or_execute_plan":
+        return labels["next_plan"]
+    if required_host_action == "continue_host_workflow":
+        return labels["next_workflow"]
+    if required_host_action == "answer_questions":
+        return labels["next_answer_questions"]
+    if required_host_action == "resolve_state_conflict":
+        return labels["next_state_conflict"]
+    if required_host_action == "confirm_plan_package":
+        return labels["next_confirm_plan_package"]
+    if required_host_action == "confirm_execute":
+        return labels["next_confirm_execute"]
+    if required_host_action == "continue_host_develop":
+        return labels["next_resume"] if result.route.route_name == "resume_active" else labels["next_exec"]
+    if required_host_action == "continue_host_quick_fix":
+        return labels["next_quick_fix"]
+    if required_host_action == "confirm_decision":
+        return labels["next_decision"]
+    if required_host_action == "review_compare_results":
+        return labels["next_compare"]
+    if required_host_action == "host_compare_bridge_required":
+        return labels["next_compare_bridge"]
+    if required_host_action == "host_replay_bridge_required":
+        return labels["next_replay"]
+    if required_host_action == "continue_host_consult":
+        return labels["next_consult"]
     if handoff.handoff_kind == "plan":
         return labels["next_plan"]
     if handoff.handoff_kind == "workflow":
@@ -560,11 +630,7 @@ def _handoff_next_hint(result: RuntimeResult, language: str) -> str:
         return labels["next_light_iterate"]
     if handoff.handoff_kind == "clarification":
         return labels["next_answer_questions"]
-    if handoff.required_host_action == "confirm_plan_package":
-        return labels["next_confirm_plan_package"]
     if handoff.handoff_kind == "execution_confirm":
-        if handoff.required_host_action == "review_or_execute_plan":
-            return labels["next_plan"]
         return labels["next_confirm_execute"]
     if handoff.handoff_kind == "develop":
         return labels["next_resume"] if result.route.route_name == "resume_active" else labels["next_exec"]
@@ -590,6 +656,9 @@ def _diagnostic_reason(result: RuntimeResult) -> str:
 
 
 def _execution_gate(result: RuntimeResult):
+    # Output only renders resolved runtime result facts. It may fall back from
+    # recovered context to persisted handoff artifacts, but it never re-opens
+    # checkpoint state from disk on its own.
     current_run = result.recovered_context.current_run
     if current_run is not None and current_run.execution_gate is not None:
         return current_run.execution_gate
@@ -671,6 +740,28 @@ def _phase_label(result: RuntimeResult, language: str) -> str:
         if current_decision is not None and current_decision.phase == "develop":
             return labels["resume_active"]
     return labels.get(route_name, labels["default"])
+
+
+def _state_conflict_payload(result: RuntimeResult) -> dict[str, object]:
+    if result.recovered_context.state_conflict:
+        return dict(result.recovered_context.state_conflict)
+    if result.route.route_name == "state_conflict" and result.route.active_run_action == "abort_conflict":
+        return {}
+    if result.handoff is not None:
+        payload = result.handoff.artifacts.get("state_conflict")
+        if isinstance(payload, dict):
+            return dict(payload)
+    return {}
+
+
+def _quarantined_items(result: RuntimeResult) -> list[dict[str, object]]:
+    if result.recovered_context.quarantined_items:
+        return [dict(item) for item in result.recovered_context.quarantined_items]
+    if result.handoff is not None:
+        payload = result.handoff.artifacts.get("quarantined_items")
+        if isinstance(payload, list):
+            return [dict(item) for item in payload if isinstance(item, dict)]
+    return []
 
 
 def _normalize_language(language: str) -> str:

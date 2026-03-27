@@ -348,6 +348,104 @@ class RouterTests(unittest.TestCase):
             self.assertEqual(blocked_exec.route_name, "decision_pending")
             self.assertEqual(blocked_exec.active_run_action, "inspect_decision")
 
+    def test_session_decision_beats_ghost_global_proposal(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            config = load_runtime_config(workspace)
+            global_store = StateStore(config)
+            review_store = StateStore(config, session_id="session-a")
+            global_store.ensure()
+            review_store.ensure()
+
+            global_store.set_current_plan_proposal(
+                PlanProposalState(
+                    schema_version="1",
+                    checkpoint_id="proposal-ghost",
+                    request_text="继续",
+                    analysis_summary="ghost proposal",
+                    proposed_level="standard",
+                    proposed_path=".sopify-skills/plan/ghost",
+                    estimated_task_count=1,
+                    candidate_files=(),
+                    topic_key="ghost",
+                    reserved_plan_id="ghost",
+                    resume_route="workflow",
+                    capture_mode="off",
+                    candidate_skill_ids=(),
+                )
+            )
+            review_store.set_current_decision(
+                DecisionState(
+                    schema_version="2",
+                    decision_id="decision-1",
+                    feature_key="runtime",
+                    phase="design",
+                    status="pending",
+                    decision_type="design_choice",
+                    question="继续哪个选项？",
+                    summary="session decision should win",
+                    options=(
+                        DecisionOption(
+                            option_id="option_1",
+                            title="option 1",
+                            summary="summary",
+                        ),
+                    ),
+                    created_at=iso_now(),
+                    updated_at=iso_now(),
+                )
+            )
+
+            router = Router(config, state_store=review_store, global_state_store=global_store)
+            skills = SkillRegistry(config, user_home=workspace / "home").discover()
+
+            routed = router.classify("~go exec", skills=skills)
+
+            self.assertEqual(routed.route_name, "decision_pending")
+            self.assertEqual(routed.active_run_action, "inspect_decision")
+
+    def test_state_conflict_routes_to_inspect_until_user_cancels(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            config = load_runtime_config(workspace)
+            store = StateStore(config)
+            store.ensure()
+
+            store.set_current_run(
+                RunState(
+                    run_id="run-1",
+                    status="active",
+                    stage="plan_generated",
+                    route_name="workflow",
+                    title="Runtime",
+                    created_at=iso_now(),
+                    updated_at=iso_now(),
+                    resolution_id="resolution-a",
+                )
+            )
+            store.set_current_handoff(
+                RuntimeHandoff(
+                    schema_version="1",
+                    route_name="workflow",
+                    run_id="run-1",
+                    handoff_kind="workflow",
+                    required_host_action="review_or_execute_plan",
+                    resolution_id="resolution-b",
+                )
+            )
+
+            router = Router(config, state_store=store)
+            skills = SkillRegistry(config, user_home=workspace / "home").discover()
+
+            inspect_route = router.classify("看看状态", skills=skills)
+            cancel_route = router.classify("强制取消", skills=skills)
+
+            self.assertEqual(inspect_route.route_name, "state_conflict")
+            self.assertEqual(inspect_route.active_run_action, "inspect_conflict")
+            self.assertEqual(inspect_route.artifacts["state_conflict"]["code"], "resolution_id_mismatch")
+            self.assertEqual(cancel_route.route_name, "state_conflict")
+            self.assertEqual(cancel_route.active_run_action, "abort_conflict")
+
     def test_pending_decision_submission_routes_to_resume(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)

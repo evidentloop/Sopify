@@ -6,6 +6,43 @@ This changelog is maintained manually (not auto-generated).
 
 ## [Unreleased]
 
+## [2026-03-28.002645] - 2026-03-28
+
+### Runtime
+
+- Updated runtime internals:
+  - `runtime/_models/core.py`
+  - `runtime/_models/handoff.py`
+  - `runtime/checkpoint_request.py`
+  - `runtime/context_recovery.py`
+  - `runtime/context_snapshot.py`
+  - `runtime/decision.py`
+  - `runtime/develop_checkpoint.py`
+  - `runtime/engine.py`
+  - `runtime/entry_guard.py`
+  - `runtime/gate.py`
+  - `runtime/handoff.py`
+  - `runtime/output.py`
+  - `runtime/router.py`
+  - `runtime/state.py`
+  - `runtime/state_invariants.py`
+
+### Tests
+
+- Updated automated coverage:
+  - `tests/runtime_test_support.py`
+  - `tests/test_installer_status_doctor.py`
+  - `tests/test_runtime_decision.py`
+  - `tests/test_runtime_engine.py`
+  - `tests/test_runtime_gate.py`
+  - `tests/test_runtime_router.py`
+  - `tests/test_runtime_state.py`
+
+### Changed
+
+- Updated project files:
+  - `installer/inspection.py`
+
 ## [2026-03-27.105943] - 2026-03-27
 
 ### Runtime

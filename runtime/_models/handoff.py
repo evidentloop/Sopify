@@ -18,11 +18,15 @@ class RecoveredContext:
     loaded_files: tuple[str, ...] = ()
     current_run: Optional[RunState] = None
     current_plan: Optional[PlanArtifact] = None
+    current_handoff: Optional["RuntimeHandoff"] = None
     current_plan_proposal: Optional[PlanProposalState] = None
     current_clarification: Optional[ClarificationState] = None
     current_decision: Optional[DecisionState] = None
     last_route: Optional[RouteDecision] = None
     documents: Mapping[str, str] = field(default_factory=dict)
+    quarantined_items: tuple[Mapping[str, Any], ...] = ()
+    state_conflict: Mapping[str, Any] = field(default_factory=dict)
+    resolution_id: str = ""
 
     @property
     def has_active_run(self) -> bool:
@@ -33,11 +37,15 @@ class RecoveredContext:
             "loaded_files": list(self.loaded_files),
             "current_run": self.current_run.to_dict() if self.current_run else None,
             "current_plan": self.current_plan.to_dict() if self.current_plan else None,
+            "current_handoff": self.current_handoff.to_dict() if self.current_handoff else None,
             "current_plan_proposal": self.current_plan_proposal.to_dict() if self.current_plan_proposal else None,
             "current_clarification": self.current_clarification.to_dict() if self.current_clarification else None,
             "current_decision": self.current_decision.to_dict() if self.current_decision else None,
             "last_route": self.last_route.to_dict() if self.last_route else None,
             "documents": dict(self.documents),
+            "quarantined_items": [dict(item) for item in self.quarantined_items],
+            "state_conflict": dict(self.state_conflict),
+            "resolution_id": self.resolution_id,
         }
 
 
@@ -56,6 +64,7 @@ class RuntimeHandoff:
     artifacts: Mapping[str, Any] = field(default_factory=dict)
     notes: tuple[str, ...] = ()
     observability: Mapping[str, Any] = field(default_factory=dict)
+    resolution_id: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -70,6 +79,7 @@ class RuntimeHandoff:
             "artifacts": dict(self.artifacts),
             "notes": list(self.notes),
             "observability": _json_mapping(self.observability),
+            "resolution_id": self.resolution_id,
         }
 
     @classmethod
@@ -87,6 +97,7 @@ class RuntimeHandoff:
             artifacts=dict(artifacts) if isinstance(artifacts, Mapping) else {},
             notes=tuple(data.get("notes") or ()),
             observability=_json_mapping(data.get("observability")),
+            resolution_id=str(data.get("resolution_id") or ""),
         )
 
 

@@ -261,6 +261,7 @@ class RunState:
     owner_session_id: str = ""
     owner_host: str = ""
     owner_run_id: str = ""
+    resolution_id: str = ""
 
     @property
     def is_active(self) -> bool:
@@ -283,6 +284,7 @@ class RunState:
             "owner_session_id": self.owner_session_id,
             "owner_host": self.owner_host,
             "owner_run_id": self.owner_run_id,
+            "resolution_id": self.resolution_id,
         }
 
     @classmethod
@@ -304,6 +306,7 @@ class RunState:
             owner_session_id=str(data.get("owner_session_id") or ""),
             owner_host=str(data.get("owner_host") or ""),
             owner_run_id=str(data.get("owner_run_id") or ""),
+            resolution_id=str(data.get("resolution_id") or ""),
         )
 
 

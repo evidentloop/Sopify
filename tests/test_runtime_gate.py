@@ -25,7 +25,7 @@ from runtime.gate import (
     NORMAL_RUNTIME_FOLLOWUP,
     enter_runtime_gate,
 )
-from runtime.models import PlanArtifact, RouteDecision, RunState, RuntimeHandoff
+from runtime.models import DecisionOption, DecisionState, PlanArtifact, PlanProposalState, RouteDecision, RunState, RuntimeHandoff
 from runtime.plan_scaffold import create_plan_scaffold
 from runtime.state import StateStore, iso_now, stable_request_sha1
 
@@ -564,6 +564,176 @@ class RuntimeGateTests(unittest.TestCase):
             self.assertFalse(result["evidence"]["handoff_found"])
             self.assertTrue(result["evidence"]["current_request_produced_handoff"])
             self.assertEqual(result["evidence"]["handoff_source_kind"], "current_request_not_persisted")
+
+    def test_gate_allows_runtime_only_state_conflict_inspect_handoff(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            config = load_runtime_config(workspace)
+            store = StateStore(config, session_id="session-test")
+            store.set_current_handoff(
+                _make_runtime_handoff(
+                    run_id="run-current",
+                    route_name="workflow",
+                    required_host_action="continue_host_workflow",
+                )
+            )
+            runtime_handoff = RuntimeHandoff(
+                schema_version="1",
+                route_name="state_conflict",
+                run_id="run-current",
+                handoff_kind="state_conflict",
+                required_host_action="resolve_state_conflict",
+                artifacts={"entry_guard": build_entry_guard_contract(required_host_action="resolve_state_conflict")},
+                observability={
+                    "generated_at": iso_now(),
+                    "request_excerpt": "看看状态",
+                    "request_sha1": stable_request_sha1("看看状态"),
+                },
+            )
+
+            with patch(
+                "runtime.gate.run_runtime",
+                return_value=_make_runtime_result(
+                    request_text="看看状态",
+                    route_name="state_conflict",
+                    handoff=runtime_handoff,
+                ),
+            ):
+                result = enter_runtime_gate(
+                    "看看状态",
+                    workspace_root=workspace,
+                    session_id="session-test",
+                    user_home=workspace / "home",
+                )
+
+            self.assertEqual(result["status"], "ready")
+            self.assertTrue(result["gate_passed"])
+            self.assertEqual(result["allowed_response_mode"], CHECKPOINT_ONLY)
+            self.assertTrue(result["evidence"]["handoff_found"])
+            self.assertTrue(result["evidence"]["current_request_produced_handoff"])
+            self.assertFalse(result["evidence"]["persisted_handoff_matches_current_request"])
+            self.assertEqual(
+                result["evidence"]["handoff_source_kind"],
+                "current_request_runtime_only_state_conflict",
+            )
+            self.assertEqual(result["handoff"]["required_host_action"], "resolve_state_conflict")
+
+    def test_gate_reads_global_abort_conflict_handoff_from_global_scope(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            config = load_runtime_config(workspace)
+            store = StateStore(config)
+            store.ensure()
+            store.set_current_run(
+                RunState(
+                    run_id="run-1",
+                    status="active",
+                    stage="plan_generated",
+                    route_name="plan_only",
+                    title="Runtime",
+                    created_at=iso_now(),
+                    updated_at=iso_now(),
+                    plan_id="plan-1",
+                    plan_path=".sopify-skills/plan/runtime",
+                    resolution_id="run-resolution",
+                )
+            )
+            store.set_current_handoff(
+                RuntimeHandoff(
+                    schema_version="1",
+                    route_name="plan_only",
+                    run_id="run-1",
+                    plan_id="plan-1",
+                    plan_path=".sopify-skills/plan/runtime",
+                    handoff_kind="plan",
+                    required_host_action="review_or_execute_plan",
+                    resolution_id="handoff-resolution",
+                )
+            )
+
+            result = enter_runtime_gate(
+                "取消",
+                workspace_root=workspace,
+                user_home=workspace / "home",
+            )
+
+            self.assertEqual(result["status"], "ready")
+            self.assertTrue(result["gate_passed"])
+            self.assertEqual(result["allowed_response_mode"], NORMAL_RUNTIME_FOLLOWUP)
+            self.assertTrue(result["evidence"]["handoff_found"])
+            self.assertEqual(result["evidence"]["handoff_source_kind"], "current_request_persisted")
+            self.assertTrue(result["evidence"]["persisted_handoff_matches_current_request"])
+            self.assertEqual(result["state"]["scope"], "global")
+            self.assertEqual(result["handoff"]["required_host_action"], "continue_host_workflow")
+
+    def test_gate_persists_abort_conflict_handoff_without_current_run_in_same_session(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            config = load_runtime_config(workspace)
+            session_id = "session-conflict"
+            store = StateStore(config, session_id=session_id)
+            store.ensure()
+            store.set_current_plan_proposal(
+                PlanProposalState(
+                    schema_version="1",
+                    checkpoint_id="proposal-1",
+                    reserved_plan_id="plan-1",
+                    topic_key="runtime",
+                    proposed_level="standard",
+                    proposed_path=".sopify-skills/plan/proposal",
+                    analysis_summary="pending proposal",
+                    estimated_task_count=2,
+                    request_text="继续",
+                    created_at=iso_now(),
+                    updated_at=iso_now(),
+                )
+            )
+            store.set_current_decision(
+                DecisionState(
+                    schema_version="2",
+                    decision_id="decision-1",
+                    feature_key="runtime",
+                    phase="design",
+                    status="pending",
+                    decision_type="design_choice",
+                    question="继续哪个选项？",
+                    summary="pending decision",
+                    options=(DecisionOption(option_id="option_1", title="option 1", summary="summary"),),
+                    recommended_option_id="option_1",
+                    resume_context={"checkpoint_id": "decision-1"},
+                    created_at=iso_now(),
+                    updated_at=iso_now(),
+                )
+            )
+
+            inspect_result = enter_runtime_gate(
+                "看看状态",
+                workspace_root=workspace,
+                session_id=session_id,
+                user_home=workspace / "home",
+            )
+            self.assertEqual(inspect_result["status"], "ready")
+            self.assertEqual(inspect_result["runtime"]["route_name"], "state_conflict")
+            self.assertEqual(inspect_result["handoff"]["required_host_action"], "resolve_state_conflict")
+
+            cancel_result = enter_runtime_gate(
+                "取消",
+                workspace_root=workspace,
+                session_id=session_id,
+                user_home=workspace / "home",
+            )
+
+            self.assertEqual(cancel_result["status"], "ready")
+            self.assertTrue(cancel_result["gate_passed"])
+            self.assertEqual(cancel_result["allowed_response_mode"], NORMAL_RUNTIME_FOLLOWUP)
+            self.assertEqual(cancel_result["runtime"]["route_name"], "state_conflict")
+            self.assertEqual(cancel_result["handoff"]["required_host_action"], "continue_host_workflow")
+            self.assertEqual(cancel_result["evidence"]["handoff_source_kind"], "current_request_persisted")
+            self.assertTrue(cancel_result["evidence"]["persisted_handoff_matches_current_request"])
+            self.assertEqual(cancel_result["state"]["scope"], "session")
+            persisted_store = StateStore(load_runtime_config(workspace), session_id=session_id)
+            self.assertIsNone(persisted_store.get_current_run())
+            self.assertIsNotNone(persisted_store.get_current_handoff())
 
     def test_gate_errors_when_persisted_handoff_mismatches_runtime_result(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

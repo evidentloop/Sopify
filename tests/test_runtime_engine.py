@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 from tests.runtime_test_support import *
-from runtime.engine import _advance_planning_route
+from runtime.engine import _advance_planning_route, _handle_execution_confirm, _handle_plan_proposal_pending
 
 
 class EngineIntegrationTests(unittest.TestCase):
@@ -79,10 +79,17 @@ class EngineIntegrationTests(unittest.TestCase):
             workspace = Path(temp_dir)
 
             proposal = run_runtime("那你执行吧 逻辑严谨", workspace_root=workspace, user_home=workspace / "home")
+            store = StateStore(load_runtime_config(workspace))
+            persisted_run = store.get_current_run()
+            persisted_handoff = store.get_current_handoff()
 
             self.assertEqual(proposal.route.route_name, "plan_proposal_pending")
             self.assertIsNone(proposal.plan_artifact)
             self.assertIsNotNone(proposal.recovered_context.current_plan_proposal)
+            self.assertIsNotNone(persisted_run)
+            self.assertIsNotNone(persisted_handoff)
+            self.assertTrue(persisted_run.resolution_id)
+            self.assertEqual(persisted_run.resolution_id, persisted_handoff.resolution_id)
             self.assertNotEqual(
                 proposal.recovered_context.current_plan_proposal.analysis_summary,
                 proposal.recovered_context.current_plan_proposal.request_text,
@@ -151,6 +158,41 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertEqual(updated.proposed_path, original.proposed_path)
             self.assertIn("修订意见", updated.request_text)
             self.assertIn("把风险再展开一点", updated.request_text)
+
+    def test_plan_proposal_handler_can_confirm_from_resolved_snapshot_without_live_state_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+
+            pending = run_runtime("实现 runtime plugin bridge", workspace_root=workspace, user_home=workspace / "home")
+            resolved_proposal = pending.recovered_context.current_plan_proposal
+            self.assertIsNotNone(resolved_proposal)
+
+            config = load_runtime_config(workspace)
+            store = StateStore(config)
+            store.reset_active_flow()
+
+            routed, plan_artifact, notes, _ = _handle_plan_proposal_pending(
+                RouteDecision(
+                    route_name="plan_proposal_pending",
+                    request_text=resolved_proposal.request_text,
+                    reason="test resolved proposal confirm",
+                    complexity="complex" if resolved_proposal.proposed_level != "light" else "medium",
+                    plan_level=resolved_proposal.proposed_level,
+                    candidate_skill_ids=resolved_proposal.candidate_skill_ids,
+                    capture_mode=resolved_proposal.capture_mode,
+                    active_run_action="confirm_plan_proposal",
+                ),
+                state_store=store,
+                resolved_proposal=resolved_proposal,
+                config=config,
+                kb_artifact=None,
+            )
+
+            self.assertEqual(routed.route_name, "plan_only")
+            self.assertIsNotNone(plan_artifact)
+            self.assertEqual(plan_artifact.plan_id, resolved_proposal.reserved_plan_id)
+            self.assertIsNone(store.get_current_plan_proposal())
+            self.assertTrue(any("after proposal confirmation" in note for note in notes))
 
     def test_explain_only_request_routes_to_consult_without_creating_plan_proposal(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -432,7 +474,7 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertIsNotNone(global_run)
             self.assertEqual(global_run.owner_session_id, "session-b")
 
-    def test_cancel_active_clears_global_execution_before_session_review(self) -> None:
+    def test_cancel_active_clears_session_active_plan_binding_checkpoint_without_touching_global_execution(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
             config, _, _ = _prepare_ready_plan_state(workspace, session_id="session-a")
@@ -459,11 +501,11 @@ class EngineIntegrationTests(unittest.TestCase):
             global_store = StateStore(config)
             review_store = StateStore(config, session_id="session-b")
             self.assertEqual(result.route.route_name, "cancel_active")
-            self.assertIsNone(global_store.get_current_run())
-            self.assertIsNone(global_store.get_current_plan())
-            self.assertIsNotNone(review_store.get_current_run())
-            self.assertIsNotNone(review_store.get_current_plan_proposal())
-            self.assertTrue(any("Global execution flow cleared; session review state preserved" in note for note in result.notes))
+            self.assertIsNotNone(global_store.get_current_run())
+            self.assertIsNotNone(global_store.get_current_plan())
+            self.assertIsNone(review_store.get_current_run())
+            self.assertIsNone(review_store.get_current_decision())
+            self.assertTrue(any("Decision checkpoint cancelled" in note for note in result.notes))
 
     def test_cancel_active_clears_only_session_review_when_global_execution_is_absent(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -486,6 +528,319 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertIsNone(review_store.get_current_plan())
             self.assertTrue(any("Session review flow cleared" in note for note in result.notes))
 
+    def test_state_conflict_is_visible_and_cancel_can_clear_negotiation_state(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            config = load_runtime_config(workspace)
+            store = StateStore(config)
+            store.ensure()
+
+            store.set_current_plan_proposal(
+                PlanProposalState(
+                    schema_version="1",
+                    checkpoint_id="proposal-1",
+                    request_text="继续",
+                    analysis_summary="proposal",
+                    proposed_level="standard",
+                    proposed_path=".sopify-skills/plan/proposal",
+                    estimated_task_count=2,
+                    candidate_files=(),
+                    topic_key="runtime",
+                    reserved_plan_id="proposal-1",
+                    resume_route="workflow",
+                    capture_mode="off",
+                    candidate_skill_ids=(),
+                )
+            )
+            store.set_current_decision(
+                DecisionState(
+                    schema_version="2",
+                    decision_id="decision-1",
+                    feature_key="runtime",
+                    phase="design",
+                    status="pending",
+                    decision_type="design_choice",
+                    question="继续哪个选项？",
+                    summary="pending decision",
+                    options=(DecisionOption(option_id="option_1", title="option 1", summary="summary"),),
+                    created_at=iso_now(),
+                    updated_at=iso_now(),
+                )
+            )
+
+            conflicted = run_runtime("看看状态", workspace_root=workspace, user_home=workspace / "home")
+
+            self.assertEqual(conflicted.route.route_name, "state_conflict")
+            self.assertEqual(conflicted.handoff.required_host_action, "resolve_state_conflict")
+            self.assertEqual(conflicted.recovered_context.state_conflict["code"], "multiple_pending_checkpoints")
+            rendered_conflict = render_runtime_output(
+                conflicted,
+                brand="demo-ai",
+                language="zh-CN",
+                title_color="none",
+                use_color=False,
+            )
+            self.assertIn("状态冲突", rendered_conflict)
+            self.assertIn("取消 / 强制取消", rendered_conflict)
+            self.assertNotIn("~go abort", rendered_conflict)
+
+            cleared = run_runtime("取消", workspace_root=workspace, user_home=workspace / "home")
+            after_store = StateStore(load_runtime_config(workspace))
+
+            self.assertEqual(cleared.route.route_name, "state_conflict")
+            self.assertEqual(cleared.route.active_run_action, "abort_conflict")
+            self.assertEqual(cleared.handoff.required_host_action, "continue_host_workflow")
+            self.assertFalse(cleared.recovered_context.state_conflict)
+            self.assertIsNone(after_store.get_current_plan_proposal())
+            self.assertIsNone(after_store.get_current_decision())
+            rendered_cleared = render_runtime_output(
+                cleared,
+                brand="demo-ai",
+                language="zh-CN",
+                title_color="none",
+                use_color=False,
+            )
+            self.assertIn("已放弃当前协商并恢复到稳定主线", rendered_cleared)
+            self.assertIn("Next: 在宿主会话中继续执行后续阶段", rendered_cleared)
+            self.assertNotIn("~go abort", rendered_cleared)
+
+    def test_state_conflict_abort_preserves_confirmed_decision_and_stable_plan_truth(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            config = load_runtime_config(workspace)
+            store = StateStore(config)
+            store.ensure()
+
+            plan_artifact = create_plan_scaffold("补 runtime 状态机 hotfix", config=config, level="standard")
+            store.set_current_plan(plan_artifact)
+            store.set_current_run(
+                RunState(
+                    run_id="run-1",
+                    status="active",
+                    stage="plan_proposal_pending",
+                    route_name="workflow",
+                    title=plan_artifact.title,
+                    created_at=iso_now(),
+                    updated_at=iso_now(),
+                    plan_id=plan_artifact.plan_id,
+                    plan_path=plan_artifact.path,
+                )
+            )
+            store.set_current_plan_proposal(
+                PlanProposalState(
+                    schema_version="1",
+                    checkpoint_id="proposal-1",
+                    request_text="继续",
+                    analysis_summary="proposal",
+                    proposed_level="standard",
+                    proposed_path=".sopify-skills/plan/proposal",
+                    estimated_task_count=2,
+                    candidate_files=(),
+                    topic_key="runtime",
+                    reserved_plan_id="proposal-1",
+                    resume_route="workflow",
+                    capture_mode="off",
+                    candidate_skill_ids=(),
+                )
+            )
+            confirmed_decision = confirm_decision(
+                DecisionState(
+                    schema_version="2",
+                    decision_id="decision-1",
+                    feature_key="runtime",
+                    phase="design",
+                    status="pending",
+                    decision_type="design_choice",
+                    question="继续哪个选项？",
+                    summary="confirmed decision should survive abort cleanup",
+                    options=(DecisionOption(option_id="option_1", title="option 1", summary="summary"),),
+                    created_at=iso_now(),
+                    updated_at=iso_now(),
+                ),
+                option_id="option_1",
+                source="text",
+                raw_input="1",
+            )
+            store.set_current_decision(confirmed_decision)
+
+            conflicted = run_runtime("看看状态", workspace_root=workspace, user_home=workspace / "home")
+            self.assertEqual(conflicted.route.route_name, "state_conflict")
+            self.assertEqual(conflicted.recovered_context.state_conflict["code"], "multiple_pending_checkpoints")
+
+            cleared = run_runtime("取消", workspace_root=workspace, user_home=workspace / "home")
+            after_store = StateStore(load_runtime_config(workspace))
+            surviving_decision = after_store.get_current_decision()
+            surviving_run = after_store.get_current_run()
+
+            self.assertEqual(cleared.route.route_name, "state_conflict")
+            self.assertEqual(cleared.route.active_run_action, "abort_conflict")
+            self.assertFalse(cleared.recovered_context.state_conflict)
+            self.assertIsNone(after_store.get_current_plan_proposal())
+            self.assertIsNotNone(surviving_decision)
+            self.assertEqual(surviving_decision.status, "confirmed")
+            self.assertEqual(surviving_decision.selected_option_id, "option_1")
+            self.assertIsNotNone(after_store.get_current_plan())
+            self.assertIsNotNone(surviving_run)
+            self.assertEqual(surviving_run.stage, "plan_generated")
+
+    def test_state_conflict_abort_tombstones_conflicting_handoff_without_resetting_plan_run(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            config = load_runtime_config(workspace)
+            store = StateStore(config)
+            store.ensure()
+
+            plan_artifact = create_plan_scaffold("补 runtime 状态机 hotfix", config=config, level="standard")
+            store.set_current_plan(plan_artifact)
+            store.set_current_run(
+                RunState(
+                    run_id="run-1",
+                    status="active",
+                    stage="plan_generated",
+                    route_name="plan_only",
+                    title=plan_artifact.title,
+                    created_at=iso_now(),
+                    updated_at=iso_now(),
+                    plan_id=plan_artifact.plan_id,
+                    plan_path=plan_artifact.path,
+                    resolution_id="run-resolution",
+                )
+            )
+            store.set_current_handoff(
+                RuntimeHandoff(
+                    schema_version="1",
+                    route_name="plan_only",
+                    run_id="run-1",
+                    plan_id=plan_artifact.plan_id,
+                    plan_path=plan_artifact.path,
+                    handoff_kind="plan_only",
+                    required_host_action="review_or_execute_plan",
+                    resolution_id="handoff-resolution",
+                )
+            )
+
+            conflicted = run_runtime("看看状态", workspace_root=workspace, user_home=workspace / "home")
+            inspected_store = StateStore(load_runtime_config(workspace))
+            self.assertEqual(conflicted.route.route_name, "state_conflict")
+            self.assertEqual(conflicted.recovered_context.state_conflict["code"], "resolution_id_mismatch")
+            self.assertEqual(inspected_store.get_current_handoff().resolution_id, "handoff-resolution")
+            self.assertEqual(inspected_store.get_current_run().resolution_id, "run-resolution")
+            self.assertIsNone(inspected_store.get_last_route())
+
+            cleared = run_runtime("强制取消", workspace_root=workspace, user_home=workspace / "home")
+            after_store = StateStore(load_runtime_config(workspace))
+            current_run = after_store.get_current_run()
+            current_handoff = after_store.get_current_handoff()
+            current_plan = after_store.get_current_plan()
+
+            self.assertEqual(cleared.route.route_name, "state_conflict")
+            self.assertEqual(cleared.route.active_run_action, "abort_conflict")
+            self.assertFalse(cleared.recovered_context.state_conflict)
+            self.assertIsNotNone(current_plan)
+            self.assertIsNotNone(current_run)
+            self.assertIsNotNone(current_handoff)
+            self.assertEqual(current_run.run_id, "run-1")
+            self.assertEqual(current_handoff.run_id, "run-1")
+            self.assertTrue(current_run.resolution_id)
+            self.assertEqual(current_run.resolution_id, current_handoff.resolution_id)
+
+    def test_cross_session_owner_bound_confirmed_decision_survives_conflict_abort(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            config = load_runtime_config(workspace)
+            global_store = StateStore(config)
+            review_store = StateStore(config, session_id="session-b")
+            global_store.ensure()
+            review_store.ensure()
+
+            plan_artifact = create_plan_scaffold("补 runtime 状态机 hotfix", config=config, level="standard")
+            global_store.set_current_plan(plan_artifact)
+            global_store.set_current_run(
+                RunState(
+                    run_id="run-1",
+                    status="active",
+                    stage="decision_pending",
+                    route_name="resume_active",
+                    title=plan_artifact.title,
+                    created_at=iso_now(),
+                    updated_at=iso_now(),
+                    plan_id=plan_artifact.plan_id,
+                    plan_path=plan_artifact.path,
+                    owner_session_id="session-a",
+                    owner_run_id="owner-run-1",
+                )
+            )
+            confirmed_decision = confirm_decision(
+                DecisionState(
+                    schema_version="2",
+                    decision_id="decision-1",
+                    feature_key="runtime",
+                    phase="develop",
+                    status="pending",
+                    decision_type="develop_choice",
+                    question="继续哪个开发方案？",
+                    summary="owner-bound confirmed develop decision should survive conflict cleanup",
+                    options=(DecisionOption(option_id="option_1", title="option 1", summary="summary"),),
+                    resume_context={
+                        "resume_after": "continue_host_develop",
+                        "active_run_stage": "executing",
+                        "current_plan_path": plan_artifact.path,
+                        "task_refs": ["5.3", "6.9"],
+                        "changed_files": ["runtime/engine.py"],
+                        "working_summary": "cross-session develop decision remains valid after resume",
+                        "verification_todo": ["补 cross-session recoverable decision 回归"],
+                    },
+                    created_at=iso_now(),
+                    updated_at=iso_now(),
+                ),
+                option_id="option_1",
+                source="text",
+                raw_input="1",
+            )
+            global_store.set_current_decision(confirmed_decision)
+
+            review_store.set_current_plan_proposal(
+                PlanProposalState(
+                    schema_version="1",
+                    checkpoint_id="proposal-1",
+                    request_text="继续",
+                    analysis_summary="proposal",
+                    proposed_level="standard",
+                    proposed_path=".sopify-skills/plan/proposal",
+                    estimated_task_count=2,
+                    candidate_files=(),
+                    topic_key="runtime",
+                    reserved_plan_id="proposal-1",
+                    resume_route="workflow",
+                    capture_mode="off",
+                    candidate_skill_ids=(),
+                )
+            )
+
+            conflicted = run_runtime(
+                "看看状态",
+                workspace_root=workspace,
+                session_id="session-b",
+                user_home=workspace / "home",
+            )
+            self.assertEqual(conflicted.route.route_name, "state_conflict")
+
+            cleared = run_runtime(
+                "取消",
+                workspace_root=workspace,
+                session_id="session-b",
+                user_home=workspace / "home",
+            )
+
+            surviving_decision = StateStore(load_runtime_config(workspace)).get_current_decision()
+            self.assertEqual(cleared.route.route_name, "state_conflict")
+            self.assertFalse(cleared.recovered_context.state_conflict)
+            self.assertIsNone(StateStore(load_runtime_config(workspace), session_id="session-b").get_current_plan_proposal())
+            self.assertIsNotNone(surviving_decision)
+            self.assertEqual(surviving_decision.status, "confirmed")
+            self.assertEqual(surviving_decision.phase, "develop")
+            self.assertEqual(surviving_decision.selected_option_id, "option_1")
+
     def test_natural_language_execution_confirmation_starts_executing(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
@@ -501,6 +856,108 @@ class EngineIntegrationTests(unittest.TestCase):
                 result.handoff.artifacts["develop_quality_contract"]["verification_discovery_order"],
                 ["project_contract", "project_native", "not_configured"],
             )
+
+    def test_execution_confirm_helper_uses_explicit_confirmed_decision_context(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            config, store, plan_artifact = _prepare_ready_plan_state(workspace)
+            _rewrite_background_scope(
+                workspace,
+                plan_artifact,
+                scope_lines=("runtime/router.py, runtime/engine.py", "runtime/router.py, runtime/engine.py"),
+                risk_lines=("范围取舍仍待拍板", "继续推进前需要先明确最终选项"),
+            )
+
+            current_run = store.get_current_run()
+            self.assertIsNotNone(current_run)
+            gate = evaluate_execution_gate(
+                decision=RouteDecision(
+                    route_name="resume_active",
+                    request_text="开始",
+                    reason="test",
+                    complexity="medium",
+                    candidate_skill_ids=("develop",),
+                ),
+                plan_artifact=plan_artifact,
+                current_clarification=None,
+                current_decision=None,
+                config=config,
+            )
+            self.assertEqual(gate.gate_status, "decision_required")
+            self.assertEqual(gate.blocking_reason, "scope_tradeoff")
+
+            pending_decision = build_execution_gate_decision_state(
+                RouteDecision(
+                    route_name="resume_active",
+                    request_text="开始",
+                    reason="test",
+                    complexity="medium",
+                    candidate_skill_ids=("develop",),
+                ),
+                gate=gate,
+                current_plan=plan_artifact,
+                config=config,
+            )
+            self.assertIsNotNone(pending_decision)
+            confirmed = confirm_decision(
+                pending_decision,
+                option_id=pending_decision.options[0].option_id,
+                source="text",
+                raw_input="1",
+            )
+
+            routed, routed_plan, notes = _handle_execution_confirm(
+                RouteDecision(
+                    route_name="execution_confirm_pending",
+                    request_text="开始",
+                    reason="test",
+                    complexity="medium",
+                    should_recover_context=True,
+                    candidate_skill_ids=("develop",),
+                    active_run_action="confirm_execution",
+                ),
+                state_store=store,
+                current_plan=plan_artifact,
+                current_run=current_run,
+                current_clarification=None,
+                current_decision=confirmed,
+                config=config,
+                session_id=None,
+            )
+
+            self.assertEqual(routed.route_name, "resume_active")
+            self.assertIsNotNone(routed_plan)
+            self.assertEqual(routed_plan.plan_id, plan_artifact.plan_id)
+            self.assertEqual(store.get_current_run().stage, "executing")
+            self.assertIsNone(store.get_current_decision())
+            self.assertTrue(any("Execution confirmed by user" in note for note in notes))
+
+    def test_execution_confirm_surfaces_new_gate_decision_in_same_round_result_context(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            _prepare_ready_plan_state(workspace)
+            config = load_runtime_config(workspace)
+            store = StateStore(config)
+            current_plan = store.get_current_plan()
+            self.assertIsNotNone(current_plan)
+            _rewrite_background_scope(
+                workspace,
+                current_plan,
+                scope_lines=("runtime/router.py, runtime/engine.py", "runtime/router.py, runtime/engine.py"),
+                risk_lines=("范围取舍仍待拍板", "继续推进前需要先明确最终选项"),
+            )
+
+            run_runtime("~go exec", workspace_root=workspace, user_home=workspace / "home")
+            result = run_runtime("开始", workspace_root=workspace, user_home=workspace / "home")
+
+            self.assertEqual(result.route.route_name, "decision_pending")
+            self.assertIsNotNone(result.recovered_context.current_decision)
+            self.assertEqual(result.recovered_context.current_decision.phase, "execution_gate")
+            self.assertEqual(result.recovered_context.current_run.stage, "decision_pending")
+            self.assertEqual(result.handoff.required_host_action, "confirm_decision")
+            persisted_decision = StateStore(config).get_current_decision()
+            self.assertIsNotNone(persisted_decision)
+            self.assertEqual(persisted_decision.phase, "execution_gate")
 
     def test_develop_checkpoint_helper_writes_decision_checkpoint_and_handoff(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -539,11 +996,18 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertEqual(submission.handoff.required_host_action, "confirm_decision")
             self.assertEqual(submission.route.route_name, "decision_pending")
             store = StateStore(config)
+            current_run = store.get_current_run()
             current_decision = store.get_current_decision()
+            current_handoff = store.get_current_handoff()
             self.assertIsNotNone(current_decision)
+            self.assertIsNotNone(current_run)
+            self.assertIsNotNone(current_handoff)
             self.assertEqual(current_decision.phase, "develop")
             self.assertEqual(current_decision.resume_context["resume_after"], "continue_host_develop")
-            self.assertEqual(store.get_current_handoff().artifacts["resume_context"]["working_summary"], "develop callback 已接入，需要确认认证边界。")
+            self.assertTrue(submission.run_state.resolution_id)
+            self.assertEqual(submission.run_state.resolution_id, submission.handoff.resolution_id)
+            self.assertEqual(current_run.resolution_id, current_handoff.resolution_id)
+            self.assertEqual(current_handoff.artifacts["resume_context"]["working_summary"], "develop callback 已接入，需要确认认证边界。")
 
     def test_develop_quality_report_updates_handoff_and_replay(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1265,6 +1729,7 @@ class EngineIntegrationTests(unittest.TestCase):
                 config=config,
             )
             self.assertIsNotNone(gate_decision)
+            self.assertEqual(gate_decision.phase, "execution_gate")
             store.set_current_plan(plan_artifact)
             store.set_current_run(
                 RunState(
@@ -1281,7 +1746,18 @@ class EngineIntegrationTests(unittest.TestCase):
                 )
             )
             confirmed = confirm_decision(
-                gate_decision,
+                replace(
+                    gate_decision,
+                    resume_context={
+                        "resume_after": "continue_host_develop",
+                        "active_run_stage": "decision_pending",
+                        "current_plan_path": plan_artifact.path,
+                        "task_refs": [],
+                        "changed_files": [],
+                        "working_summary": "Execution gate decision was confirmed on the existing plan",
+                        "verification_todo": [],
+                    },
+                ),
                 option_id="option_1",
                 source="text",
                 raw_input="1",

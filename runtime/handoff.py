@@ -25,7 +25,7 @@ from .decision import CURRENT_DECISION_RELATIVE_PATH
 from .entry_guard import build_entry_guard_contract
 from .execution_confirm import build_execution_summary
 from .plan_proposal import CURRENT_PLAN_PROPOSAL_RELATIVE_PATH
-from .models import KbArtifact, PlanArtifact, RouteDecision, RunState, RuntimeConfig, RuntimeHandoff
+from .models import KbArtifact, PlanArtifact, RecoveredContext, RouteDecision, RunState, RuntimeConfig, RuntimeHandoff
 
 HANDOFF_SCHEMA_VERSION = "1"
 CURRENT_HANDOFF_FILENAME = "current_handoff.json"
@@ -45,6 +45,7 @@ _ROUTE_HANDOFF_KIND = {
     "exec_plan": "develop",
     "decision_pending": "decision",
     "decision_resume": "decision",
+    "state_conflict": "state_conflict",
     "compare": "compare",
     "replay": "replay",
     "consult": "consult",
@@ -56,22 +57,23 @@ def build_runtime_handoff(
     config: RuntimeConfig,
     decision: RouteDecision,
     run_id: str,
-    current_run: RunState | None,
+    resolved_context: RecoveredContext,
     current_plan: PlanArtifact | None,
-    current_plan_proposal: Any | None,
     kb_artifact: KbArtifact | None,
     replay_session_dir: str | None,
     skill_result: Mapping[str, Any] | None,
-    current_clarification: Any | None,
-    current_decision: Any | None,
     notes: Sequence[str],
-    previous_handoff: RuntimeHandoff | None = None,
 ) -> RuntimeHandoff | None:
     """Build the structured host handoff for an actionable route."""
+    # Handoff assembly must consume one resolved context snapshot. The engine
+    # may mutate state before this point, but once we start building host-facing
+    # truth we must not re-read ad hoc checkpoint files and risk split-brain.
+    current_run = resolved_context.current_run
+    resolved_plan = current_plan or resolved_context.current_plan
     handoff_kind = _ROUTE_HANDOFF_KIND.get(decision.route_name)
     if handoff_kind is None:
         return None
-    if not _should_emit_handoff(decision=decision, current_run=current_run, current_plan=current_plan):
+    if not _should_emit_handoff(decision=decision, current_run=current_run, current_plan=resolved_plan):
         return None
 
     normalized_notes = tuple(note.strip() for note in notes if note and note.strip())
@@ -80,7 +82,7 @@ def build_runtime_handoff(
     finalize_completed = _is_finalize_completed(
         config=config,
         decision=decision,
-        current_plan=current_plan,
+        current_plan=resolved_plan,
     )
     required_host_action = _required_host_action(
         decision,
@@ -91,15 +93,15 @@ def build_runtime_handoff(
         config=config,
         decision=decision,
         current_run=current_run,
-        current_plan=current_plan,
-        current_plan_proposal=current_plan_proposal,
+        current_plan=resolved_plan,
+        current_plan_proposal=resolved_context.current_plan_proposal,
         kb_artifact=kb_artifact,
         replay_session_dir=replay_session_dir,
         skill_result=skill_result,
-        current_clarification=current_clarification,
-        current_decision=current_decision,
+        current_clarification=resolved_context.current_clarification,
+        current_decision=resolved_context.current_decision,
         required_host_action=required_host_action,
-        previous_handoff=previous_handoff,
+        previous_handoff=resolved_context.current_handoff,
     )
     guard_reason_code = str(artifacts.get("entry_guard_reason_code") or "").strip()
     if guard_reason_code:
@@ -111,8 +113,8 @@ def build_runtime_handoff(
         schema_version=HANDOFF_SCHEMA_VERSION,
         route_name=decision.route_name,
         run_id=run_id,
-        plan_id=current_plan.plan_id if current_plan is not None else None,
-        plan_path=current_plan.path if current_plan is not None else None,
+        plan_id=resolved_plan.plan_id if resolved_plan is not None else None,
+        plan_path=resolved_plan.path if resolved_plan is not None else None,
         handoff_kind=handoff_kind,
         required_host_action=required_host_action,
         recommended_skill_ids=tuple(decision.candidate_skill_ids),
@@ -196,6 +198,8 @@ def _required_host_action(
         return "continue_host_quick_fix"
     if route_name in {"decision_pending", "decision_resume"}:
         return "confirm_decision"
+    if route_name == "state_conflict":
+        return "continue_host_workflow" if decision.active_run_action == "abort_conflict" else "resolve_state_conflict"
     if route_name == "compare":
         return "review_compare_results" if skill_result_present else "host_compare_bridge_required"
     if route_name == "replay":
@@ -241,6 +245,12 @@ def _collect_handoff_artifacts(
     consult_override_reason_code = str(decision.artifacts.get("consult_override_reason_code") or "").strip()
     if consult_override_reason_code:
         artifacts["consult_override_reason_code"] = consult_override_reason_code
+    state_conflict_payload = decision.artifacts.get("state_conflict")
+    if required_host_action == "resolve_state_conflict" and isinstance(state_conflict_payload, Mapping):
+        artifacts["state_conflict"] = dict(state_conflict_payload)
+    raw_quarantined_items = decision.artifacts.get("quarantined_items")
+    if isinstance(raw_quarantined_items, list):
+        artifacts["quarantined_items"] = list(raw_quarantined_items)
     execution_summary_payload = None
     if current_run is not None:
         artifacts["run_stage"] = current_run.stage
@@ -358,6 +368,7 @@ def _collect_handoff_artifacts(
         artifacts["checkpoint_request"] = checkpoint_request_from_decision_state(
             current_decision,
             source_route=decision.route_name,
+            source_stage="develop" if getattr(current_decision, "phase", None) == "execution_gate" else None,
         ).to_dict()
         _attach_resume_context_artifacts(
             artifacts,

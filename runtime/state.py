@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime, time, timedelta, timezone
 from hashlib import sha1
 import json
@@ -11,6 +12,7 @@ import shutil
 from tempfile import NamedTemporaryFile
 from typing import Any, Mapping, Optional
 
+from .checkpoint_request import CheckpointRequestError, validate_develop_resume_context
 from .handoff import read_runtime_handoff
 from .models import (
     ClarificationState,
@@ -22,6 +24,14 @@ from .models import (
     RunState,
     RuntimeConfig,
     RuntimeHandoff,
+)
+from .state_invariants import (
+    InvariantViolationError,
+    stamp_handoff_resolution_id,
+    stamp_run_resolution_id,
+    validate_paired_host_truth_write,
+    validate_phase,
+    validate_resolution_id,
 )
 
 SESSIONS_DIRNAME = "sessions"
@@ -78,6 +88,7 @@ class StateStore:
             "owner_session_id": run_state.owner_session_id,
             "owner_host": run_state.owner_host,
             "owner_run_id": run_state.owner_run_id,
+            "resolution_id": run_state.resolution_id,
         }
         if self.session_id:
             payload["observability"]["session_id"] = self.session_id
@@ -127,7 +138,16 @@ class StateStore:
 
     def set_current_clarification(self, clarification_state: ClarificationState) -> None:
         self.ensure()
-        self._write_json(self.current_clarification_path, clarification_state.to_dict())
+        normalized_phase = validate_phase(state_kind="current_clarification", phase=clarification_state.phase)
+        _validate_state_resume_contract(
+            state_kind="current_clarification",
+            phase=normalized_phase,
+            resume_context=clarification_state.resume_context,
+        )
+        self._write_json(
+            self.current_clarification_path,
+            _stamp_clarification_provenance(self, clarification_state).to_dict(),
+        )
 
     def set_current_clarification_response(
         self,
@@ -160,7 +180,16 @@ class StateStore:
 
     def set_current_decision(self, decision_state: DecisionState) -> None:
         self.ensure()
-        self._write_json(self.current_decision_path, decision_state.to_dict())
+        normalized_phase = validate_phase(state_kind="current_decision", phase=decision_state.phase)
+        _validate_state_resume_contract(
+            state_kind="current_decision",
+            phase=normalized_phase,
+            resume_context=decision_state.resume_context,
+        )
+        self._write_json(
+            self.current_decision_path,
+            _stamp_decision_provenance(self, decision_state).to_dict(),
+        )
 
     def set_current_decision_submission(self, submission: DecisionSubmission) -> Optional[DecisionState]:
         """Persist host-collected decision answers without rewriting the whole state file."""
@@ -193,12 +222,39 @@ class StateStore:
                 "run_id": handoff.run_id,
                 "route_name": handoff.route_name,
                 "required_host_action": handoff.required_host_action,
+                "resolution_id": handoff.resolution_id,
             }
         )
         if self.session_id:
             observability["session_id"] = self.session_id
         payload["observability"] = observability
         self._write_json(self.current_handoff_path, payload)
+
+    def set_host_facing_truth(
+        self,
+        *,
+        run_state: RunState,
+        handoff: RuntimeHandoff,
+        resolution_id: str,
+        truth_kind: str,
+    ) -> tuple[RunState, RuntimeHandoff]:
+        """Persist the paired host-facing checkpoint truth for the Hotfix whitelist only."""
+        normalized_truth_kind = validate_paired_host_truth_write(
+            run_state=run_state,
+            handoff=handoff,
+            resolution_id=resolution_id,
+            truth_kind=truth_kind,
+        )
+        normalized_resolution_id = validate_resolution_id(resolution_id)
+        stamped_run_state = stamp_run_resolution_id(run_state, resolution_id=normalized_resolution_id)
+        stamped_handoff = stamp_handoff_resolution_id(
+            handoff,
+            resolution_id=normalized_resolution_id,
+            truth_kind=normalized_truth_kind,
+        )
+        self.set_current_run(stamped_run_state)
+        self.set_current_handoff(stamped_handoff)
+        return stamped_run_state, stamped_handoff
 
     def clear_current_handoff(self) -> None:
         self.current_handoff_path.unlink(missing_ok=True)
@@ -235,6 +291,7 @@ class StateStore:
             owner_session_id=current.owner_session_id,
             owner_host=current.owner_host,
             owner_run_id=current.owner_run_id,
+            resolution_id=current.resolution_id,
         )
         self.set_current_run(updated)
         return updated
@@ -274,6 +331,60 @@ def summarize_request_text(text: str, *, limit: int = 120) -> str:
     if limit <= 3:
         return compact[:limit]
     return compact[: limit - 3].rstrip() + "..."
+
+
+def _stamp_clarification_provenance(store: StateStore, clarification_state: ClarificationState) -> ClarificationState:
+    resume_context = dict(clarification_state.resume_context)
+    resume_context.setdefault("checkpoint_id", clarification_state.clarification_id)
+    if store.session_id:
+        resume_context.setdefault("owner_session_id", store.session_id)
+    if clarification_state.phase == "develop":
+        current_run = store.get_current_run()
+        if current_run is not None:
+            owner_session_id = str(current_run.owner_session_id or store.session_id or "").strip()
+            owner_run_id = str(current_run.owner_run_id or current_run.run_id or "").strip()
+            if owner_session_id:
+                resume_context.setdefault("owner_session_id", owner_session_id)
+            if owner_run_id:
+                resume_context.setdefault("owner_run_id", owner_run_id)
+    return replace(clarification_state, resume_context=resume_context)
+
+
+def _stamp_decision_provenance(store: StateStore, decision_state: DecisionState) -> DecisionState:
+    resume_context = dict(decision_state.resume_context)
+    resume_context.setdefault("checkpoint_id", decision_state.active_checkpoint.checkpoint_id or decision_state.decision_id)
+    if store.session_id:
+        resume_context.setdefault("owner_session_id", store.session_id)
+    if decision_state.phase in {"execution_gate", "develop"}:
+        current_run = store.get_current_run()
+        if current_run is not None:
+            owner_session_id = str(current_run.owner_session_id or store.session_id or "").strip()
+            owner_run_id = str(current_run.owner_run_id or current_run.run_id or "").strip()
+            if owner_session_id:
+                resume_context.setdefault("owner_session_id", owner_session_id)
+            if owner_run_id:
+                resume_context.setdefault("owner_run_id", owner_run_id)
+    return replace(decision_state, resume_context=resume_context)
+
+
+def _validate_state_resume_contract(
+    *,
+    state_kind: str,
+    phase: str,
+    resume_context: Mapping[str, Any],
+) -> None:
+    if state_kind == "current_clarification" and phase != "develop":
+        return
+    if state_kind == "current_decision" and phase not in {"develop", "execution_gate"}:
+        return
+
+    try:
+        validate_develop_resume_context(
+            resume_context,
+            field_prefix=f"{state_kind}.resume_context",
+        )
+    except CheckpointRequestError as exc:
+        raise InvariantViolationError(str(exc)) from exc
 
 
 def local_now() -> datetime:

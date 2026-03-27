@@ -20,6 +20,12 @@
 
 因此本方案的定位不是直接开工，而是作为 program-level 总 plan，统一收口结论、明确后续拆分顺序、锁定哪些事项必须先拍板。
 
+最近的 runtime 排查又补出一个更底层的事实：在“状态机与恢复线”里，`stale state + router 优先级错误 + handler 作用域盲区` 会让最基础的 decision / proposal / handoff 流转出现自相矛盾的出口。这个问题已经从“实现细节瑕疵”升级为 `Plan B1` 的前置门禁：
+
+1. 如果不先封堵幽灵 Proposal、统一 checkpoint resolver、收口 `abort/state_conflict`，B1 的全局 bundle / shared runtime 只会把单仓状态错乱放大成多仓共享问题
+2. 因此总纲下新增独立前置子 plan `20260327_hotfix`
+3. 当前 B1 继续保留为 control-plane 主 plan，但其涉及 runtime 状态链路的部分必须等待该 Hotfix 解除门禁后再继续
+
 ## 变更内容
 本总 plan 收口以下结论：
 
@@ -27,6 +33,7 @@
 2. `Ghost Mode` 必须分解为不同里程碑，不能用一个词覆盖不同量级的改动
 3. `ExecutionGate` 的核心机器语义需要在风险打断 plan 中保持稳定
 4. 对外文档只能宣传已交付能力，不能预售未来路线
+5. `20260327_hotfix` 必须先于 `Plan B1` 的状态链路实现与验收完成；B1 只允许保留纯 filesystem / manifest / payload index / thin stub 脚手架并行
 
 本总 plan 不直接落代码，只负责：
 
@@ -41,8 +48,11 @@
   - `runtime/decision_policy.py`
   - `runtime/config.py`
   - `runtime/state.py`
+  - `runtime/context_recovery.py`
   - `runtime/handoff.py`
+  - `runtime/engine.py`
   - `runtime/develop_checkpoint.py`
+  - `runtime/_models/proposal.py`
   - `runtime/knowledge_layout.py`
   - `runtime/finalize.py`
   - `runtime/router.py`
@@ -59,5 +69,7 @@
 - 缓解: 将 Ghost 方案拆成 `B1 延迟物化`、`B2 Ghost State`、`B3 Ghost Knowledge` 三层，并明确 `B3` 延后独立立项
 - 风险: 在风险自适应打断中误改 `ExecutionGate` 核心语义，破坏 decision / handoff / output 消费链
 - 缓解: 冻结 `gate_status` 值集与核心字段名，仅允许在受控前提下扩展 `blocking_reason`
+- 风险: 带着当前 stale-state / ghost checkpoint 缺陷直接推进 B1，会让 shared runtime 下的状态域重叠问题放大，并使 `doctor / status / smoke` 出现历史状态相关的 flaky failure
+- 缓解: 将 `20260327_hotfix` 提升为独立前置门禁；B1 仅允许纯 filesystem/control-plane 脚手架并行，所有 runtime 状态链路任务等待 Hotfix H5 通过
 - 风险: 在对外文档中提前承诺未交付的 Ghost / side-task 能力，造成产品承诺超前
 - 缓解: 文档子 plan 仅在已交付能力基础上更新对外叙事

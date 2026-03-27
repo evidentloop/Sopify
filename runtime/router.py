@@ -7,6 +7,7 @@ import re
 from typing import Iterable
 
 from .clarification import has_submitted_clarification, parse_clarification_response
+from .context_snapshot import ContextResolvedSnapshot, resolve_context_snapshot, snapshot_state_conflict_artifacts
 from .decision import has_submitted_decision, parse_decision_response
 from .entry_guard import DIRECT_EDIT_BLOCKED_RUNTIME_REQUIRED_REASON_CODE
 from .execution_confirm import parse_execution_confirm_response
@@ -39,6 +40,7 @@ SUPPORTED_ROUTE_NAMES = (
     "finalize_active",
     "decision_pending",
     "decision_resume",
+    "state_conflict",
     "summary",
     "compare",
     "replay",
@@ -59,7 +61,7 @@ _REPLAY_KEYWORDS = (
     "review the implementation",
 )
 _CONTINUE_KEYWORDS = {"继续", "下一步", "继续执行", "继续吧", "go on", "continue", "resume", "next"}
-_CANCEL_KEYWORDS = {"取消", "停止", "终止", "abort", "cancel", "stop"}
+_CANCEL_KEYWORDS = {"取消", "强制取消", "停止", "终止", "算了", "放弃", "abort", "cancel", "stop", "force cancel"}
 _ARCHITECTURE_KEYWORDS = ("架构", "系统", "runtime", "workflow", "engine", "adapter", "plugin", "新功能", "重构", "refactor")
 _ACTION_KEYWORDS = (
     "补",
@@ -255,36 +257,48 @@ class Router:
         self.state_store = state_store
         self.global_state_store = global_state_store or state_store
 
-    def classify(self, user_input: str, *, skills: Iterable[SkillMeta]) -> RouteDecision:
+    def classify(
+        self,
+        user_input: str,
+        *,
+        skills: Iterable[SkillMeta],
+        snapshot: ContextResolvedSnapshot | None = None,
+    ) -> RouteDecision:
         text = user_input.strip()
-        review_active_run = self.state_store.get_current_run()
-        review_current_plan = self.state_store.get_current_plan()
-        review_current_plan_proposal = self.state_store.get_current_plan_proposal()
-        review_current_clarification = self.state_store.get_current_clarification()
-        review_current_decision = self.state_store.get_current_decision()
-        review_last_route = self.state_store.get_last_route()
+        if snapshot is None:
+            snapshot = resolve_context_snapshot(
+                config=self.config,
+                review_store=self.state_store,
+                global_store=self.global_state_store,
+            )
 
-        global_active_run = self.global_state_store.get_current_run()
-        global_current_plan = self.global_state_store.get_current_plan()
-        global_current_plan_proposal = self.global_state_store.get_current_plan_proposal()
-        global_current_clarification = self.global_state_store.get_current_clarification()
-        global_current_decision = self.global_state_store.get_current_decision()
-        global_last_route = self.global_state_store.get_last_route()
-
-        # Review checkpoints stay session-first; execution truth stays global-first.
-        current_clarification = review_current_clarification or global_current_clarification
-        current_decision = review_current_decision or global_current_decision
-        current_plan_proposal = review_current_plan_proposal or global_current_plan_proposal
-        execution_active_run = global_active_run or review_active_run
-        execution_current_plan = global_current_plan or review_current_plan
-        current_plan = review_current_plan or global_current_plan
-        current_last_route = review_last_route or global_last_route
+        current_clarification = snapshot.current_clarification
+        current_decision = snapshot.current_decision
+        current_plan_proposal = snapshot.current_plan_proposal
+        review_active_run = snapshot.current_run
+        execution_active_run = snapshot.execution_active_run
+        global_active_run = execution_active_run if snapshot.preferred_state_scope == "global" else None
+        if review_active_run is global_active_run:
+            review_active_run = None
+        execution_current_plan = snapshot.execution_current_plan
+        current_plan = snapshot.current_plan
+        current_last_route = snapshot.last_route
 
         decide_decision = _classify_decide_command(text, skills=skills)
         if decide_decision is not None:
             return self._with_capture(decide_decision)
 
         command_decision = _classify_command(text, skills=skills, config=self.config)
+        if snapshot.is_conflict:
+            return self._with_capture(
+                _classify_state_conflict(
+                    text,
+                    command_decision=command_decision,
+                    snapshot=snapshot,
+                    skills=skills,
+                )
+            )
+
         if current_clarification is not None and current_clarification.status == "pending":
             pending_clarification = _classify_pending_clarification(
                 text,
@@ -295,14 +309,15 @@ class Router:
             if pending_clarification is not None:
                 return self._with_capture(pending_clarification)
 
-        if current_plan_proposal is not None:
-            pending_plan_proposal = _classify_pending_plan_proposal(
+        if current_decision is not None and current_decision.status in {"pending", "collecting", "confirmed", "cancelled", "timed_out"}:
+            pending_decision = _classify_pending_decision(
                 text,
+                current_decision,
                 command_decision=command_decision,
                 skills=skills,
             )
-            if pending_plan_proposal is not None:
-                return self._with_capture(pending_plan_proposal)
+            if pending_decision is not None:
+                return self._with_capture(pending_decision)
 
         if _contains_intent(text, _REPLAY_KEYWORDS):
             return RouteDecision(
@@ -327,15 +342,14 @@ class Router:
                 },
             )
 
-        if current_decision is not None and current_decision.status in {"pending", "collecting", "confirmed", "cancelled", "timed_out"}:
-            pending_decision = _classify_pending_decision(
+        if current_plan_proposal is not None:
+            pending_plan_proposal = _classify_pending_plan_proposal(
                 text,
-                current_decision,
                 command_decision=command_decision,
                 skills=skills,
             )
-            if pending_decision is not None:
-                return self._with_capture(pending_decision)
+            if pending_plan_proposal is not None:
+                return self._with_capture(pending_plan_proposal)
 
         if execution_active_run is not None and execution_current_plan is not None:
             pending_execution_confirm = _classify_pending_execution_confirm(
@@ -575,6 +589,37 @@ def _classify_command(text: str, *, skills: Iterable[SkillMeta], config: Runtime
                 runtime_skill_id=_runtime_skill("compare", skills, "model-compare"),
             )
     return None
+
+
+def _classify_state_conflict(
+    text: str,
+    *,
+    command_decision: RouteDecision | None,
+    snapshot: ContextResolvedSnapshot,
+    skills: Iterable[SkillMeta],
+) -> RouteDecision:
+    normalized = _normalize(text)
+    if normalized in _CANCEL_KEYWORDS:
+        reason = "State conflict cleanup requested explicitly"
+        active_run_action = "abort_conflict"
+    else:
+        reason = snapshot.conflict_message or "A conflicting runtime state blocks further routing until it is cleaned up"
+        active_run_action = "inspect_conflict"
+    artifacts = {
+        **snapshot_state_conflict_artifacts(snapshot),
+        "entry_guard_reason_code": "entry_guard_state_conflict",
+    }
+    return RouteDecision(
+        route_name="state_conflict",
+        request_text=text,
+        reason=reason,
+        command=command_decision.command if command_decision is not None else None,
+        complexity="simple",
+        should_recover_context=True,
+        candidate_skill_ids=_candidate_skills("state_conflict", skills, "analyze", "develop"),
+        active_run_action=active_run_action,
+        artifacts=artifacts,
+    )
 
 
 def _classify_decide_command(text: str, *, skills: Iterable[SkillMeta]) -> RouteDecision | None:

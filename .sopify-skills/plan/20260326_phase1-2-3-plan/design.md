@@ -8,23 +8,44 @@
   - 后续所有实现都应通过独立子 plan 承接
 
 ## 设计原则
-1. 先减阻力，再加能力
+1. 先治状态机，再放大全局控制面
+   若 runtime 连“当前 checkpoint 到底是什么”都不能唯一收敛，那么全局 bundle、shared runtime、diagnostics 只会放大状态漂移。
+
+2. 先减阻力，再加能力
    先处理最直接的推广阻力，再进入更深的路径与状态语义改造。
 
-2. 先保 contract，再改 behavior
+3. 先保 contract，再改 behavior
    能通过内部打分与策略层解决的问题，不先改共享机器契约。
 
-3. Ghost 不是单个 feature
+4. Ghost 不是单个 feature
    `延迟物化`、`Ghost State`、`Ghost Knowledge` 不是一个量级，不能绑成同一轮。
 
-4. Side task 必须有边界
+5. Side task 必须有边界
    目标是 `suspend -> bounded side task -> resume`，不是自由漫游。
 
-5. 文档只宣传已交付能力
+6. 文档只宣传已交付能力
    对外定位可以提前设计，但不能提前承诺未实现能力。
 
 ## 总拆分
-后续路线拆为六个命名方案：
+后续路线拆为七个命名方案：
+
+### Plan H | 状态机 Hotfix（B1 前置门禁）
+状态: immediate prerequisite
+
+目标:
+- 修复 stale-state、ghost proposal、checkpoint 解析分裂与 handoff 对冲
+
+范围:
+- 统一 checkpoint resolver / immutable snapshot
+- 收口 proposal / clarification / decision 的作用域与 provenance
+- 收口 `state_conflict` 与 `~go abort` 脱困路径
+- 补状态机专项回归测试
+
+硬约束:
+- Proposal 只允许 Session-only，不保留 global fallback
+- Router / Engine / Handoff 只消费同一份 resolved snapshot
+- `state_conflict` 必须可见且可恢复，不能在构建期直接 Fatal
+- `current_plan / current_run` 不纳入 abort 清理范围
 
 ### Plan A | 风险自适应打断
 状态: committed next
@@ -59,7 +80,7 @@
 - 不预售 Ghost / Suspend / Side Task 的未实现行为
 
 ### Plan B1 | 延迟物化
-状态: upgraded to current priority child plan
+状态: current control-plane child plan, but state-chain-sensitive slices are blocked by Plan H
 
 目标:
 - 将原“延迟物化”升级为完整的 control-plane decoupling：
@@ -80,6 +101,8 @@
 - payload 索引化必须同步升级 `validate / inspection / doctor / status / smoke`
 - ignore 默认优先 `.git/info/exclude`，仅“提交版本锁”模式才写 `.gitignore`
 - `stub 优先 / legacy vendored fallback 次之 / no_silent_downgrade` 必须有可见 reason code
+- 不吸收 `runtime/state / router / engine / handoff` 的协商态一致性修复；该部分由 `Plan H` 单独承接
+- 与 `Plan H` 并行时，只允许纯 filesystem / manifest / payload index / thin stub / ignore 脚手架，且不得 `import runtime.state` 或读取 `.sopify-skills/state/*.json`
 
 非目标:
 - 不改变 `plan/blueprint/history` 路径 contract
@@ -138,15 +161,18 @@
 ## 依赖与顺序
 推荐顺序如下：
 
-1. Plan B1
-2. Plan A
-3. Plan D 在 B1 与 A 收口后推进
-4. Plan B2
-5. Plan C
-6. Plan B3
+1. Plan H
+2. Plan B1
+3. Plan A
+4. Plan D 在 B1 与 A 收口后推进
+5. Plan B2
+6. Plan C
+7. Plan B3
 
 补充说明:
-- `B1` 现阶段是当前最高优先级 child plan，因为它直接解决 adoption friction、workspace 侵入感与 control-plane 漂移问题
+- `Plan H` 是 `B1` 的前置门禁，因为它解决的是“runtime 当前到底在等哪个 checkpoint”这一层唯一事实源问题
+- `B1` 仍是当前主 control-plane child plan，但其涉及 runtime 状态链路与协商恢复的切片必须等待 `Plan H` 解锁
+- `B1` 在 `Plan H` 执行期间只允许推进纯 filesystem / manifest / payload index / thin stub / ignore 脚手架
 - `A` 可继续保留分析结论，但 host-facing implementation 不应与 `B1` 的 control-plane contract 迁移交叉推进
 - `D` 必须等 `B1` 与 `A` 两侧对外语义都稳定后再更新对外文档
 - `B2` 不依赖 `A`，但应在 `B1` 之后，避免同时处理 control-plane bundle 迁移与运行态目录迁移
@@ -154,17 +180,19 @@
 - `B3` 必须单独决策后再开工
 
 ## 当前执行窗口
-当前总纲下的最高优先级子 plan 是：
+当前总纲下的即时执行窗口分成两个层次：
 
+- `.sopify-skills/plan/20260327_hotfix`
 - `.sopify-skills/plan/20260326_5-plan-20260326-phase1-2-3-plan-plan-20260326-ph`
 
 它与总纲的关系如下：
 
-1. 它是当前 `Plan B1` 的升级落地窗口，不是 `B2 / B3 / Plan C` 的前置偷渡
-2. 它先处理 control-plane：global bundle、thin stub/pin、bootstrap ignore、dual-host preflight、legacy fallback
-3. 它收口后，`Plan A` 才进入真正的下一优先级执行窗口
-4. `Plan D` 必须等 `B1 + A` 稳定后再跟进，以免外部叙事与真实能力错位
-5. `B2 / C / B3` 继续保持后移，不并入当前窗口
+1. `20260327_hotfix` 是即时门禁窗口，负责修复 stale-state / ghost checkpoint / contradictory handoff
+2. `20260326_5-plan-20260326-phase1-2-3-plan-plan-20260326-ph` 仍是当前 `Plan B1` 的升级落地窗口，但只保留可并行的 control-plane 脚手架
+3. 任何触碰 runtime 状态链路、checkpoint 恢复、handoff 唯一出口、`doctor/status/smoke` 协商态解释的 B1 子任务，必须等待 `20260327_hotfix` 的 H5 解锁
+4. `Plan A` 只有在 `Plan H + B1` 各自收口后才进入真正下一优先级执行窗口
+5. `Plan D` 必须等 `B1 + A` 稳定后再跟进，以免外部叙事与真实能力错位
+6. `B2 / C / B3` 继续保持后移，不并入当前窗口
 
 ## 待拍板的产品决策
 以下事项必须先拍板，不能留到实现 plan 中边做边定：
@@ -193,27 +221,33 @@
 ## 验收门
 每个后续子 plan 都必须显式写出 acceptance gate，最低要求如下：
 
-1. Plan A
+1. Plan H
+   - Proposal 不再以 global fallback 参与当前会话路由
+   - `state_conflict` 与 `~go abort` 构成完整脱困闭环
+   - `current_handoff` 与 `current_run.stage` 不再对冲输出不同 checkpoint
+
+2. Plan A
    - 覆盖既有 blocking_reason 的正例 / 反例 / 边界例
    - 验证 `gate_status` 语义不变
 
-2. Plan D
+3. Plan D
    - 文档不提前承诺未实现功能
    - 文案与当前支持面一致
 
-3. Plan B1
+4. Plan B1
    - 验证首次需要时才发生物化
    - 验证不影响现有 workspace-relative plan contract
+   - 验证与 `Plan H` 并行时不触碰 runtime checkpoint 状态系统
 
-4. Plan B2
+5. Plan B2
    - 验证 state/replay 移出 workspace
    - 验证 `plan/blueprint/history` 行为不变
 
-5. Plan C
+6. Plan C
    - 验证 `suspend -> side task -> resume` 一进一出完整可回
    - 验证 resume 后 plan truth 不漂移
 
-6. Plan B3
+7. Plan B3
    - 需要独立定义更高等级的 contract migration gate
 
 ## 安全与性能

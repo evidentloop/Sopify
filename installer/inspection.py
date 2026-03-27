@@ -12,6 +12,9 @@ from installer.hosts import iter_host_registrations
 from installer.hosts.base import HostAdapter, HostRegistration
 from installer.models import HostCapability, InstallError
 from installer.validate import run_bundle_smoke_check, validate_host_install, validate_payload_install
+from runtime.config import ConfigError, load_runtime_config
+from runtime.context_snapshot import resolve_context_snapshot
+from runtime.state import SESSIONS_DIRNAME, StateStore
 
 STATUS_SCHEMA_VERSION = "2"
 DOCTOR_SCHEMA_VERSION = "1"
@@ -24,6 +27,9 @@ STATUS_NO = "no"
 STATUS_NOT_REQUESTED = "not_requested"
 REASON_OK = "ok"
 REASON_WORKSPACE_NOT_REQUESTED = "WORKSPACE_NOT_REQUESTED"
+REASON_RUNTIME_STATE_CONFLICT = "RUNTIME_STATE_CONFLICT"
+REASON_QUARANTINED_RUNTIME_STATE = "QUARANTINED_RUNTIME_STATE"
+REASON_RUNTIME_INSPECTION_UNAVAILABLE = "RUNTIME_INSPECTION_UNAVAILABLE"
 STATUS_READY_STATES = {"READY", "NEWER_THAN_GLOBAL"}
 STATUS_WARN_STATES = {"MISSING", "OUTDATED_COMPATIBLE"}
 
@@ -265,18 +271,24 @@ def inspect_workspace_state(workspace_root: Path | None) -> dict[str, object]:
             "active_plan": None,
             "current_run_stage": None,
             "pending_checkpoint": None,
+            "quarantine_count": 0,
+            "quarantined_items": [],
+            "state_conflicts": [],
+            "runtime_notes": [],
         }
-    state_root = workspace_root / ".sopify-skills" / "state"
-    current_run = _read_json(state_root / "current_run.json")
-    current_handoff = _read_json(state_root / "current_handoff.json")
+    runtime_state = _inspect_runtime_workspace_state(workspace_root)
     return {
         "requested": True,
         "root": str(workspace_root),
         "bootstrap_mode": "prewarmed",
         "sopify_skills_present": (workspace_root / ".sopify-skills").is_dir(),
-        "active_plan": str(current_run.get("plan_path") or current_run.get("plan_id") or "") or None,
-        "current_run_stage": current_run.get("stage"),
-        "pending_checkpoint": current_handoff.get("required_host_action"),
+        "active_plan": runtime_state["active_plan"],
+        "current_run_stage": runtime_state["current_run_stage"],
+        "pending_checkpoint": runtime_state["pending_checkpoint"],
+        "quarantine_count": runtime_state["quarantine_count"],
+        "quarantined_items": runtime_state["quarantined_items"],
+        "state_conflicts": runtime_state["state_conflicts"],
+        "runtime_notes": runtime_state["runtime_notes"],
     }
 
 
@@ -296,6 +308,8 @@ def build_doctor_payload(*, home_root: Path, workspace_root: Path | None) -> dic
     """Build the machine contract for `sopify doctor`."""
     inspections = inspect_all_hosts(home_root=home_root, workspace_root=workspace_root, include_smoke=True)
     checks = [check.to_dict() for inspection in inspections for check in inspection.doctor_checks()]
+    workspace_state = inspect_workspace_state(workspace_root)
+    checks.extend(check.to_dict() for check in _runtime_workspace_checks(workspace_state))
     return {
         "schema_version": DOCTOR_SCHEMA_VERSION,
         "checks": checks,
@@ -342,6 +356,25 @@ def render_status_text(payload: dict[str, object]) -> str:
                 f"  pending_checkpoint: {workspace_state['pending_checkpoint'] or '(none)'}",
             ]
         )
+        if workspace_state["quarantine_count"]:
+            lines.append(f"  quarantine_count: {workspace_state['quarantine_count']}")
+            for item in workspace_state["quarantined_items"][:3]:
+                lines.append(
+                    "  quarantined: {state_kind} {path} ({reason})".format(
+                        state_kind=item.get("state_kind") or "unknown",
+                        path=item.get("path") or "(unknown)",
+                        reason=item.get("reason") or "unknown",
+                    )
+                )
+        if workspace_state["state_conflicts"]:
+            lines.append(f"  state_conflict_count: {len(workspace_state['state_conflicts'])}")
+            first_conflict = workspace_state["state_conflicts"][0]
+            lines.append(
+                "  state_conflict: {code} @ {path}".format(
+                    code=first_conflict.get("code") or "unknown",
+                    path=first_conflict.get("path") or "(unknown)",
+                )
+            )
     return "\n".join(lines)
 
 
@@ -363,6 +396,139 @@ def render_doctor_text(payload: dict[str, object]) -> str:
             line += f" | {check['recommendation']}"
         lines.append(line)
     return "\n".join(lines)
+
+
+def _inspect_runtime_workspace_state(workspace_root: Path) -> dict[str, object]:
+    fallback_state_root = workspace_root / ".sopify-skills" / "state"
+    fallback_run = _read_json(fallback_state_root / "current_run.json")
+    fallback_handoff = _read_json(fallback_state_root / "current_handoff.json")
+    fallback_payload = {
+        "active_plan": str(fallback_run.get("plan_path") or fallback_run.get("plan_id") or "") or None,
+        "current_run_stage": fallback_run.get("stage"),
+        "pending_checkpoint": fallback_handoff.get("required_host_action"),
+        "quarantine_count": 0,
+        "quarantined_items": [],
+        "state_conflicts": [],
+        "runtime_notes": [],
+    }
+    try:
+        config = load_runtime_config(workspace_root)
+    except (ConfigError, ValueError) as exc:
+        fallback_payload["runtime_notes"] = [f"Runtime inspection unavailable: {exc}"]
+        return fallback_payload
+
+    global_store = StateStore(config)
+    snapshots = [
+        resolve_context_snapshot(
+            config=config,
+            review_store=global_store,
+            global_store=global_store,
+        )
+    ]
+    sessions_root = config.state_dir / SESSIONS_DIRNAME
+    if sessions_root.is_dir():
+        for session_dir in sorted(sessions_root.iterdir(), key=lambda item: item.name):
+            if not session_dir.is_dir():
+                continue
+            try:
+                session_store = StateStore(config, session_id=session_dir.name)
+            except ValueError:
+                continue
+            snapshots.append(
+                resolve_context_snapshot(
+                    config=config,
+                    review_store=session_store,
+                    global_store=global_store,
+                )
+            )
+
+    primary_snapshot = snapshots[0]
+    quarantined_items: dict[tuple[str, str, str, str, str], dict[str, object]] = {}
+    state_conflicts: dict[tuple[str, str, str, str], dict[str, object]] = {}
+    runtime_notes: list[str] = []
+    for snapshot in snapshots:
+        for item in snapshot.quarantined_items:
+            key = (item.state_kind, item.path, item.reason, item.provenance_status, item.state_scope)
+            quarantined_items.setdefault(key, item.to_dict())
+        for item in snapshot.conflict_items:
+            key = (item.code, item.message, item.path, item.state_scope)
+            state_conflicts.setdefault(key, item.to_dict())
+        for note in snapshot.notes:
+            if note not in runtime_notes:
+                runtime_notes.append(note)
+
+    current_run = primary_snapshot.current_run
+    current_plan = primary_snapshot.current_plan
+    current_handoff = primary_snapshot.current_handoff
+    active_plan = None
+    if current_run is not None:
+        active_plan = str(current_run.plan_path or current_run.plan_id or "") or None
+    elif current_plan is not None:
+        active_plan = str(current_plan.path or current_plan.plan_id or "") or None
+
+    return {
+        "active_plan": active_plan,
+        "current_run_stage": current_run.stage if current_run is not None else None,
+        "pending_checkpoint": current_handoff.required_host_action if current_handoff is not None else None,
+        "quarantine_count": len(quarantined_items),
+        "quarantined_items": list(quarantined_items.values()),
+        "state_conflicts": list(state_conflicts.values()),
+        "runtime_notes": runtime_notes,
+    }
+
+
+def _runtime_workspace_checks(workspace_state: dict[str, object]) -> tuple[InspectionCheck, ...]:
+    checks: list[InspectionCheck] = []
+    quarantined_items = workspace_state.get("quarantined_items") or []
+    if isinstance(quarantined_items, list) and quarantined_items:
+        checks.append(
+            InspectionCheck(
+                check_id="workspace_runtime_quarantine",
+                status=CHECK_WARN,
+                reason_code=REASON_QUARANTINED_RUNTIME_STATE,
+                evidence=tuple(
+                    "{path} ({reason})".format(
+                        path=item.get("path") or "(unknown)",
+                        reason=item.get("reason") or "unknown",
+                    )
+                    for item in quarantined_items[:5]
+                    if isinstance(item, dict)
+                ),
+                recommendation="Review the quarantined runtime files via status/doctor before resuming planning or execution.",
+            )
+        )
+    state_conflicts = workspace_state.get("state_conflicts") or []
+    if isinstance(state_conflicts, list) and state_conflicts:
+        checks.append(
+            InspectionCheck(
+                check_id="workspace_runtime_state_conflict",
+                status=CHECK_FAIL,
+                reason_code=REASON_RUNTIME_STATE_CONFLICT,
+                evidence=tuple(
+                    "{code} @ {path}".format(
+                        code=item.get("code") or "unknown",
+                        path=item.get("path") or "(unknown)",
+                    )
+                    for item in state_conflicts[:5]
+                    if isinstance(item, dict)
+                ),
+                recommendation="Clear the conflicting negotiation state before resuming runtime execution.",
+            )
+        )
+    runtime_notes = workspace_state.get("runtime_notes") or []
+    if not checks and isinstance(runtime_notes, list):
+        unavailable_notes = [note for note in runtime_notes if isinstance(note, str) and note.startswith("Runtime inspection unavailable:")]
+        if unavailable_notes:
+            checks.append(
+                InspectionCheck(
+                    check_id="workspace_runtime_inspection",
+                    status=CHECK_WARN,
+                    reason_code=REASON_RUNTIME_INSPECTION_UNAVAILABLE,
+                    evidence=tuple(unavailable_notes[:3]),
+                    recommendation="Fix the workspace runtime configuration so status/doctor can inspect runtime state health.",
+                )
+            )
+    return tuple(checks)
 
 
 def _inspect_host_prompt(*, adapter: HostAdapter, capability: HostCapability, home_root: Path) -> InspectionCheck:

@@ -2,17 +2,19 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from hashlib import sha1
 from pathlib import Path
 import re
 from typing import Any, Mapping, Optional
+from uuid import uuid4
 
 from .checkpoint_materializer import materialize_checkpoint_request
 from .checkpoint_request import checkpoint_request_from_clarification_state, checkpoint_request_from_decision_state
 from .clarification import build_clarification_state, has_submitted_clarification, merge_clarification_request, parse_clarification_response, stale_clarification
 from .compare_decision import build_compare_decision_contract
 from .config import load_runtime_config
+from .context_snapshot import ContextResolvedSnapshot, resolve_context_snapshot
 from .context_recovery import recover_context
 from .daily_summary import build_daily_summary
 from .decision import (
@@ -35,7 +37,7 @@ from .execution_gate import evaluate_execution_gate
 from .finalize import finalize_plan
 from .handoff import build_runtime_handoff
 from .kb import bootstrap_kb, ensure_blueprint_index, ensure_blueprint_scaffold
-from .models import ClarificationState, DecisionState, ExecutionGate, KbArtifact, PlanArtifact, ReplayEvent, RouteDecision, RunState, RuntimeConfig, RuntimeHandoff, RuntimeResult, SkillActivation, SkillMeta
+from .models import ClarificationState, DecisionState, ExecutionGate, KbArtifact, PlanArtifact, PlanProposalState, RecoveredContext, ReplayEvent, RouteDecision, RunState, RuntimeConfig, RuntimeHandoff, RuntimeResult, SkillActivation, SkillMeta
 from .plan_registry import (
     PlanRegistryError,
     encode_priority_note_event,
@@ -72,11 +74,34 @@ from .state import (
     stable_request_sha1,
     summarize_request_text,
 )
+from .state_invariants import stamp_handoff_resolution_id
 
 _CURRENT_PLAN_ANCHOR_PATTERNS = (
     re.compile(r"(当前|这个|该)\s*(plan|方案)", re.IGNORECASE),
     re.compile(r"(current|active)\s+plan", re.IGNORECASE),
     re.compile(r"(继续|回到|基于|沿用|挂到|并入|写进|写入).*(plan|方案)", re.IGNORECASE),
+)
+
+_HOST_FACING_TRUTH_KIND_ENGINE_RUNTIME_HANDOFF = "engine_runtime_handoff"
+_HOST_FACING_TRUTH_KIND_PROMOTION_GLOBAL_EXECUTION = "promotion_global_execution"
+_ABORTABLE_CLARIFICATION_STATUSES = frozenset({"pending", "collecting"})
+_ABORTABLE_DECISION_STATUSES = frozenset({"pending", "collecting", "cancelled", "timed_out"})
+_ABORTABLE_HANDOFF_ACTIONS = frozenset(
+    {
+        "answer_questions",
+        "confirm_decision",
+        "confirm_plan_package",
+        "confirm_execute",
+        "resolve_state_conflict",
+    }
+)
+_ABORTABLE_RUN_STAGES = frozenset(
+    {
+        "clarification_pending",
+        "decision_pending",
+        "plan_proposal_pending",
+        "execution_confirm_pending",
+    }
 )
 # These routes operate on the single root-scoped execution truth once review
 # state is explicitly promoted out of a session.
@@ -95,13 +120,66 @@ class _PlanSelection:
     reason_note: str = ""
 
 
+@dataclass(frozen=True)
+class _PlanningContext:
+    """Single captured planning truth used by deep planning helpers.
+
+    Main runtime flow should pass this explicitly from recovered context so the
+    helper chain does not re-open state files mid-decision. A capture helper
+    remains only as a narrow compatibility bridge for direct helper tests and
+    internal restart points that must intentionally refresh local state once.
+    """
+
+    current_run: RunState | None = None
+    current_plan: PlanArtifact | None = None
+    current_plan_proposal: PlanProposalState | None = None
+    current_clarification: ClarificationState | None = None
+    current_decision: DecisionState | None = None
+    last_route: RouteDecision | None = None
+
+
+def _capture_planning_context(state_store: StateStore) -> _PlanningContext:
+    return _PlanningContext(
+        current_run=state_store.get_current_run(),
+        current_plan=state_store.get_current_plan(),
+        current_plan_proposal=state_store.get_current_plan_proposal(),
+        current_clarification=state_store.get_current_clarification(),
+        current_decision=state_store.get_current_decision(),
+        last_route=state_store.get_last_route(),
+    )
+
+
+def _snapshot_has_global_execution_truth(snapshot: ContextResolvedSnapshot | None) -> bool:
+    if snapshot is None:
+        return False
+    return snapshot.preferred_state_scope == "global" and snapshot.execution_active_run is not None
+
+
+def _snapshot_global_execution_run(snapshot: ContextResolvedSnapshot | None) -> RunState | None:
+    if not _snapshot_has_global_execution_truth(snapshot):
+        return None
+    return snapshot.execution_active_run
+
+
+def _snapshot_review_run(snapshot: ContextResolvedSnapshot | None) -> RunState | None:
+    if snapshot is None or snapshot.current_run is None:
+        return None
+    global_run = _snapshot_global_execution_run(snapshot)
+    if global_run is not None and snapshot.current_run == global_run:
+        return None
+    return snapshot.current_run
+
+
 def _recovery_store_for_route(
     decision: RouteDecision,
     *,
     review_store: StateStore,
     global_store: StateStore,
+    snapshot: ContextResolvedSnapshot | None = None,
 ) -> StateStore:
-    if decision.route_name in _GLOBAL_EXECUTION_ROUTES and global_store.get_current_run() is not None:
+    if decision.route_name == "state_conflict" and snapshot is not None and snapshot.preferred_state_scope == "global":
+        return global_store
+    if decision.route_name in _GLOBAL_EXECUTION_ROUTES and _snapshot_has_global_execution_truth(snapshot):
         return global_store
     return review_store
 
@@ -111,16 +189,148 @@ def _handle_cancel_active(
     *,
     review_store: StateStore,
     global_store: StateStore,
-) -> tuple[StateStore, list[str]]:
+    review_run: RunState | None,
+    global_run: RunState | None,
+) -> tuple[StateStore, bool, list[str]]:
     cancel_scope = str(decision.artifacts.get("cancel_scope") or "").strip()
-    global_run = global_store.get_current_run()
     if cancel_scope != "session" and global_run is not None:
         global_store.reset_active_flow()
-        if review_store is global_store or review_store.get_current_run() is None:
-            return (global_store, ["Global execution flow cleared"])
-        return (global_store, ["Global execution flow cleared; session review state preserved"])
+        if review_store is global_store or review_run is None:
+            return (global_store, False, ["Global execution flow cleared"])
+        return (global_store, True, ["Global execution flow cleared; session review state preserved"])
     review_store.reset_active_flow()
-    return (review_store, ["Session review flow cleared"])
+    return (review_store, False, ["Session review flow cleared"])
+
+
+def _handle_state_conflict(
+    decision: RouteDecision,
+    *,
+    review_store: StateStore,
+    global_store: StateStore,
+    snapshot: ContextResolvedSnapshot,
+) -> tuple[StateStore, ContextResolvedSnapshot, list[str]]:
+    # `state_conflict` only models user-recoverable resolved-state skew.
+    # Writer-side contract breaks must keep surfacing as invariant errors
+    # instead of being silently downcast into this cleanup path.
+    target_store = global_store if snapshot.preferred_state_scope == "global" else review_store
+    if decision.active_run_action != "abort_conflict":
+        return (target_store, snapshot, list(snapshot.notes))
+
+    notes = ["Conflict cleanup started via explicit abort"]
+    processed_roots: set[str] = set()
+    for store in (review_store, global_store):
+        root_key = str(store.root)
+        if root_key in processed_roots:
+            continue
+        processed_roots.add(root_key)
+        notes.extend(_clear_conflict_carriers(store, snapshot=snapshot))
+        notes.extend(_clear_abortable_negotiation_state(store))
+
+    next_snapshot = resolve_context_snapshot(
+        config=review_store.config,
+        review_store=review_store,
+        global_store=global_store,
+    )
+    notes.append("Conflict cleanup completed")
+    if next_snapshot.is_conflict:
+        notes.append("Conflict cleanup left a remaining conflict that still requires inspection")
+    return (
+        global_store if next_snapshot.preferred_state_scope == "global" else review_store,
+        next_snapshot,
+        notes,
+    )
+
+
+def _clear_abortable_negotiation_state(store: StateStore) -> list[str]:
+    notes: list[str] = []
+    if store.get_current_plan_proposal() is not None:
+        store.clear_current_plan_proposal()
+        notes.append(f"Cleared pending plan proposal from {store.scope} scope")
+    clarification = store.get_current_clarification()
+    if _is_abortable_clarification(clarification):
+        store.clear_current_clarification()
+        notes.append(f"Cleared pending clarification from {store.scope} scope")
+    decision = store.get_current_decision()
+    if _is_abortable_decision(decision):
+        store.clear_current_decision()
+        notes.append(f"Cleared unconsumed decision from {store.scope} scope")
+    elif decision is not None and decision.status == "confirmed" and decision.selection is not None:
+        # A confirmed decision can be the last valid user-owned checkpoint after
+        # a crash or session restart. Abort should abandon the live negotiation
+        # state around it, but not erase the confirmed choice itself.
+        notes.append(f"Preserved confirmed decision in {store.scope} scope")
+    handoff = store.get_current_handoff()
+    if handoff is not None and handoff.required_host_action in _ABORTABLE_HANDOFF_ACTIONS:
+        store.clear_current_handoff()
+        notes.append(f"Cleared checkpoint handoff from {store.scope} scope")
+    current_run = store.get_current_run()
+    current_plan = store.get_current_plan()
+    if current_run is not None and current_run.stage in _ABORTABLE_RUN_STAGES:
+        if current_plan is None:
+            store.clear_current_run()
+            notes.append(f"Cleared orphaned negotiation run from {store.scope} scope")
+        else:
+            store.set_current_run(_normalize_run_after_abort(current_run))
+            notes.append(f"Normalized run stage back to stable planning truth in {store.scope} scope")
+    return notes
+
+
+def _clear_conflict_carriers(store: StateStore, *, snapshot: ContextResolvedSnapshot) -> list[str]:
+    notes: list[str] = []
+    conflict_paths = {
+        detail.path
+        for detail in snapshot.conflict_items
+        if detail.state_scope == store.scope and detail.path
+    }
+    handoff_path = store.relative_path(store.current_handoff_path)
+    if handoff_path in conflict_paths and store.get_current_handoff() is not None:
+        # The handoff is a derived carrier for route/run truth. When the
+        # snapshot proves it is the conflicted file, we clear only that carrier
+        # so the next pass can rebuild a fresh pair without wiping plan/run.
+        store.clear_current_handoff()
+        notes.append(f"Tombstoned conflicting handoff carrier from {store.scope} scope")
+    return notes
+
+
+def _is_abortable_clarification(clarification: ClarificationState | None) -> bool:
+    if clarification is None:
+        return False
+    return clarification.status in _ABORTABLE_CLARIFICATION_STATUSES
+
+
+def _is_abortable_decision(decision: DecisionState | None) -> bool:
+    if decision is None:
+        return False
+    return decision.status in _ABORTABLE_DECISION_STATUSES
+
+
+def _normalize_run_after_abort(current_run: RunState) -> RunState:
+    gate = current_run.execution_gate
+    stable_stage = "ready_for_execution" if gate is not None and gate.gate_status == "ready" else "plan_generated"
+    return RunState(
+        run_id=current_run.run_id,
+        status=current_run.status,
+        stage=stable_stage,
+        route_name=current_run.route_name,
+        title=current_run.title,
+        created_at=current_run.created_at,
+        updated_at=iso_now(),
+        plan_id=current_run.plan_id,
+        plan_path=current_run.plan_path,
+        execution_gate=current_run.execution_gate,
+        request_excerpt=current_run.request_excerpt,
+        request_sha1=current_run.request_sha1,
+        owner_session_id=current_run.owner_session_id,
+        owner_host=current_run.owner_host,
+        owner_run_id=current_run.owner_run_id,
+        resolution_id=current_run.resolution_id,
+    )
+
+
+def _is_zero_write_conflict_inspect(route: RouteDecision) -> bool:
+    # Conflict inspection is intentionally observational. Keep it out of
+    # last_route.json as well so "inspect" does not mutate any state file.
+    return route.route_name == "state_conflict" and route.active_run_action != "abort_conflict"
 
 
 def _resolve_execution_state_store(
@@ -129,42 +339,61 @@ def _resolve_execution_state_store(
     config: RuntimeConfig,
     review_store: StateStore,
     global_store: StateStore,
+    recovered_context: RecoveredContext,
     session_id: str | None,
 ) -> tuple[StateStore, Any, list[str]]:
-    if global_store.get_current_run() is not None and global_store.get_current_plan() is not None:
-        recovered = recover_context(decision, config=config, state_store=global_store)
-        return (global_store, recovered, [])
+    global_execution_context = recover_context(
+        decision,
+        config=config,
+        state_store=global_store,
+        global_state_store=global_store,
+    )
+    if global_execution_context.current_run is not None and global_execution_context.current_plan is not None:
+        # Re-resolve against the global store alone so execution routes only see
+        # the single global execution truth instead of the mixed review/global
+        # composite snapshot used at the router boundary.
+        return (global_store, global_execution_context, [])
 
-    promotion_notes = _promote_review_state_to_global_execution(
+    promoted, promotion_notes = _promote_review_state_to_global_execution(
         review_store=review_store,
         global_store=global_store,
+        review_plan=recovered_context.current_plan,
+        review_run=recovered_context.current_run,
+        review_handoff=recovered_context.current_handoff,
+        existing_global_run=global_execution_context.current_run,
         session_id=session_id,
+        resolution_id=recovered_context.resolution_id,
     )
+    recovery_store = global_store if promoted else review_store
     recovered = recover_context(
         decision,
         config=config,
-        state_store=global_store if global_store.get_current_run() is not None else review_store,
+        state_store=recovery_store,
+        global_state_store=global_store,
     )
-    return (global_store, recovered, promotion_notes)
+    return (recovery_store, recovered, promotion_notes)
 
 
 def _promote_review_state_to_global_execution(
     *,
     review_store: StateStore,
     global_store: StateStore,
+    review_plan: PlanArtifact | None,
+    review_run: RunState | None,
+    review_handoff: RuntimeHandoff | None,
+    existing_global_run: RunState | None,
     session_id: str | None,
-) -> list[str]:
+    resolution_id: str,
+) -> tuple[bool, list[str]]:
     if review_store is global_store:
-        return []
-    review_plan = review_store.get_current_plan()
-    review_run = review_store.get_current_run()
+        return (False, [])
     if review_plan is None or review_run is None:
-        return []
+        return (False, [])
     if review_run.stage not in _PROMOTABLE_REVIEW_STAGES:
-        return []
+        return (False, [])
 
     notes: list[str] = []
-    existing_owner = global_store.get_current_run()
+    existing_owner = existing_global_run
     if (
         existing_owner is not None
         and existing_owner.owner_session_id
@@ -178,18 +407,26 @@ def _promote_review_state_to_global_execution(
     # Promotion is the explicit handoff point from session review state into the
     # single global execution truth used by execution-confirm / resume / finalize.
     global_store.set_current_plan(review_plan)
-    _set_execution_run_state(global_store, review_run, session_id=session_id)
-    review_handoff = review_store.get_current_handoff()
+    global_run = _with_global_run_ownership(review_run, session_id=session_id)
     if review_handoff is not None:
-        global_store.set_current_handoff(
-            _with_global_handoff_ownership(
+        global_run, _ = global_store.set_host_facing_truth(
+            run_state=global_run,
+            handoff=_with_global_handoff_ownership(
                 review_handoff,
-                current_run=review_run,
+                current_run=global_run,
                 session_id=session_id,
-            )
+            ),
+            resolution_id=_derived_resolution_id(
+                resolved_resolution_id=resolution_id,
+                current_run=global_run,
+                current_handoff=review_handoff,
+            ),
+            truth_kind=_HOST_FACING_TRUTH_KIND_PROMOTION_GLOBAL_EXECUTION,
         )
+    else:
+        global_store.set_current_run(global_run)
     notes.append(f"Promoted session review state to global execution truth from {review_store.root.name}")
-    return notes
+    return (True, notes)
 
 
 def _set_execution_run_state(
@@ -222,6 +459,7 @@ def _with_global_run_ownership(run_state: RunState, *, session_id: str | None) -
         owner_session_id=owner_session_id,
         owner_host=run_state.owner_host or "runtime",
         owner_run_id=run_state.owner_run_id or run_state.run_id,
+        resolution_id=run_state.resolution_id,
     )
 
 
@@ -256,6 +494,7 @@ def _with_global_handoff_ownership(
         artifacts=handoff.artifacts,
         notes=handoff.notes,
         observability=observability,
+        resolution_id=handoff.resolution_id,
     )
 
 
@@ -265,21 +504,27 @@ def _result_state_store_for_route(
     review_store: StateStore,
     global_store: StateStore,
     canceled_store: StateStore | None,
+    preserved_review_after_cancel: bool = False,
+    current_clarification: ClarificationState | None = None,
+    current_decision: DecisionState | None = None,
+    snapshot: ContextResolvedSnapshot | None = None,
 ) -> StateStore:
     if canceled_store is not None:
-        if canceled_store is global_store and review_store.get_current_run() is not None:
+        if canceled_store is global_store and preserved_review_after_cancel:
             return review_store
         return canceled_store
+    if decision.route_name == "state_conflict" and snapshot is not None and snapshot.preferred_state_scope == "global":
+        return global_store
     if decision.route_name in _GLOBAL_EXECUTION_ROUTES:
         return global_store
     if decision.route_name in {"decision_pending", "decision_resume"}:
-        if review_store.get_current_decision() is not None:
-            return review_store
-        return global_store
+        if current_decision is not None and current_decision.phase in {"execution_gate", "develop"}:
+            return global_store
+        return review_store
     if decision.route_name in {"clarification_pending", "clarification_resume"}:
-        if review_store.get_current_clarification() is not None:
-            return review_store
-        return global_store
+        if current_clarification is not None and current_clarification.phase == "develop":
+            return global_store
+        return review_store
     return review_store
 
 
@@ -313,7 +558,12 @@ def run_runtime(
 
     skills = SkillRegistry(config, user_home=user_home).discover()
     router = Router(config, state_store=review_store, global_state_store=global_store)
-    classified_route = router.classify(user_input, skills=skills)
+    snapshot = resolve_context_snapshot(
+        config=config,
+        review_store=review_store,
+        global_store=global_store,
+    )
+    classified_route = router.classify(user_input, skills=skills, snapshot=snapshot)
     recovered = recover_context(
         classified_route,
         config=config,
@@ -321,10 +571,13 @@ def run_runtime(
             classified_route,
             review_store=review_store,
             global_store=global_store,
+            snapshot=snapshot,
         ),
+        global_state_store=global_store,
+        snapshot=snapshot,
     )
 
-    notes: list[str] = []
+    notes: list[str] = list(snapshot.notes)
     plan_artifact: PlanArtifact | None = None
     skill_result: Mapping[str, Any] | None = None
     replay_session_dir: str | None = None
@@ -336,7 +589,7 @@ def run_runtime(
     confirmed_decision_for_replay: DecisionState | None = None
     registry_changed_hint = False
 
-    current_clarification = review_store.get_current_clarification()
+    current_clarification = recovered.current_clarification
     if (
         current_clarification is not None
         and effective_route.route_name in {"plan_only", "workflow", "light_iterate"}
@@ -349,7 +602,7 @@ def run_runtime(
         notes.append(f"Superseded pending clarification: {stale_state.clarification_id}")
         current_clarification = None
 
-    current_decision = review_store.get_current_decision()
+    current_decision = recovered.current_decision
     if (
         current_decision is not None
         and effective_route.route_name in {"plan_only", "workflow", "light_iterate"}
@@ -362,7 +615,9 @@ def run_runtime(
         notes.append(f"Superseded pending decision checkpoint: {stale_state.decision_id}")
         current_decision = None
 
-    current_plan_proposal = review_store.get_current_plan_proposal()
+    # Proposal is now session-only and already resolved by the entry snapshot,
+    # so the engine should not re-open the proposal file as business truth here.
+    current_plan_proposal = recovered.current_plan_proposal
     if (
         current_plan_proposal is not None
         and effective_route.route_name in {"plan_only", "workflow", "light_iterate"}
@@ -373,18 +628,21 @@ def run_runtime(
         current_plan_proposal = None
 
     canceled_store: StateStore | None = None
+    preserved_review_after_cancel = False
     if effective_route.route_name == "cancel_active":
-        canceled_store, cancel_notes = _handle_cancel_active(
+        canceled_store, preserved_review_after_cancel, cancel_notes = _handle_cancel_active(
             effective_route,
             review_store=review_store,
             global_store=global_store,
+            review_run=_snapshot_review_run(snapshot),
+            global_run=_snapshot_global_execution_run(snapshot),
         )
         notes.extend(cancel_notes)
     elif effective_route.route_name == "finalize_active":
         finalized = finalize_plan(
             config=config,
             state_store=global_store,
-            current_plan=global_store.get_current_plan() or recovered.current_plan,
+            current_plan=recovered.current_plan,
         )
         plan_artifact = finalized.archived_plan
         registry_changed_hint = finalized.registry_updated
@@ -395,6 +653,10 @@ def run_runtime(
         effective_route, plan_artifact, clarification_notes, kb_artifact = _handle_clarification_resume(
             effective_route,
             state_store=review_store,
+            current_clarification=recovered.current_clarification,
+            current_decision=recovered.current_decision,
+            current_plan=recovered.current_plan,
+            current_run=recovered.current_run,
             config=config,
             kb_artifact=kb_artifact,
         )
@@ -403,6 +665,9 @@ def run_runtime(
         effective_route, plan_artifact, decision_notes, kb_artifact, confirmed_decision_for_replay = _handle_decision_resume(
             effective_route,
             state_store=review_store,
+            current_decision=recovered.current_decision,
+            current_plan=recovered.current_plan,
+            current_run=recovered.current_run,
             config=config,
             kb_artifact=kb_artifact,
         )
@@ -411,22 +676,43 @@ def run_runtime(
         effective_route, plan_artifact, proposal_notes, kb_artifact = _handle_plan_proposal_pending(
             effective_route,
             state_store=review_store,
+            resolved_proposal=current_plan_proposal,
             config=config,
             kb_artifact=kb_artifact,
         )
         notes.extend(proposal_notes)
+    elif effective_route.route_name == "state_conflict":
+        result_store, snapshot, conflict_notes = _handle_state_conflict(
+            effective_route,
+            review_store=review_store,
+            global_store=global_store,
+            snapshot=snapshot,
+        )
+        recovered = recover_context(
+            effective_route,
+            config=config,
+            state_store=result_store,
+            global_state_store=global_store,
+            snapshot=snapshot,
+        )
+        notes.extend(conflict_notes)
     elif effective_route.route_name == "execution_confirm_pending":
         execution_store, execution_recovered, promotion_notes = _resolve_execution_state_store(
             effective_route,
             config=config,
             review_store=review_store,
             global_store=global_store,
+            recovered_context=recovered,
             session_id=session_id,
         )
         notes.extend(promotion_notes)
         effective_route, plan_artifact, execution_confirm_notes = _handle_execution_confirm(
             effective_route,
             state_store=execution_store,
+            current_plan=execution_recovered.current_plan,
+            current_run=execution_recovered.current_run,
+            current_clarification=execution_recovered.current_clarification,
+            current_decision=execution_recovered.current_decision,
             config=config,
             session_id=session_id,
         )
@@ -438,6 +724,14 @@ def run_runtime(
             state_store=review_store,
             config=config,
             kb_artifact=kb_artifact,
+            planning_context=_PlanningContext(
+                current_run=recovered.current_run,
+                current_plan=recovered.current_plan,
+                current_plan_proposal=recovered.current_plan_proposal,
+                current_clarification=recovered.current_clarification,
+                current_decision=recovered.current_decision,
+                last_route=recovered.last_route,
+            ),
         )
         notes.extend(planning_notes)
     elif effective_route.route_name in {"resume_active", "exec_plan"}:
@@ -446,17 +740,18 @@ def run_runtime(
             config=config,
             review_store=review_store,
             global_store=global_store,
+            recovered_context=recovered,
             session_id=session_id,
         )
         notes.extend(promotion_notes)
-        if execution_store.get_current_clarification() is not None:
+        if execution_recovered.current_clarification is not None:
             effective_route = _clarification_pending_route(
                 effective_route,
                 reason="Pending clarification must be answered before execution can continue",
             )
             notes.append("Blocked execution because clarification is still pending")
         else:
-            current_plan = execution_store.get_current_plan() or execution_recovered.current_plan
+            current_plan = execution_recovered.current_plan
             if current_plan is None:
                 if effective_route.route_name == "exec_plan":
                     effective_route = _exec_plan_unavailable_route(
@@ -471,36 +766,45 @@ def run_runtime(
                     decision=effective_route,
                     plan_artifact=current_plan,
                     current_clarification=None,
-                    current_decision=_confirmed_decision_context(execution_store),
+                    current_decision=(
+                        execution_recovered.current_decision
+                        if execution_recovered.current_decision is not None
+                        and execution_recovered.current_decision.status == "confirmed"
+                        and execution_recovered.current_decision.selection is not None
+                        else None
+                    ),
                     config=config,
                 )
                 if gate.gate_status == "decision_required" and gate.blocking_reason != "unresolved_decision":
+                    current_run = execution_recovered.current_run
+                    next_run_state = RunState(
+                        run_id=current_run.run_id if current_run is not None else _make_run_id(effective_route.request_text),
+                        status="active",
+                        stage="decision_pending",
+                        route_name=effective_route.route_name,
+                        title=current_plan.title,
+                        created_at=current_run.created_at if current_run is not None else current_plan.created_at,
+                        updated_at=iso_now(),
+                        plan_id=current_plan.plan_id,
+                        plan_path=current_plan.path,
+                        execution_gate=gate,
+                        request_excerpt=summarize_request_text(effective_route.request_text),
+                        request_sha1=stable_request_sha1(effective_route.request_text),
+                    )
                     gate_decision = _build_route_native_gate_decision_state(
                         effective_route,
                         gate=gate,
                         current_plan=current_plan,
+                        current_run=next_run_state,
                         config=config,
                     )
                     if gate_decision is not None:
-                        execution_store.set_current_decision(gate_decision)
                         _set_execution_run_state(
                             execution_store,
-                            RunState(
-                                run_id=(execution_store.get_current_run() or execution_recovered.current_run).run_id if (execution_store.get_current_run() or execution_recovered.current_run) is not None else _make_run_id(effective_route.request_text),
-                                status="active",
-                                stage="decision_pending",
-                                route_name=effective_route.route_name,
-                                title=current_plan.title,
-                                created_at=(execution_store.get_current_run() or execution_recovered.current_run).created_at if (execution_store.get_current_run() or execution_recovered.current_run) is not None else current_plan.created_at,
-                                updated_at=iso_now(),
-                                plan_id=current_plan.plan_id,
-                                plan_path=current_plan.path,
-                                execution_gate=gate,
-                                request_excerpt=summarize_request_text(effective_route.request_text),
-                                request_sha1=stable_request_sha1(effective_route.request_text),
-                            ),
+                            next_run_state,
                             session_id=session_id,
                         )
+                        execution_store.set_current_decision(gate_decision)
                         effective_route = _decision_pending_route(
                             effective_route,
                             reason="Execution gate found a blocking risk that still requires confirmation",
@@ -523,7 +827,7 @@ def run_runtime(
                     notes.extend(gate.notes)
                     notes.append("Blocked execution because the execution gate is not ready")
                 else:
-                    current_run = execution_store.get_current_run() or execution_recovered.current_run
+                    current_run = execution_recovered.current_run
                     _set_execution_run_state(
                         execution_store,
                         RunState(
@@ -546,14 +850,31 @@ def run_runtime(
                     notes.append("Active run resumed")
         recovered = execution_recovered
 
-    if effective_route.route_name != "summary":
+    if effective_route.route_name != "summary" and not _is_zero_write_conflict_inspect(effective_route):
         review_store.set_last_route(effective_route)
 
+    # Resolve once after all route-side mutations, then let store selection,
+    # handoff, replay, and output consume the same fresh post-route truth.
+    result_snapshot = resolve_context_snapshot(
+        config=config,
+        review_store=review_store,
+        global_store=global_store,
+    )
     result_store = _result_state_store_for_route(
         effective_route,
         review_store=review_store,
         global_store=global_store,
         canceled_store=canceled_store,
+        preserved_review_after_cancel=preserved_review_after_cancel,
+        current_clarification=result_snapshot.current_clarification,
+        current_decision=result_snapshot.current_decision,
+        snapshot=result_snapshot,
+    )
+    resolved_result_context = recover_context(
+        effective_route,
+        config=config,
+        state_store=result_store,
+        global_state_store=global_store,
     )
 
     if effective_route.runtime_skill_id is not None:
@@ -571,9 +892,9 @@ def run_runtime(
 
     activation = _build_skill_activation(
         decision=effective_route,
-        run_state=result_store.get_current_run() or recovered.current_run,
-        current_clarification=result_store.get_current_clarification(),
-        current_decision=result_store.get_current_decision(),
+        run_state=resolved_result_context.current_run,
+        current_clarification=resolved_result_context.current_clarification,
+        current_decision=resolved_result_context.current_decision,
     )
 
     if effective_route.route_name == "summary" and activation is not None:
@@ -592,7 +913,7 @@ def run_runtime(
 
     if effective_route.capture_mode != "off":
         writer = ReplayWriter(config)
-        run_state = result_store.get_current_run() or recovered.current_run
+        run_state = resolved_result_context.current_run
         run_id = run_state.run_id if run_state is not None else _make_run_id(effective_route.request_text)
         replay_event = ReplayEvent(
             ts=iso_now(),
@@ -606,7 +927,7 @@ def run_runtime(
             metadata={"activation": activation.to_dict()} if activation is not None else {},
         )
         replay_events.append(replay_event)
-        current_decision = result_store.get_current_decision()
+        current_decision = resolved_result_context.current_decision
         if current_decision is not None and effective_route.route_name == "decision_pending":
             replay_events.append(
                 build_decision_replay_event(
@@ -643,9 +964,9 @@ def run_runtime(
             writer.append_event(run_id, extra_event)
         writer.render_documents(
             run_id,
-            run_state=result_store.get_current_run(),
+            run_state=resolved_result_context.current_run,
             route=effective_route,
-            plan_artifact=plan_artifact or recovered.current_plan,
+            plan_artifact=plan_artifact or resolved_result_context.current_plan,
             events=replay_events,
         )
         replay_session_dir = str(session_dir.relative_to(config.workspace_root))
@@ -656,9 +977,13 @@ def run_runtime(
         # Preserve the current handoff on disk; `~summary` should not consume or overwrite active flow state.
         handoff = None
     else:
-        current_run = result_store.get_current_run() or recovered.current_run
-        current_plan = plan_artifact or result_store.get_current_plan() or recovered.current_plan
-        previous_handoff = result_store.get_current_handoff()
+        current_run = resolved_result_context.current_run
+        current_plan = plan_artifact or resolved_result_context.current_plan
+        if effective_route.route_name == "finalize_active" and current_plan is None:
+            # A blocked finalize may still need to expose the review-scoped plan
+            # that prevented archival, even though the host-facing handoff is
+            # persisted under the global execution store.
+            current_plan = recovered.current_plan
         if effective_route.route_name == "finalize_active" and plan_artifact is not None:
             # Finalize clears active-flow state; only persist a completion handoff
             # when the archive transaction actually succeeded.
@@ -668,16 +993,12 @@ def run_runtime(
             config=config,
             decision=effective_route,
             run_id=(current_run.run_id if current_run is not None else _make_run_id(effective_route.request_text)),
-            current_run=current_run,
+            resolved_context=resolved_result_context,
             current_plan=current_plan,
-            current_plan_proposal=result_store.get_current_plan_proposal(),
             kb_artifact=kb_artifact,
             replay_session_dir=replay_session_dir,
             skill_result=skill_result,
-            current_clarification=result_store.get_current_clarification(),
-            current_decision=result_store.get_current_decision(),
             notes=notes,
-            previous_handoff=previous_handoff,
         )
         if handoff is not None:
             if result_store is global_store:
@@ -686,7 +1007,47 @@ def run_runtime(
                     current_run=current_run,
                     session_id=session_id,
                 )
-            result_store.set_current_handoff(handoff)
+            derived_resolution_id = _derived_resolution_id(
+                resolved_resolution_id=resolved_result_context.resolution_id,
+                current_run=current_run,
+                current_handoff=handoff,
+            )
+            if effective_route.route_name == "state_conflict":
+                if effective_route.active_run_action == "abort_conflict":
+                    if current_run is not None:
+                        current_run, handoff = result_store.set_host_facing_truth(
+                            run_state=current_run,
+                            handoff=handoff,
+                            resolution_id=derived_resolution_id,
+                            truth_kind=_HOST_FACING_TRUTH_KIND_ENGINE_RUNTIME_HANDOFF,
+                        )
+                    else:
+                        # Conflict abort must still persist a stable handoff even
+                        # when no run truth survives the cleanup. Otherwise the
+                        # gate sees a current-request handoff with no persisted
+                        # carrier and fail-closes as current_request_not_persisted.
+                        handoff = stamp_handoff_resolution_id(
+                            handoff,
+                            resolution_id=derived_resolution_id,
+                        )
+                        result_store.set_current_handoff(handoff)
+                else:
+                    # Conflict inspection must remain strictly read-only so the
+                    # host can inspect the exact skew that triggered routing.
+                    pass
+            elif current_run is not None:
+                current_run, handoff = result_store.set_host_facing_truth(
+                    run_state=current_run,
+                    handoff=handoff,
+                    resolution_id=derived_resolution_id,
+                    truth_kind=_HOST_FACING_TRUTH_KIND_ENGINE_RUNTIME_HANDOFF,
+                )
+            else:
+                handoff = stamp_handoff_resolution_id(
+                    handoff,
+                    resolution_id=derived_resolution_id,
+                )
+                result_store.set_current_handoff(handoff)
         else:
             result_store.clear_current_handoff()
 
@@ -698,7 +1059,14 @@ def run_runtime(
         notes=tuple(notes),
         registry_changed_hint=registry_changed_hint,
     )
-    latest_context = recover_context(effective_route, config=config, state_store=result_store)
+    # Re-resolve once after persisting the handoff so callers observe the
+    # stamped host-facing truth (including paired-write resolution ids).
+    latest_context = recover_context(
+        effective_route,
+        config=config,
+        state_store=result_store,
+        global_state_store=global_store,
+    )
     return RuntimeResult(
         route=effective_route,
         recovered_context=latest_context,
@@ -718,6 +1086,29 @@ def _default_plan_level(decision: RouteDecision) -> str:
     if decision.complexity == "medium":
         return "light"
     return "standard"
+
+
+def _new_resolution_id() -> str:
+    return uuid4().hex
+
+
+def _derived_resolution_id(
+    *,
+    resolved_resolution_id: str = "",
+    current_run: RunState | None = None,
+    current_handoff: RuntimeHandoff | None = None,
+) -> str:
+    # Host-facing writes should reuse the resolution batch from the snapshot
+    # that produced the derived checkpoint truth whenever it is available.
+    for candidate in (
+        resolved_resolution_id,
+        current_run.resolution_id if current_run is not None else "",
+        current_handoff.resolution_id if current_handoff is not None else "",
+    ):
+        normalized = str(candidate or "").strip()
+        if normalized:
+            return normalized
+    return _new_resolution_id()
 
 
 def _augment_generated_files(
@@ -948,10 +1339,13 @@ def _handle_clarification_resume(
     decision: RouteDecision,
     *,
     state_store: StateStore,
+    current_clarification: ClarificationState | None,
+    current_decision: DecisionState | None,
+    current_plan: PlanArtifact | None,
+    current_run: RunState | None,
     config: RuntimeConfig,
     kb_artifact: KbArtifact | None,
 ) -> tuple[RouteDecision, PlanArtifact | None, list[str], KbArtifact | None]:
-    current_clarification = state_store.get_current_clarification()
     notes: list[str] = []
     if current_clarification is None:
         return (
@@ -993,6 +1387,8 @@ def _handle_clarification_resume(
         return _resume_from_develop_clarification(
             state_store=state_store,
             current_clarification=current_clarification,
+            current_plan=current_plan,
+            current_run=current_run,
             resumed_request=resumed_request,
             notes=notes,
             kb_artifact=kb_artifact,
@@ -1012,12 +1408,22 @@ def _handle_clarification_resume(
         artifacts={"planning_resume_source": "clarification"},
     )
     state_store.clear_current_clarification()
+    confirmed_decision = (
+        current_decision
+        if current_decision is not None and current_decision.status == "confirmed" and current_decision.selection is not None
+        else None
+    )
     planning_route, plan_artifact, planning_notes, kb_artifact = _advance_planning_route(
         resumed_route,
         state_store=state_store,
         config=config,
         kb_artifact=kb_artifact,
-        confirmed_decision=_confirmed_decision_context(state_store),
+        confirmed_decision=confirmed_decision,
+        planning_context=_PlanningContext(
+            current_run=current_run,
+            current_plan=current_plan,
+            current_decision=current_decision,
+        ),
     )
     notes.extend(planning_notes)
     return (planning_route, plan_artifact, notes, kb_artifact)
@@ -1027,10 +1433,12 @@ def _handle_decision_resume(
     decision: RouteDecision,
     *,
     state_store: StateStore,
+    current_decision: DecisionState | None,
+    current_plan: PlanArtifact | None,
+    current_run: RunState | None,
     config: RuntimeConfig,
     kb_artifact: KbArtifact | None,
 ) -> tuple[RouteDecision, PlanArtifact | None, list[str], KbArtifact | None, DecisionState | None]:
-    current_decision = state_store.get_current_decision()
     notes: list[str] = []
     if current_decision is None:
         return (
@@ -1103,6 +1511,8 @@ def _handle_decision_resume(
         return _resume_from_develop_decision(
             state_store=state_store,
             current_decision=current_decision,
+            current_plan=current_plan,
+            current_run=current_run,
             notes=notes,
             kb_artifact=kb_artifact,
         )
@@ -1111,6 +1521,7 @@ def _handle_decision_resume(
         return _resume_from_active_plan_binding_decision(
             state_store=state_store,
             current_decision=current_decision,
+            current_plan=current_plan,
             notes=notes,
             kb_artifact=kb_artifact,
             config=config,
@@ -1134,6 +1545,11 @@ def _handle_decision_resume(
         config=config,
         kb_artifact=kb_artifact,
         confirmed_decision=current_decision,
+        planning_context=_PlanningContext(
+            current_run=current_run,
+            current_plan=current_plan,
+            current_decision=current_decision,
+        ),
     )
     notes.extend(planning_notes)
     return (planning_route, plan_artifact, notes, kb_artifact, confirmed_decision)
@@ -1143,12 +1559,12 @@ def _resume_from_develop_clarification(
     *,
     state_store: StateStore,
     current_clarification: ClarificationState,
+    current_plan: PlanArtifact | None,
+    current_run: RunState | None,
     resumed_request: str,
     notes: list[str],
     kb_artifact: KbArtifact | None,
 ) -> tuple[RouteDecision, PlanArtifact | None, list[str], KbArtifact | None]:
-    current_plan = state_store.get_current_plan()
-    current_run = state_store.get_current_run()
     if current_plan is None or current_run is None:
         notes.append("Develop clarification could not resume because the active run context is missing")
         return (_clarification_pending_route(RouteDecision(route_name="clarification_resume", request_text=resumed_request, reason="missing develop context"), reason="Develop clarification still requires an active plan context"), None, notes, kb_artifact)
@@ -1205,19 +1621,23 @@ def _handle_plan_proposal_pending(
     decision: RouteDecision,
     *,
     state_store: StateStore,
+    resolved_proposal: PlanProposalState | None,
     config: RuntimeConfig,
     kb_artifact: KbArtifact | None,
 ) -> tuple[RouteDecision, PlanArtifact | None, list[str], KbArtifact | None]:
-    proposal_state = state_store.get_current_plan_proposal()
+    # Router already classified this branch from a resolved snapshot. The
+    # handler must consume that resolved proposal instead of re-reading the
+    # checkpoint file and risking a different truth than routing saw.
+    proposal_state = resolved_proposal
     notes: list[str] = []
     if proposal_state is None:
         return (
             _plan_proposal_pending_route(
                 decision,
-                reason="No pending plan proposal was found",
+                reason="Resolved snapshot did not include a pending plan proposal",
             ),
             None,
-            ["No pending plan proposal to resume"],
+            ["Resolved snapshot did not include a pending plan proposal"],
             kb_artifact,
         )
 
@@ -1304,6 +1724,7 @@ def _handle_plan_proposal_pending(
                 config=config,
                 kb_artifact=kb_artifact,
                 confirmed_decision=confirmed_decision_from_proposal(proposal_state),
+                planning_context=_capture_planning_context(state_store),
             )
             notes.extend(planning_notes)
             return (routed_decision, plan_artifact, notes, kb_artifact)
@@ -1352,11 +1773,11 @@ def _resume_from_develop_decision(
     *,
     state_store: StateStore,
     current_decision: DecisionState,
+    current_plan: PlanArtifact | None,
+    current_run: RunState | None,
     notes: list[str],
     kb_artifact: KbArtifact | None,
 ) -> tuple[RouteDecision, PlanArtifact | None, list[str], KbArtifact | None, DecisionState | None]:
-    current_plan = state_store.get_current_plan()
-    current_run = state_store.get_current_run()
     if current_plan is None or current_run is None:
         notes.append("Develop decision could not resume because the active run context is missing")
         return (_decision_pending_route(RouteDecision(route_name="decision_resume", request_text=current_decision.request_text, reason="missing develop context"), reason="Develop decision still requires an active plan context"), None, notes, kb_artifact, None)
@@ -1415,6 +1836,7 @@ def _resume_from_active_plan_binding_decision(
     *,
     state_store: StateStore,
     current_decision: DecisionState,
+    current_plan: PlanArtifact | None,
     notes: list[str],
     kb_artifact: KbArtifact | None,
     config: RuntimeConfig,
@@ -1443,6 +1865,9 @@ def _resume_from_active_plan_binding_decision(
         state_store=state_store,
         config=config,
         kb_artifact=kb_artifact,
+        planning_context=_PlanningContext(
+            current_plan=current_plan,
+        ),
     )
     notes.extend(planning_notes)
     return (planning_route, plan_artifact, notes, kb_artifact, current_decision)
@@ -1452,11 +1877,13 @@ def _handle_execution_confirm(
     decision: RouteDecision,
     *,
     state_store: StateStore,
+    current_plan: PlanArtifact | None,
+    current_run: RunState | None,
+    current_clarification: ClarificationState | None,
+    current_decision: DecisionState | None,
     config: RuntimeConfig,
     session_id: str | None,
 ) -> tuple[RouteDecision, PlanArtifact | None, list[str]]:
-    current_plan = state_store.get_current_plan()
-    current_run = state_store.get_current_run()
     notes: list[str] = []
     if current_plan is None or current_run is None:
         return (
@@ -1546,40 +1973,42 @@ def _handle_execution_confirm(
     gate = evaluate_execution_gate(
         decision=gate_route,
         plan_artifact=current_plan,
-        current_clarification=state_store.get_current_clarification(),
-        current_decision=_confirmed_decision_context(state_store),
+        current_clarification=current_clarification,
+        current_decision=_confirmed_decision_context(current_decision=current_decision),
         config=config,
     )
     if gate.gate_status == "decision_required" and gate.blocking_reason != "unresolved_decision":
+        next_run_state = RunState(
+            run_id=current_run.run_id,
+            status="active",
+            stage="decision_pending",
+            route_name=current_run.route_name,
+            title=current_plan.title,
+            created_at=current_run.created_at,
+            updated_at=iso_now(),
+            plan_id=current_plan.plan_id,
+            plan_path=current_plan.path,
+            execution_gate=gate,
+            request_excerpt=current_run.request_excerpt,
+            request_sha1=current_run.request_sha1,
+            owner_session_id=current_run.owner_session_id,
+            owner_host=current_run.owner_host,
+            owner_run_id=current_run.owner_run_id,
+        )
         gate_decision = _build_route_native_gate_decision_state(
             gate_route,
             gate=gate,
             current_plan=current_plan,
+            current_run=next_run_state,
             config=config,
         )
         if gate_decision is not None:
-            state_store.set_current_decision(gate_decision)
             _set_execution_run_state(
                 state_store,
-                RunState(
-                    run_id=current_run.run_id,
-                    status="active",
-                    stage="decision_pending",
-                    route_name=current_run.route_name,
-                    title=current_plan.title,
-                    created_at=current_run.created_at,
-                    updated_at=iso_now(),
-                    plan_id=current_plan.plan_id,
-                    plan_path=current_plan.path,
-                    execution_gate=gate,
-                    request_excerpt=current_run.request_excerpt,
-                    request_sha1=current_run.request_sha1,
-                    owner_session_id=current_run.owner_session_id,
-                    owner_host=current_run.owner_host,
-                    owner_run_id=current_run.owner_run_id,
-                ),
+                next_run_state,
                 session_id=session_id,
             )
+            state_store.set_current_decision(gate_decision)
             notes.extend(gate.notes)
             notes.append(f"Execution gate requested a new decision: {gate_decision.decision_id}")
             return (
@@ -1831,8 +2260,10 @@ def _advance_planning_route(
     config: RuntimeConfig,
     kb_artifact: KbArtifact | None,
     confirmed_decision: DecisionState | None = None,
+    planning_context: _PlanningContext | None = None,
 ) -> tuple[RouteDecision, PlanArtifact | None, list[str], KbArtifact | None]:
     notes: list[str] = []
+    context = planning_context or _capture_planning_context(state_store)
     plan_package_policy = _normalized_plan_package_policy(decision, config=config)
     kb_artifact = _merge_kb_artifacts(kb_artifact, ensure_blueprint_scaffold(config), config=config)
 
@@ -1841,6 +2272,7 @@ def _advance_planning_route(
         state_store.set_current_clarification(pending_clarification)
         _preserve_or_clear_current_plan_for_pending_planning_checkpoint(
             decision,
+            current_plan=context.current_plan,
             state_store=state_store,
             config=config,
         )
@@ -1872,7 +2304,7 @@ def _advance_planning_route(
         )
 
     if confirmed_decision is None:
-        current_plan = state_store.get_current_plan()
+        current_plan = context.current_plan
         if current_plan is not None and _should_create_active_plan_binding_decision(
             decision,
             current_plan=current_plan,
@@ -1884,7 +2316,7 @@ def _advance_planning_route(
                 config=config,
             )
             state_store.set_current_decision(pending_decision)
-            current_run = state_store.get_current_run()
+            current_run = context.current_run
             state_store.set_current_run(
                 RunState(
                     run_id=current_run.run_id if current_run is not None else _make_run_id(decision.request_text),
@@ -1917,6 +2349,7 @@ def _advance_planning_route(
             state_store.set_current_decision(pending_decision)
             _preserve_or_clear_current_plan_for_pending_planning_checkpoint(
                 decision,
+                current_plan=context.current_plan,
                 state_store=state_store,
                 config=config,
             )
@@ -1945,6 +2378,7 @@ def _advance_planning_route(
     level = decision.plan_level or _default_plan_level(decision)
     selection = _resolve_plan_for_request(
         decision,
+        current_plan=context.current_plan,
         state_store=state_store,
         config=config,
         confirmed_decision=confirmed_decision,
@@ -1970,14 +2404,18 @@ def _advance_planning_route(
     explain_only_override = detect_explain_only_consult_override(
         decision.request_text,
         command=decision.command,
-        current_run=state_store.get_current_run(),
-        current_plan=state_store.get_current_plan(),
-        current_plan_proposal=state_store.get_current_plan_proposal(),
-        last_route=state_store.get_last_route(),
+        current_run=context.current_run,
+        current_plan=context.current_plan,
+        current_plan_proposal=context.current_plan_proposal,
+        last_route=context.last_route,
     )
     if explain_only_override is not None and plan_package_policy == "confirm":
         notes.append("Bypassed plan proposal materialization for explain-only request")
-        if _consume_current_decision_if_confirmed_match(state_store, confirmed_decision):
+        if _consume_current_decision_if_confirmed_match(
+            state_store,
+            confirmed_decision,
+            current_decision=context.current_decision,
+        ):
             notes.append(f"Decision consumed: {confirmed_decision.decision_id}")
         return (
             RouteDecision(
@@ -2060,11 +2498,11 @@ def _advance_planning_route(
 def _resolve_plan_for_request(
     decision: RouteDecision,
     *,
+    current_plan: PlanArtifact | None,
     state_store: StateStore,
     config: RuntimeConfig,
     confirmed_decision: DecisionState | None,
 ) -> _PlanSelection:
-    current_plan = state_store.get_current_plan()
     active_plan_binding_selection = str(decision.artifacts.get("active_plan_binding_selection") or "").strip()
 
     if confirmed_decision is not None:
@@ -2208,10 +2646,10 @@ def _request_anchors_current_plan(request_text: str, *, current_plan: PlanArtifa
 def _preserve_or_clear_current_plan_for_pending_planning_checkpoint(
     decision: RouteDecision,
     *,
+    current_plan: PlanArtifact | None,
     state_store: StateStore,
     config: RuntimeConfig,
 ) -> None:
-    current_plan = state_store.get_current_plan()
     if current_plan is None:
         return
 
@@ -2282,30 +2720,30 @@ def _apply_execution_gate_to_plan(
         notes.append(f"Decision consumed: {decision_context.decision_id}")
 
     if gate.gate_status == "decision_required" and gate.blocking_reason != "unresolved_decision":
+        next_run_state = RunState(
+            run_id=_make_run_id(decision.request_text),
+            status="active",
+            stage="decision_pending",
+            route_name=decision.route_name,
+            title=plan_artifact.title,
+            created_at=plan_artifact.created_at,
+            updated_at=iso_now(),
+            plan_id=plan_artifact.plan_id,
+            plan_path=plan_artifact.path,
+            execution_gate=gate,
+            request_excerpt=summarize_request_text(decision.request_text),
+            request_sha1=stable_request_sha1(decision.request_text),
+        )
         gate_decision = _build_route_native_gate_decision_state(
             decision,
             gate=gate,
             current_plan=plan_artifact,
+            current_run=next_run_state,
             config=config,
         )
         if gate_decision is not None:
+            state_store.set_current_run(next_run_state)
             state_store.set_current_decision(gate_decision)
-            state_store.set_current_run(
-                RunState(
-                    run_id=_make_run_id(decision.request_text),
-                    status="active",
-                    stage="decision_pending",
-                    route_name=decision.route_name,
-                    title=plan_artifact.title,
-                    created_at=plan_artifact.created_at,
-                    updated_at=iso_now(),
-                    plan_id=plan_artifact.plan_id,
-                    plan_path=plan_artifact.path,
-                    execution_gate=gate,
-                    request_excerpt=summarize_request_text(decision.request_text),
-                    request_sha1=stable_request_sha1(decision.request_text),
-                )
-            )
             notes.append(f"Execution gate requested a new decision: {gate_decision.decision_id}")
             return (
                 _decision_pending_route(decision, reason="Execution gate found a blocking risk that still requires confirmation"),
@@ -2338,10 +2776,11 @@ def _consume_current_decision(state_store: StateStore, decision_state: DecisionS
 def _consume_current_decision_if_confirmed_match(
     state_store: StateStore,
     decision_state: DecisionState | None,
+    *,
+    current_decision: DecisionState | None,
 ) -> bool:
     if decision_state is None or decision_state.status != "confirmed" or decision_state.selection is None:
         return False
-    current_decision = state_store.get_current_decision()
     if current_decision is None:
         return False
     if current_decision.decision_id != decision_state.decision_id:
@@ -2352,8 +2791,7 @@ def _consume_current_decision_if_confirmed_match(
     return True
 
 
-def _confirmed_decision_context(state_store: StateStore) -> DecisionState | None:
-    current_decision = state_store.get_current_decision()
+def _confirmed_decision_context(*, current_decision: DecisionState | None) -> DecisionState | None:
     if current_decision is None or current_decision.status != "confirmed" or current_decision.selection is None:
         return None
     return current_decision
@@ -2411,9 +2849,16 @@ def _build_route_native_gate_decision_state(
     *,
     gate: ExecutionGate,
     current_plan: PlanArtifact,
+    current_run: RunState | None,
     config: RuntimeConfig,
 ) -> DecisionState | None:
-    """Normalize execution-gate follow-up decisions through the same contract."""
+    """Create execution-bound gate decisions without downcasting their phase.
+
+    Generic checkpoint requests only expose public source stages like design /
+    develop. Execution-gate decisions are internal execution-bound checkpoints,
+    so routing them through the generic materializer would both reject the
+    source stage and erase the execution-gate phase we need for liveness.
+    """
     decision_state = build_execution_gate_decision_state(
         decision,
         gate=gate,
@@ -2422,9 +2867,33 @@ def _build_route_native_gate_decision_state(
     )
     if decision_state is None:
         return None
-    request = checkpoint_request_from_decision_state(
+    return replace(
         decision_state,
-        source_route=decision.route_name,
+        resume_context=_execution_gate_decision_resume_context(
+            decision_state=decision_state,
+            current_plan=current_plan,
+            current_run=current_run,
+            gate=gate,
+        ),
     )
-    materialized = materialize_checkpoint_request(request.to_dict(), config=config)
-    return materialized.decision_state
+
+
+def _execution_gate_decision_resume_context(
+    *,
+    decision_state: DecisionState,
+    current_plan: PlanArtifact,
+    current_run: RunState | None,
+    gate: ExecutionGate,
+) -> Mapping[str, Any]:
+    resume_context = dict(decision_state.resume_context)
+    resume_context.setdefault("active_run_stage", current_run.stage if current_run is not None else "decision_pending")
+    resume_context.setdefault("current_plan_path", current_plan.path)
+    resume_context["task_refs"] = list(resume_context.get("task_refs") or [])
+    resume_context["changed_files"] = list(resume_context.get("changed_files") or [])
+    resume_context.setdefault(
+        "working_summary",
+        f"Execution gate is waiting for a blocking-risk decision before develop continues: {gate.blocking_reason}",
+    )
+    resume_context["verification_todo"] = list(resume_context.get("verification_todo") or [])
+    resume_context.setdefault("resume_after", "continue_host_develop")
+    return resume_context

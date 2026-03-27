@@ -34,9 +34,12 @@ from .develop_quality import (
 )
 from .decision_policy import has_tradeoff_checkpoint_signal
 from .handoff import build_runtime_handoff
-from .models import PlanArtifact, RouteDecision, RunState, RuntimeConfig, RuntimeHandoff
+from .context_snapshot import resolve_context_snapshot
+from .models import PlanArtifact, RecoveredContext, RouteDecision, RunState, RuntimeConfig, RuntimeHandoff
 from .replay import ReplayWriter, build_develop_quality_replay_event
 from .state import StateStore, iso_now
+
+_HOST_FACING_TRUTH_KIND_DEVELOP_CHECKPOINT_CALLBACK = "develop_checkpoint_callback"
 
 DEVELOP_CHECKPOINT_SCHEMA_VERSION = "1"
 DEVELOP_CHECKPOINT_ALLOWED_KINDS = ("decision", "clarification")
@@ -56,6 +59,7 @@ class ActiveDevelopContext:
     current_run: RunState
     current_plan: PlanArtifact
     current_handoff: RuntimeHandoff
+    resolution_id: str
 
 
 @dataclass(frozen=True)
@@ -112,9 +116,16 @@ def inspect_develop_checkpoint_context(*, config: RuntimeConfig) -> Mapping[str,
 def load_active_develop_context(*, config: RuntimeConfig) -> ActiveDevelopContext:
     """Load the minimum runtime state required before a host may emit a develop checkpoint."""
     state_store = StateStore(config)
-    current_run = state_store.get_current_run()
-    current_plan = state_store.get_current_plan()
-    current_handoff = state_store.get_current_handoff()
+    snapshot = resolve_context_snapshot(
+        config=config,
+        review_store=state_store,
+        global_store=state_store,
+    )
+    if snapshot.is_conflict:
+        raise DevelopCheckpointError("develop checkpoint callback is unavailable while runtime state_conflict is active")
+    current_run = snapshot.current_run
+    current_plan = snapshot.current_plan
+    current_handoff = snapshot.current_handoff
 
     if current_run is None or current_plan is None or current_handoff is None:
         raise DevelopCheckpointError(
@@ -129,11 +140,11 @@ def load_active_develop_context(*, config: RuntimeConfig) -> ActiveDevelopContex
             f"develop checkpoint callback is only allowed during {sorted(DEVELOP_CHECKPOINT_ACTIVE_STAGES)}, got {current_run.stage}"
         )
 
-    existing_clarification = state_store.get_current_clarification()
+    existing_clarification = snapshot.current_clarification
     if existing_clarification is not None and existing_clarification.status in {"pending", "collecting"}:
         raise DevelopCheckpointError("a clarification checkpoint is already pending; resume it before creating another")
 
-    existing_decision = state_store.get_current_decision()
+    existing_decision = snapshot.current_decision
     if existing_decision is not None and existing_decision.status in {"pending", "collecting"}:
         raise DevelopCheckpointError("a decision checkpoint is already pending; resume it before creating another")
 
@@ -142,6 +153,7 @@ def load_active_develop_context(*, config: RuntimeConfig) -> ActiveDevelopContex
         current_run=current_run,
         current_plan=current_plan,
         current_handoff=current_handoff,
+        resolution_id=snapshot.resolution_id,
     )
 
 
@@ -163,7 +175,6 @@ def submit_develop_checkpoint(
     )
 
     state_store = context.state_store
-    state_store.set_current_run(run_state)
     if materialized.clarification_state is not None:
         state_store.clear_current_decision()
         state_store.set_current_clarification(materialized.clarification_state)
@@ -175,24 +186,31 @@ def submit_develop_checkpoint(
         config=config,
         decision=route,
         run_id=run_state.run_id,
-        current_run=run_state,
+        resolved_context=RecoveredContext(
+            current_run=run_state,
+            current_plan=context.current_plan,
+            current_handoff=context.current_handoff,
+            current_clarification=materialized.clarification_state,
+            current_decision=materialized.decision_state,
+        ),
         current_plan=context.current_plan,
-        current_plan_proposal=None,
         kb_artifact=None,
         replay_session_dir=None,
         skill_result={"checkpoint_request": request.to_dict()},
-        current_clarification=materialized.clarification_state,
-        current_decision=materialized.decision_state,
         notes=(
             f"Develop checkpoint callback created: {request.checkpoint_id}",
             f"Develop checkpoint resume_after={develop_resume_after(request.resume_context)}",
         ),
-        previous_handoff=context.current_handoff,
     )
     if handoff is None:  # pragma: no cover - defensive guard
         raise DevelopCheckpointError("develop checkpoint callback could not build a runtime handoff")
 
-    state_store.set_current_handoff(handoff)
+    run_state, handoff = state_store.set_host_facing_truth(
+        run_state=run_state,
+        handoff=handoff,
+        resolution_id=context.resolution_id,
+        truth_kind=_HOST_FACING_TRUTH_KIND_DEVELOP_CHECKPOINT_CALLBACK,
+    )
     state_store.set_last_route(route)
     return DevelopCheckpointSubmission(
         request=request,
@@ -530,6 +548,7 @@ def _with_quality_handoff(
         artifacts=artifacts,
         notes=notes,
         observability=observability,
+        resolution_id=current_handoff.resolution_id,
     )
 
 
@@ -594,6 +613,10 @@ def _develop_checkpoint_run_state(
         execution_gate=context.current_run.execution_gate,
         request_excerpt=context.current_run.request_excerpt,
         request_sha1=context.current_run.request_sha1,
+        owner_session_id=context.current_run.owner_session_id,
+        owner_host=context.current_run.owner_host,
+        owner_run_id=context.current_run.owner_run_id,
+        resolution_id=context.current_run.resolution_id,
     )
 
 
@@ -615,9 +638,8 @@ def _copy_run_state(current_run: RunState) -> RunState:
         owner_session_id=current_run.owner_session_id,
         owner_host=current_run.owner_host,
         owner_run_id=current_run.owner_run_id,
+        resolution_id=current_run.resolution_id,
     )
-
-
 def _default_checkpoint_id(*, checkpoint_kind: str, run_id: str, seed_text: str) -> str:
     digest = sha1(f"{run_id}:{checkpoint_kind}:{seed_text}".encode("utf-8")).hexdigest()[:10]
     return f"develop_{checkpoint_kind}_{digest}"

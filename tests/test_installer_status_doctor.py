@@ -47,6 +47,16 @@ def _seed_workspace_state(workspace_root: Path) -> None:
     )
 
 
+def _seed_quarantined_workspace_state(workspace_root: Path) -> None:
+    state_root = workspace_root / ".sopify-skills" / "state"
+    _write_json(
+        state_root / "current_plan_proposal.json",
+        {
+            "request_text": "继续",
+        },
+    )
+
+
 class HostCapabilityRegistryTests(unittest.TestCase):
     def test_registry_returns_complete_capabilities_for_declared_hosts(self) -> None:
         codex = get_host_capability("codex")
@@ -120,6 +130,8 @@ class StatusDoctorContractTests(unittest.TestCase):
             self.assertIn("workspace_state", payload)
             self.assertEqual(payload["workspace_state"]["active_plan"], ".sopify-skills/plan/20260320_helloagents_integration_enhancements")
             self.assertEqual(payload["workspace_state"]["pending_checkpoint"], "confirm_execute")
+            self.assertEqual(payload["workspace_state"]["quarantine_count"], 0)
+            self.assertEqual(payload["workspace_state"]["state_conflicts"], [])
             self.assertEqual(payload["state"]["overall_status"], "partial")
             self.assertEqual(payload["hosts"][0]["verified_features"], ["prompt_install", "payload_install", "workspace_bootstrap", "runtime_gate", "preferences_preload", "handoff_first", "host_bridge", "smoke_verified"])
             self.assertEqual(
@@ -149,6 +161,31 @@ class StatusDoctorContractTests(unittest.TestCase):
             self.assertIn("status", check)
             self.assertIn("reason_code", check)
             self.assertIn(check["reason_code"], {"ok", "MISSING_REQUIRED_FILE", "MISSING_BUNDLE", "UNEXPECTED_ERROR"})
+
+    def test_status_and_doctor_surface_runtime_quarantine(self) -> None:
+        with tempfile.TemporaryDirectory() as home_dir, tempfile.TemporaryDirectory() as workspace_dir:
+            home_root = Path(home_dir)
+            workspace_root = Path(workspace_dir)
+            _seed_quarantined_workspace_state(workspace_root)
+
+            install_host_assets(CODEX_ADAPTER, repo_root=REPO_ROOT, home_root=home_root, language_directory="CN")
+            install_global_payload(CODEX_ADAPTER, repo_root=REPO_ROOT, home_root=home_root)
+
+            status_payload = build_status_payload(home_root=home_root, workspace_root=workspace_root)
+            self.assertEqual(status_payload["workspace_state"]["quarantine_count"], 1)
+            self.assertEqual(status_payload["workspace_state"]["quarantined_items"][0]["reason"], "proposal_contract_missing")
+            rendered = render_status_text(status_payload)
+            self.assertIn("quarantine_count: 1", rendered)
+            self.assertIn("proposal_contract_missing", rendered)
+
+            doctor_payload = build_doctor_payload(home_root=home_root, workspace_root=workspace_root)
+            quarantine_check = next(
+                check
+                for check in doctor_payload["checks"]
+                if check["check_id"] == "workspace_runtime_quarantine"
+            )
+            self.assertEqual(quarantine_check["status"], "warn")
+            self.assertEqual(quarantine_check["reason_code"], "QUARANTINED_RUNTIME_STATE")
 
     def test_status_json_reports_ready_when_workspace_bundle_is_healthy(self) -> None:
         with tempfile.TemporaryDirectory() as home_dir, tempfile.TemporaryDirectory() as workspace_dir:
