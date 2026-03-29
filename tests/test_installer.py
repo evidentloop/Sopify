@@ -19,7 +19,13 @@ from installer.hosts.claude import CLAUDE_ADAPTER
 from installer.hosts.codex import CODEX_ADAPTER
 from installer.models import InstallPhaseResult, InstallResult, parse_install_target
 from installer.payload import _REQUIRED_BUNDLE_CAPABILITIES, _payload_is_current, install_global_payload
-from installer.validate import validate_bundle_install, validate_host_install
+from installer.validate import (
+    validate_bundle_install,
+    validate_host_install,
+    validate_payload_manifests,
+    validate_workspace_bundle_manifest,
+    validate_workspace_stub_manifest,
+)
 from runtime.engine import run_runtime
 from runtime.output import render_runtime_output
 from scripts.install_sopify import render_result
@@ -198,6 +204,96 @@ class WorkspaceBootstrapCompatibilityTests(unittest.TestCase):
 
             with self.assertRaisesRegex(Exception, "cli_interactive.py"):
                 validate_bundle_install(bundle_root)
+
+    def test_validate_workspace_bundle_manifest_only_requires_manifest_object(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle_root = Path(temp_dir) / ".sopify-runtime"
+            bundle_root.mkdir(parents=True, exist_ok=True)
+            manifest_path = bundle_root / "manifest.json"
+            _write_json(
+                manifest_path,
+                {
+                    "schema_version": "1",
+                    "bundle_version": "2026-02-13",
+                    "capabilities": dict(_REQUIRED_BUNDLE_CAPABILITIES),
+                },
+            )
+
+            resolved_path, manifest = validate_workspace_bundle_manifest(bundle_root)
+            self.assertEqual(resolved_path, manifest_path)
+            self.assertEqual(manifest["schema_version"], "1")
+
+    def test_validate_workspace_stub_manifest_applies_defaults(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace_root = Path(temp_dir)
+            bundle_root = workspace_root / ".sopify-runtime"
+            bundle_root.mkdir(parents=True, exist_ok=True)
+            manifest_path = bundle_root / "manifest.json"
+            _write_json(
+                manifest_path,
+                {
+                    "schema_version": "1",
+                    "bundle_version": "2026-02-13",
+                    "capabilities": dict(_REQUIRED_BUNDLE_CAPABILITIES),
+                },
+            )
+
+            resolved_path, manifest = validate_workspace_stub_manifest(bundle_root)
+            self.assertEqual(resolved_path, manifest_path)
+            self.assertEqual(manifest["locator_mode"], "global_first")
+            self.assertEqual(manifest["required_capabilities"], ["runtime_gate", "preferences_preload"])
+            self.assertEqual(manifest["ignore_mode"], "noop")
+            self.assertFalse(manifest["legacy_fallback"])
+
+    def test_validate_workspace_stub_manifest_rejects_invalid_bundle_version(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace_root = Path(temp_dir)
+            bundle_root = workspace_root / ".sopify-runtime"
+            bundle_root.mkdir(parents=True, exist_ok=True)
+            manifest_path = bundle_root / "manifest.json"
+            _write_json(
+                manifest_path,
+                {
+                    "schema_version": "1",
+                    "bundle_version": "latest",
+                    "locator_mode": "global_first",
+                    "required_capabilities": ["runtime_gate", "preferences_preload"],
+                },
+            )
+
+            with self.assertRaisesRegex(Exception, "bundle_version"):
+                validate_workspace_stub_manifest(bundle_root)
+
+    def test_validate_workspace_stub_manifest_rejects_global_only_legacy_fallback_conflict(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace_root = Path(temp_dir)
+            bundle_root = workspace_root / ".sopify-runtime"
+            bundle_root.mkdir(parents=True, exist_ok=True)
+            manifest_path = bundle_root / "manifest.json"
+            _write_json(
+                manifest_path,
+                {
+                    "schema_version": "1",
+                    "bundle_version": "2026-02-13",
+                    "locator_mode": "global_only",
+                    "legacy_fallback": True,
+                    "required_capabilities": ["runtime_gate", "preferences_preload"],
+                },
+            )
+
+            with self.assertRaisesRegex(Exception, str(manifest_path)):
+                validate_workspace_stub_manifest(bundle_root)
+
+    def test_validate_payload_manifests_returns_both_payload_and_bundle_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            home_root = Path(temp_dir)
+            payload_root = _create_incomplete_payload(home_root=home_root, version="2026-02-13")
+
+            payload_manifest_path, payload_manifest, bundle_manifest_path, bundle_manifest = validate_payload_manifests(payload_root)
+            self.assertEqual(payload_manifest_path, payload_root / "payload-manifest.json")
+            self.assertEqual(bundle_manifest_path, payload_root / "bundle" / "manifest.json")
+            self.assertEqual(payload_manifest["payload_version"], "2026-02-13")
+            self.assertEqual(bundle_manifest["bundle_version"], "2026-02-13")
 
 
 class HostPromptContractTests(unittest.TestCase):

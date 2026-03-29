@@ -270,6 +270,60 @@ class StatusDoctorContractTests(unittest.TestCase):
             self.assertEqual(payload["state"]["workspace_bundle_healthy_hosts"], ["codex"])
             self.assertEqual(payload["hosts"][0]["state"]["workspace_bundle_healthy"], "yes")
 
+    def test_status_and_doctor_keep_stub_only_workspace_non_ready_in_b1_compatibility_phase(self) -> None:
+        with tempfile.TemporaryDirectory() as home_dir, tempfile.TemporaryDirectory() as workspace_dir:
+            home_root = Path(home_dir)
+            workspace_root = Path(workspace_dir)
+
+            install_host_assets(CODEX_ADAPTER, repo_root=REPO_ROOT, home_root=home_root, language_directory="CN")
+            install_global_payload(CODEX_ADAPTER, repo_root=REPO_ROOT, home_root=home_root)
+            run_workspace_bootstrap(CODEX_ADAPTER.payload_root(home_root), workspace_root)
+
+            bundle_root = workspace_root / ".sopify-runtime"
+            for name in ("runtime", "scripts", "tests"):
+                target = bundle_root / name
+                if target.exists():
+                    import shutil
+
+                    shutil.rmtree(target)
+
+            status_payload = build_status_payload(home_root=home_root, workspace_root=workspace_root)
+            self.assertEqual(status_payload["hosts"][0]["state"]["workspace_bundle_healthy"], "no")
+
+            doctor_payload = build_doctor_payload(home_root=home_root, workspace_root=workspace_root)
+            workspace_check = next(
+                check
+                for check in doctor_payload["checks"]
+                if check["host_id"] == "codex" and check["check_id"] == "workspace_bundle_manifest"
+            )
+            self.assertEqual(workspace_check["status"], "fail")
+            self.assertEqual(workspace_check["reason_code"], "MISSING_REQUIRED_FILE")
+            self.assertIn("B1 compatibility phase", workspace_check["recommendation"])
+
+    def test_status_and_doctor_surface_partial_bundle_damage_as_replace_required(self) -> None:
+        with tempfile.TemporaryDirectory() as home_dir, tempfile.TemporaryDirectory() as workspace_dir:
+            home_root = Path(home_dir)
+            workspace_root = Path(workspace_dir)
+
+            install_host_assets(CODEX_ADAPTER, repo_root=REPO_ROOT, home_root=home_root, language_directory="CN")
+            install_global_payload(CODEX_ADAPTER, repo_root=REPO_ROOT, home_root=home_root)
+            run_workspace_bootstrap(CODEX_ADAPTER.payload_root(home_root), workspace_root)
+
+            bundle_root = workspace_root / ".sopify-runtime"
+            (bundle_root / "scripts" / "runtime_gate.py").unlink()
+
+            doctor_payload = build_doctor_payload(home_root=home_root, workspace_root=workspace_root)
+            workspace_check = next(
+                check
+                for check in doctor_payload["checks"]
+                if check["host_id"] == "codex" and check["check_id"] == "workspace_bundle_manifest"
+            )
+            self.assertEqual(workspace_check["status"], "fail")
+            self.assertEqual(workspace_check["reason_code"], "MISSING_REQUIRED_FILE")
+            self.assertNotIn("B1 compatibility phase", workspace_check["recommendation"])
+            self.assertIn("Workspace bundle is missing required files", workspace_check["recommendation"])
+            self.assertIn("scripts/runtime_gate.py", workspace_check["recommendation"])
+
     def test_status_cli_json_output_contains_hosts_and_workspace_state(self) -> None:
         with tempfile.TemporaryDirectory() as home_dir, tempfile.TemporaryDirectory() as workspace_dir:
             home_root = Path(home_dir)

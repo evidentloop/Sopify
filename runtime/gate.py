@@ -22,6 +22,7 @@ NORMAL_RUNTIME_FOLLOWUP = "normal_runtime_followup"
 CHECKPOINT_ONLY = "checkpoint_only"
 ERROR_VISIBLE_RETRY = "error_visible_retry"
 _RUNTIME_ONLY_STATE_CONFLICT_SOURCE_KIND = "current_request_runtime_only_state_conflict"
+_PREFLIGHT_BLOCKING_REASON_CODES = frozenset({"BRAKE_LAYER_BLOCKED", "FIRST_WRITE_NOT_AUTHORIZED", "COMMAND_NOT_BOOTSTRAP_AUTHORIZED"})
 
 
 def enter_runtime_gate(
@@ -30,6 +31,10 @@ def enter_runtime_gate(
     workspace_root: str | Path = ".",
     global_config_path: str | Path | None = None,
     payload_manifest_path: str | Path | None = None,
+    activation_root: str | Path | None = None,
+    payload_root: str | Path | None = None,
+    host_id: str | None = None,
+    requested_root: str | Path | None = None,
     session_id: str | None = None,
     user_home: Path | None = None,
     write_receipt: bool = True,
@@ -48,14 +53,68 @@ def enter_runtime_gate(
         contract["preflight"] = dict(
             preflight_workspace_runtime(
                 workspace,
+                request_text=request,
                 payload_manifest_path=payload_manifest_path,
+                activation_root=activation_root,
+                payload_root=payload_root,
+                host_id=host_id,
+                requested_root=requested_root,
+                user_home=user_home,
             )
         )
+        if _preflight_blocks_runtime(contract["preflight"]):
+            resolved_session_id = _resolve_session_id(session_id)
+            contract["session_id"] = resolved_session_id
+            contract["runtime"] = {
+                "route_name": "preflight_blocked",
+                "reason": str(contract["preflight"].get("message") or "Workspace preflight blocked runtime execution"),
+            }
+            contract["trigger_evidence"] = {
+                "preflight_reason_code": str(contract["preflight"].get("reason_code") or ""),
+            }
+            contract["observability"] = _build_gate_observability(
+                request=request,
+                runtime_route="preflight_blocked",
+                persisted_handoff=None,
+                runtime_handoff=None,
+                current_run=None,
+                ingress_mode="runtime_gate_enter",
+                session_id=resolved_session_id,
+                cleaned_session_dirs=(),
+            )
+            contract["state"] = _fallback_state_contract(workspace=workspace, session_id=resolved_session_id)
+            contract["evidence"] = {
+                "manifest_found": (workspace / ".sopify-runtime" / "manifest.json").is_file(),
+                "handoff_found": False,
+                "strict_runtime_entry": False,
+                "handoff_source_kind": "preflight_blocked",
+                "current_request_produced_handoff": False,
+                "persisted_handoff_matches_current_request": False,
+            }
+            contract.update(
+                {
+                    "status": "error",
+                    "gate_passed": False,
+                    "allowed_response_mode": ERROR_VISIBLE_RETRY,
+                    "error_code": "workspace_first_write_blocked",
+                    "message": str(contract["preflight"].get("message") or "Workspace preflight blocked runtime execution"),
+                }
+            )
+            return _finalize_gate_contract(
+                contract=contract,
+                workspace=workspace,
+                request=request,
+                runtime_route_name="preflight_blocked",
+                config=None,
+                write_receipt=write_receipt,
+            )
         config = load_runtime_config(workspace, global_config_path=global_config_path)
         resolved_session_id = _resolve_session_id(session_id)
-        cleaned_session_dirs = cleanup_expired_session_state(config)
         contract["session_id"] = resolved_session_id
         contract["preferences"] = _normalize_preferences(preload_preferences(config))
+        cleaned_session_dirs = cleanup_expired_session_state(config)
+        if cleaned_session_dirs:
+            pass
 
         runtime_result = run_runtime(
             request,
@@ -148,21 +207,14 @@ def enter_runtime_gate(
             }
         )
 
-    if config is not None:
-        receipt_path = config.state_dir / CURRENT_GATE_RECEIPT_FILENAME
-        observability = contract.get("observability")
-        if not isinstance(observability, dict):
-            observability = {}
-            contract["observability"] = observability
-        observability["previous_receipt"] = _read_previous_receipt(
-            receipt_path=receipt_path,
-            request_sha1=stable_request_sha1(request),
-            runtime_route_name=str(contract.get("runtime", {}).get("route_name") or ""),
-        )
-        if write_receipt:
-            contract["receipt_path"] = str(receipt_path)
-            write_gate_receipt(receipt_path, contract)
-    return contract
+    return _finalize_gate_contract(
+        contract=contract,
+        workspace=workspace,
+        request=request,
+        runtime_route_name=str(contract.get("runtime", {}).get("route_name") or ""),
+        config=config,
+        write_receipt=write_receipt,
+    )
 
 
 def _base_contract(workspace_root: Path) -> dict[str, Any]:
@@ -586,6 +638,62 @@ def _error_code_for_exception(exc: Exception) -> str:
     if isinstance(exc, ValueError):
         return "invalid_request"
     return "runtime_gate_error"
+
+
+def _preflight_blocks_runtime(preflight: Mapping[str, Any]) -> bool:
+    return str(preflight.get("reason_code") or "").strip() in _PREFLIGHT_BLOCKING_REASON_CODES
+
+
+def _fallback_state_contract(*, workspace: Path, session_id: str) -> dict[str, Any]:
+    # This is a pre-config fail-safe contract. When first-write preflight is
+    # blocked, the gate must not re-enter config loading just to honor a custom
+    # plan.directory override. The fallback state paths therefore stay pinned to
+    # `.sopify-skills/...` and are intentionally not guaranteed to align with a
+    # custom runtime root for this blocked turn.
+    state_root = workspace / ".sopify-skills" / "state" / "sessions" / session_id
+    return {
+        "scope": "session",
+        "state_root": str(state_root.relative_to(workspace)),
+        "current_plan_path": str((state_root / "current_plan.json").relative_to(workspace)),
+        "current_plan_proposal_path": str((state_root / "current_plan_proposal.json").relative_to(workspace)),
+        "current_run_path": str((state_root / "current_run.json").relative_to(workspace)),
+        "current_handoff_path": str((state_root / "current_handoff.json").relative_to(workspace)),
+        "current_clarification_path": str((state_root / "current_clarification.json").relative_to(workspace)),
+        "current_decision_path": str((state_root / "current_decision.json").relative_to(workspace)),
+        "last_route_path": str((state_root / "last_route.json").relative_to(workspace)),
+    }
+
+
+def _fallback_receipt_path(*, workspace: Path) -> Path:
+    # Keep the blocked-turn receipt colocated with the pre-config fail-safe
+    # state contract above; do not depend on plan.directory before config
+    # successfully loads.
+    return workspace / ".sopify-skills" / "state" / CURRENT_GATE_RECEIPT_FILENAME
+
+
+def _finalize_gate_contract(
+    *,
+    contract: dict[str, Any],
+    workspace: Path,
+    request: str,
+    runtime_route_name: str,
+    config,
+    write_receipt: bool,
+) -> dict[str, Any]:
+    receipt_path = config.state_dir / CURRENT_GATE_RECEIPT_FILENAME if config is not None else _fallback_receipt_path(workspace=workspace)
+    observability = contract.get("observability")
+    if not isinstance(observability, dict):
+        observability = {}
+        contract["observability"] = observability
+    observability["previous_receipt"] = _read_previous_receipt(
+        receipt_path=receipt_path,
+        request_sha1=stable_request_sha1(request),
+        runtime_route_name=runtime_route_name,
+    )
+    if write_receipt:
+        contract["receipt_path"] = str(receipt_path)
+        write_gate_receipt(receipt_path, contract)
+    return contract
 
 
 __all__ = [

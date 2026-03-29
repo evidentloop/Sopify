@@ -11,7 +11,15 @@ from installer.bootstrap_workspace import _classify_workspace_bundle
 from installer.hosts import iter_host_registrations
 from installer.hosts.base import HostAdapter, HostRegistration
 from installer.models import HostCapability, InstallError
-from installer.validate import run_bundle_smoke_check, validate_host_install, validate_payload_install
+from installer.validate import (
+    run_bundle_smoke_check,
+    validate_bundle_install,
+    validate_host_install,
+    validate_payload_install,
+    validate_payload_manifests,
+    validate_workspace_bundle_manifest,
+    validate_workspace_stub_manifest,
+)
 from runtime.config import ConfigError, load_runtime_config
 from runtime.context_snapshot import resolve_context_snapshot
 from runtime.state import SESSIONS_DIRNAME, StateStore
@@ -609,23 +617,23 @@ def _inspect_workspace_bundle(
     workspace_root: Path,
 ) -> InspectionCheck:
     payload_root = adapter.payload_root(home_root)
-    payload_manifest_path = payload_root / "payload-manifest.json"
-    bundle_manifest_path = payload_root / "bundle" / "manifest.json"
-    payload_manifest = _read_json(payload_manifest_path)
-    bundle_manifest = _read_json(bundle_manifest_path)
     bundle_root = workspace_root / ".sopify-runtime"
-    current_manifest_path = bundle_root / "manifest.json"
-    current_manifest = _read_json(current_manifest_path)
-
-    if not payload_manifest or not bundle_manifest:
+    try:
+        payload_manifest_path, payload_manifest, bundle_manifest_path, bundle_manifest = validate_payload_manifests(payload_root)
+    except InstallError:
         return InspectionCheck(
             host_id=capability.host_id,
             check_id="workspace_bundle_manifest",
             status=CHECK_FAIL,
             reason_code="MISSING_REQUIRED_FILE",
-            evidence=tuple(str(path) for path in (payload_manifest_path, bundle_manifest_path) if path.exists()),
+            evidence=tuple(str(path) for path in (payload_root / "payload-manifest.json", payload_root / "bundle" / "manifest.json") if path.exists()),
             recommendation=f"Install or refresh the {capability.host_id} payload before inspecting workspace bundle health.",
         )
+    try:
+        current_manifest_path, current_manifest = validate_workspace_stub_manifest(bundle_root)
+    except InstallError:
+        current_manifest_path = bundle_root / "manifest.json"
+        current_manifest = {}
 
     state, reason_code, message, _from_version = _classify_workspace_bundle(
         current_manifest=current_manifest,
@@ -634,6 +642,27 @@ def _inspect_workspace_bundle(
         current_manifest_path=current_manifest_path,
         bundle_root=bundle_root,
     )
+    if (
+        reason_code == "MISSING_REQUIRED_FILE"
+        and str(current_manifest.get("stub_version") or "").strip()
+        and _looks_like_stub_only_workspace(bundle_root)
+    ):
+        # B1 compatibility phase keeps workspace bootstrap backward-compatible:
+        # the manifest already carries thin-stub fields, but the host still
+        # expects workspace runtime files to be present until the no-workspace-
+        # scripts smoke and rollback validation gates are complete.
+        message = (
+            "Workspace bundle is in the B1 compatibility phase: thin-stub-only "
+            "state is expected to remain non-ready until workspace runtime files "
+            "are no longer required."
+        )
+    if state in STATUS_READY_STATES:
+        try:
+            validate_bundle_install(bundle_root)
+        except InstallError:
+            state = "INCOMPATIBLE"
+            reason_code = "MISSING_REQUIRED_FILE"
+            message = "Workspace bundle is missing required files and must be replaced."
     status = CHECK_FAIL
     if state in STATUS_READY_STATES:
         status = CHECK_PASS
@@ -775,6 +804,10 @@ def _workspace_bundle_recommendation(host_id: str, workspace_root: Path, reason_
             f"python3 scripts/install_sopify.py --target {host_id}:zh-CN --workspace {workspace_root}"
         )
     return message
+
+
+def _looks_like_stub_only_workspace(bundle_root: Path) -> bool:
+    return all(not (bundle_root / name).exists() for name in ("runtime", "scripts", "tests"))
 
 
 def _reason_code_from_install_error(exc: InstallError, *, default: str = "MISSING_REQUIRED_FILE") -> str:

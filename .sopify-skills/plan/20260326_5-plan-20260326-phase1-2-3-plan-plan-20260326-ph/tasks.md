@@ -53,6 +53,8 @@ archive_ready: false
 - [ ] 0.B.8 按已冻结规则落 `monorepo` 首次激活默认 root 逻辑：`显式 root 指定 > 最近的有效 ancestor marker > 当前 cwd`；`sopify.config.yaml` 不作为上层复用信号；向上 walk 命中的第一个 ancestor marker 只有通过最低有效性才允许复用，若最低有效性失败则立即停止并 `fail-closed` 回退 `cwd`；`repo-root` 级激活必须显式指定
 - [ ] 0.B.9 按已冻结边界落实 marker 最低有效性：仅用于 root 选择，定义为 `JSON 可解析 + schema_version 存在`，不提前承担 `preflight / validate` 的 stub 健康度校验
 - [ ] 0.B.10 按已冻结降级策略落 `readonly / non-interactive / non-git / monorepo 歧义` 的 `confirm_bootstrap` 回退条件：不得卡在确认、不得 silent activation、不得静默写到错误 root
+  评审记录：`preflight block` 回合下的 receipt/state fallback 路径目前固定为 `.sopify-skills/...`，作为 pre-config fail-safe contract 明确保留；本轮不追随 custom `plan.directory`，避免 block 分支重新依赖 config。
+  评审记录：payload manifest 存在但 JSON 非法/非 object 时，doctor 侧当前仍统一折叠为 `MISSING_REQUIRED_FILE`；已评审为 diagnostics debt，后续在 reason-code matrix 阶段细化，不作为当前阻断项。
 
 ## 1. P0 | Bootstrap 与 Ignore 基线
 - [ ] 1.1 盘点 bootstrap 当前写路径、ancestor `marker` 探测与 `target_root` 解析逻辑，标出必须拆除的 vendored 前提，并移除 `config` 参与 root 复用的旧分支
@@ -66,6 +68,8 @@ archive_ready: false
 ## 2. P1 | Thin Stub Contract
 - [ ] 2.1 按已冻结 schema 落 workspace-local thin stub：`schema_version / stub_version / bundle_version / required_capabilities / locator_mode / legacy_fallback / ignore_mode / written_by_host`
 - [ ] 2.2 落 thin stub 的最小有效性规则、缺失字段降级规则与 schema evolution 兼容策略，并显式区分“root 选择最低有效性”与“preflight 合同有效性”；至少覆盖 `locator_mode` 缺失视为 `global_first`、`bundle_version` 缺失或 `null` 视为 host-delegated、禁用 semver range / `latest` / 空字符串
+  进展记录：当前已落过渡态实现。workspace `.sopify-runtime/manifest.json` 在保持旧 vendored entry 字段兼容的前提下，开始写入 thin stub 字段，并在 `validate.py / inspection.py / bootstrap_workspace.py` 中统一校验默认值与冲突规则；完整 `stub-only` 收口仍待 payload index 与入口链切换后继续推进。
+  阶段标签：`B1 compatibility phase`。在本阶段，`stub-only => non-ready` 是预期行为，不视为 defect；`ready` 仍要求 manifest 合同通过且 workspace runtime 文件完整。
 - [ ] 2.3 将 workspace classifier 从“整包文件存在”改为“stub 有效 + global bundle 可解析”
 - [ ] 2.4 拆分三层职责：root 选择最低有效性、workspace stub 校验、global bundle 校验、legacy vendored 校验
 - [ ] 2.5 明确 bootstrap 生成物只写 thin stub，不再复制重型 runtime bundle；thin stub 写入采用同目录临时文件 + 原子替换，不引入跨平台文件锁前提
@@ -77,6 +81,7 @@ archive_ready: false
 - [ ] 3.2 将 payload root 解析责任收拢到 `installer/hosts/*` 与 host base contract
 - [ ] 3.3 移除把 `.codex -> .claude` 固定探测顺序当成最终 payload 选择逻辑的实现
 - [ ] 3.4 固化 `stub -> global bundle -> manifest-first gate/preload -> legacy fallback` 的解析顺序
+  进展记录：当前已支持显式 `payload_root` 与 `host_id` 进入 preflight；在提供显式 ingress 信息时，不再把 `.codex -> .claude` 固定顺序当作最终 payload 选择逻辑。兼容阶段下，legacy home/env 扫描仍保留为 fallback，以避免提前切断现有宿主链路。
 - [ ] 3.5 明确 dual-host 同仓库下的选择规则、冲突提示与 `host_mismatch / ingress_contract_invalid` 的产出边界，并让 monorepo root 复用结果进入同一 observability 词汇表
 - [ ] 3.6 确保 gate / preload 的入口仍由 resolved global bundle manifest 暴露，而不是宿主侧硬编码
 
@@ -104,6 +109,7 @@ archive_ready: false
 - [ ] 5.4 补 smoke 验证矩阵：一次安装、bootstrap、global bundle 解析、fallback visibility、默认入口不变
 - [ ] 5.5 更新迁移说明：新仓库、已 bootstrap 仓库、旧 vendored 仓库分别怎么过渡，并确保迁移说明与 `doctor / status` 的 actionable hint 一致；本轮仅补可见性与说明，不提供一键迁移器
 - [ ] 5.6 更新安装输出与自检脚本，确保用户能看到“当前走的是 stub/global/legacy 哪条路径”
+- [ ] 5.7 （待确认是否纳入本轮）为 installer 入口补 Python 最低版本 preflight：覆盖 `install.sh / scripts/install-sopify.sh / scripts/install_sopify.py` 三入口，在 `Python < 3.11` 时稳定输出明确的 `phase / reason_code / detail / next_step`，避免在导入 `StrEnum` 前直接抛原始 traceback；若确认纳入，本任务同时要求补最小回归验证
 
 ## 5.A 验证分层
 - [ ] 5.A.1 单测先覆盖 contract 与判定器：stub validity、payload index、host-aware resolution、fallback gating、`ingress_contract_invalid` 的 `violations[]` 顺序与短路规则，以及 CLI 渲染层的字段级映射；dual-host 相关断言只覆盖 `host_mismatch + typed evidence`，不覆盖提示文案模板
@@ -121,6 +127,11 @@ archive_ready: false
 - [ ] 6.8 本轮没有把 `A / B2 / C / B3` 的任务或语义，或 `execution gate / risk classifier` 的误报修复偷偷并入 B1
 
 ## 7. Post-B1 Backlog
+- Direct switch preparation checklist
+  - host first-hop 改造完成，不再依赖 workspace-local scripts 作为默认入口
+  - `no workspace scripts` smoke 全绿
+  - 回滚验证通过
+  - 仅在上述门槛都满足后，才允许把 `stub-only` 从 non-ready 提升为 ready
 - Migration Utility
   - 目标是为旧 vendored workspace 提供可确认的一键升级路径，但不属于当前 B1 交付门
 - Bundle prune
