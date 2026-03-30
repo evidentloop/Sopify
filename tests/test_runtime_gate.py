@@ -714,10 +714,14 @@ class RuntimeGateTests(unittest.TestCase):
                 payload_manifest_path=payload_manifest_path,
                 user_home=temp_root / "home",
             )
+            payload_manifest = json.loads(payload_manifest_path.read_text(encoding="utf-8"))
+            active_version = str(payload_manifest["active_version"])
 
             self.assertEqual(result["status"], "ready")
-            self.assertTrue(result["preflight"]["bundle_manifest_path"].endswith("/bundle/manifest.json"))
-            self.assertTrue(result["preflight"]["global_bundle_root"].endswith("/bundle"))
+            self.assertTrue(
+                result["preflight"]["bundle_manifest_path"].endswith(f"/bundles/{active_version}/manifest.json")
+            )
+            self.assertTrue(result["preflight"]["global_bundle_root"].endswith(f"/bundles/{active_version}"))
 
     def test_gate_preflight_falls_back_when_helper_rejects_host_id_only(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

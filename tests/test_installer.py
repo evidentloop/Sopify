@@ -6,6 +6,7 @@ import re
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
@@ -17,8 +18,13 @@ from installer.bootstrap_workspace import _REQUIRED_BUNDLE_FILES, _classify_work
 from installer.hosts.base import install_host_assets
 from installer.hosts.claude import CLAUDE_ADAPTER
 from installer.hosts.codex import CODEX_ADAPTER
-from installer.models import InstallPhaseResult, InstallResult, parse_install_target
-from installer.payload import _REQUIRED_BUNDLE_CAPABILITIES, _payload_is_current, install_global_payload
+from installer.models import InstallError, InstallPhaseResult, InstallResult, parse_install_target
+from installer.payload import (
+    _REQUIRED_BUNDLE_CAPABILITIES,
+    _install_versioned_runtime_bundle,
+    _payload_is_current,
+    install_global_payload,
+)
 from installer.validate import (
     validate_bundle_install,
     validate_host_install,
@@ -38,7 +44,7 @@ def _write_json(path: Path, payload: dict[str, object]) -> None:
 
 def _create_incomplete_payload(*, home_root: Path, version: str) -> Path:
     payload_root = CODEX_ADAPTER.payload_root(home_root)
-    bundle_root = payload_root / "bundle"
+    bundle_root = payload_root / "bundles" / version
 
     _write_json(
         payload_root / "payload-manifest.json",
@@ -46,8 +52,10 @@ def _create_incomplete_payload(*, home_root: Path, version: str) -> Path:
             "schema_version": "1",
             "payload_version": version,
             "bundle_version": version,
-            "bundle_manifest": "bundle/manifest.json",
-            "bundle_template_dir": "bundle",
+            "active_version": version,
+            "bundles_dir": "bundles",
+            "bundle_manifest": f"bundles/{version}/manifest.json",
+            "bundle_template_dir": f"bundles/{version}",
             "helper_entry": "helpers/bootstrap_workspace.py",
         },
     )
@@ -90,12 +98,14 @@ class PayloadInstallTests(unittest.TestCase):
 
             self.assertEqual(result.action, "updated")
             self.assertEqual(result.root, payload_root)
-            self.assertTrue((payload_root / "bundle" / "scripts" / "clarification_bridge_runtime.py").exists())
-            self.assertTrue((payload_root / "bundle" / "scripts" / "develop_checkpoint_runtime.py").exists())
-            self.assertTrue((payload_root / "bundle" / "scripts" / "decision_bridge_runtime.py").exists())
-            self.assertTrue((payload_root / "bundle" / "scripts" / "preferences_preload_runtime.py").exists())
-            self.assertTrue((payload_root / "bundle" / "scripts" / "runtime_gate.py").exists())
             payload_manifest = json.loads((payload_root / "payload-manifest.json").read_text(encoding="utf-8"))
+            bundle_root = payload_root / "bundles" / payload_manifest["active_version"]
+            self.assertTrue((bundle_root / "scripts" / "clarification_bridge_runtime.py").exists())
+            self.assertTrue((bundle_root / "scripts" / "develop_checkpoint_runtime.py").exists())
+            self.assertTrue((bundle_root / "scripts" / "decision_bridge_runtime.py").exists())
+            self.assertTrue((bundle_root / "scripts" / "preferences_preload_runtime.py").exists())
+            self.assertTrue((bundle_root / "scripts" / "runtime_gate.py").exists())
+            self.assertEqual(payload_manifest["bundle_manifest"], f"bundles/{payload_manifest['active_version']}/manifest.json")
             self.assertEqual(payload_manifest["dependency_model"]["mode"], "stdlib_only")
             self.assertTrue(
                 payload_manifest["minimum_workspace_manifest"]["required_capabilities"]["planning_mode_orchestrator"]
@@ -106,6 +116,44 @@ class PayloadInstallTests(unittest.TestCase):
             self.assertTrue(payload_manifest["minimum_workspace_manifest"]["required_capabilities"]["preferences_preload"])
             self.assertTrue(payload_manifest["minimum_workspace_manifest"]["required_capabilities"]["runtime_gate"])
             self.assertTrue(payload_manifest["minimum_workspace_manifest"]["required_capabilities"]["runtime_entry_guard"])
+
+    def test_install_versioned_runtime_bundle_rejects_invalid_manifest_bundle_version_before_rename(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            host_root = Path(temp_dir)
+            bundle_root = host_root / "sopify" / "bundles" / "2026-02-13"
+            bundle_root.mkdir(parents=True, exist_ok=True)
+            _write_json(
+                bundle_root / "manifest.json",
+                {
+                    "schema_version": "1",
+                    "bundle_version": "../escape",
+                },
+            )
+
+            with patch("installer.payload.sync_runtime_bundle", return_value=bundle_root):
+                with self.assertRaisesRegex(InstallError, "bundle_version"):
+                    _install_versioned_runtime_bundle(
+                        repo_root=REPO_ROOT,
+                        host_root=host_root,
+                        desired_bundle_version="2026-02-13",
+                    )
+
+            self.assertTrue(bundle_root.exists())
+            self.assertFalse((host_root / "sopify" / "escape").exists())
+
+    def test_install_versioned_runtime_bundle_rejects_invalid_desired_bundle_version_before_sync(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            host_root = Path(temp_dir)
+
+            with patch("installer.payload.sync_runtime_bundle") as sync_runtime_bundle:
+                with self.assertRaisesRegex(InstallError, "bundle_version"):
+                    _install_versioned_runtime_bundle(
+                        repo_root=REPO_ROOT,
+                        host_root=host_root,
+                        desired_bundle_version="../escape",
+                    )
+
+            sync_runtime_bundle.assert_not_called()
 
 
 class WorkspaceBootstrapCompatibilityTests(unittest.TestCase):
@@ -291,9 +339,95 @@ class WorkspaceBootstrapCompatibilityTests(unittest.TestCase):
 
             payload_manifest_path, payload_manifest, bundle_manifest_path, bundle_manifest = validate_payload_manifests(payload_root)
             self.assertEqual(payload_manifest_path, payload_root / "payload-manifest.json")
-            self.assertEqual(bundle_manifest_path, payload_root / "bundle" / "manifest.json")
+            self.assertEqual(bundle_manifest_path, payload_root / "bundles" / "2026-02-13" / "manifest.json")
             self.assertEqual(payload_manifest["payload_version"], "2026-02-13")
             self.assertEqual(bundle_manifest["bundle_version"], "2026-02-13")
+
+    def test_validate_payload_manifests_supports_exact_bundle_version_lookup(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            home_root = Path(temp_dir)
+            payload_root = _create_incomplete_payload(home_root=home_root, version="2026-02-14")
+            _write_json(
+                payload_root / "bundles" / "2026-02-13" / "manifest.json",
+                {
+                    "schema_version": "1",
+                    "bundle_version": "2026-02-13",
+                    "capabilities": {
+                        "bundle_role": "control_plane",
+                        "manifest_first": True,
+                        "writes_handoff_file": True,
+                    },
+                },
+            )
+
+            _payload_manifest_path, _payload_manifest, bundle_manifest_path, bundle_manifest = validate_payload_manifests(
+                payload_root,
+                bundle_version="2026-02-13",
+            )
+
+            self.assertEqual(bundle_manifest_path, payload_root / "bundles" / "2026-02-13" / "manifest.json")
+            self.assertEqual(bundle_manifest["bundle_version"], "2026-02-13")
+
+    def test_validate_payload_manifests_rejects_escaping_bundles_dir(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            home_root = Path(temp_dir)
+            payload_root = _create_incomplete_payload(home_root=home_root, version="2026-02-13")
+            _write_json(
+                payload_root / "payload-manifest.json",
+                {
+                    "schema_version": "1",
+                    "payload_version": "2026-02-13",
+                    "bundle_version": "2026-02-13",
+                    "active_version": "2026-02-13",
+                    "bundles_dir": "..",
+                    "bundle_manifest": "bundles/2026-02-13/manifest.json",
+                    "bundle_template_dir": "bundles/2026-02-13",
+                    "helper_entry": "helpers/bootstrap_workspace.py",
+                },
+            )
+
+            with self.assertRaisesRegex(InstallError, "bundles_dir"):
+                validate_payload_manifests(payload_root)
+
+    def test_validate_payload_manifests_rejects_bundles_dir_with_parent_segments(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            home_root = Path(temp_dir)
+            payload_root = _create_incomplete_payload(home_root=home_root, version="2026-02-13")
+            _write_json(
+                payload_root / "payload-manifest.json",
+                {
+                    "schema_version": "1",
+                    "payload_version": "2026-02-13",
+                    "bundle_version": "2026-02-13",
+                    "active_version": "2026-02-13",
+                    "bundles_dir": "bundles/../bundles",
+                    "bundle_manifest": "bundles/2026-02-13/manifest.json",
+                    "bundle_template_dir": "bundles/2026-02-13",
+                    "helper_entry": "helpers/bootstrap_workspace.py",
+                },
+            )
+
+            with self.assertRaisesRegex(InstallError, "bundles_dir"):
+                validate_payload_manifests(payload_root)
+
+    def test_validate_payload_manifests_rejects_escaping_legacy_bundle_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            home_root = Path(temp_dir)
+            payload_root = _create_incomplete_payload(home_root=home_root, version="2026-02-13")
+            _write_json(
+                payload_root / "payload-manifest.json",
+                {
+                    "schema_version": "1",
+                    "payload_version": "2026-02-13",
+                    "bundle_version": "2026-02-13",
+                    "bundle_manifest": "../outside/manifest.json",
+                    "bundle_template_dir": "bundle",
+                    "helper_entry": "helpers/bootstrap_workspace.py",
+                },
+            )
+
+            with self.assertRaisesRegex(InstallError, "bundle_manifest"):
+                validate_payload_manifests(payload_root)
 
 
 class HostPromptContractTests(unittest.TestCase):

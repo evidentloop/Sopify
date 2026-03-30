@@ -44,15 +44,16 @@ archive_ready: false
 
 ## 0.B | 首次写入许可模型
 - [ ] 0.B.1 按已冻结结论落首次写入许可模型的入口边界与触发优先级：显式强意图命令、`confirm_bootstrap` checkpoint、禁止纯语义自动 bootstrap，并明确 `~go / ~go plan` 何时可直接落 thin stub
-- [ ] 0.B.2 按已冻结白名单落宿主入口：明确 `~go / ~go plan / ~go init` 的许可语义，以及 `~compare / 未激活仓库上的 ~go finalize` 默认不触发 bootstrap；其中 `~go init` 只作为合法入口，不阻塞 `B1` 主链交付
+- [x] 0.B.2 按已冻结白名单落宿主入口：明确 `~go / ~go plan / ~go init` 的许可语义，以及 `~compare / 未激活仓库上的 ~go finalize` 默认不触发 bootstrap；其中 `~go init` 只作为合法入口，不阻塞 `B1` 主链交付
 - [ ] 0.B.3 按已冻结职责边界收敛语义判定层：只允许输出结构化 intent proposal，不得直接驱动 `bootstrap / plan scaffold / proposal materialization / workspace write`
 - [ ] 0.B.4 按已冻结生成物边界落首次 auto-bootstrap：默认只写 thin stub，不默认生成 `sopify.config.yaml`
 - [ ] 0.B.5 按已冻结路由语义落实“已激活 workspace”后续行为：继续走 `consult / minimal / adaptive`，不得把激活态等同于“所有请求都强管控”
-- [ ] 0.B.6 按已冻结授权位置收敛 host ingress / preflight：首次写入许可必须发生在宿主入口前置决策，不得下沉到 repo-local runtime 内部再确认
-- [ ] 0.B.7 按已冻结规则落实 brake layer 的最小覆盖面：`不要改 / 先分析 / 只解释 / 不写文件 / explain-only` 等高确定性表达优先阻断写入意图
-- [ ] 0.B.8 按已冻结规则落 `monorepo` 首次激活默认 root 逻辑：`显式 root 指定 > 最近的有效 ancestor marker > 当前 cwd`；`sopify.config.yaml` 不作为上层复用信号；向上 walk 命中的第一个 ancestor marker 只有通过最低有效性才允许复用，若最低有效性失败则立即停止并 `fail-closed` 回退 `cwd`；`repo-root` 级激活必须显式指定
-- [ ] 0.B.9 按已冻结边界落实 marker 最低有效性：仅用于 root 选择，定义为 `JSON 可解析 + schema_version 存在`，不提前承担 `preflight / validate` 的 stub 健康度校验
+- [x] 0.B.6 按已冻结授权位置收敛 host ingress / preflight：首次写入许可必须发生在宿主入口前置决策，不得下沉到 repo-local runtime 内部再确认
+- [x] 0.B.7 按已冻结规则落实 brake layer 的最小覆盖面：`不要改 / 先分析 / 只解释 / 不写文件 / explain-only` 等高确定性表达优先阻断写入意图
+- [x] 0.B.8 按已冻结规则落 `monorepo` 首次激活默认 root 逻辑：`显式 root 指定 > 最近的有效 ancestor marker > 当前 cwd`；`sopify.config.yaml` 不作为上层复用信号；向上 walk 命中的第一个 ancestor marker 只有通过最低有效性才允许复用，若最低有效性失败则立即停止并 `fail-closed` 回退 `cwd`；`repo-root` 级激活必须显式指定
+- [x] 0.B.9 按已冻结边界落实 marker 最低有效性：仅用于 root 选择，定义为 `JSON 可解析 + schema_version 存在`，不提前承担 `preflight / validate` 的 stub 健康度校验
 - [ ] 0.B.10 按已冻结降级策略落 `readonly / non-interactive / non-git / monorepo 歧义` 的 `confirm_bootstrap` 回退条件：不得卡在确认、不得 silent activation、不得静默写到错误 root
+  进展记录：part1 已收口 `explicit_allow / blocked_command / no_write_consult / brake_layer_blocked` 四类首次写入前置判定，并把 `activation_root / requested_root / payload_root / host_id` 贯通到 `runtime_gate -> workspace_preflight -> bootstrap helper`。`confirm_bootstrap` checkpoint 与 `readonly / non-interactive` 回退仍留在后续切片，不在本次 part1 收口内。
   评审记录：`preflight block` 回合下的 receipt/state fallback 路径目前固定为 `.sopify-skills/...`，作为 pre-config fail-safe contract 明确保留；本轮不追随 custom `plan.directory`，避免 block 分支重新依赖 config。
   评审记录：payload manifest 存在但 JSON 非法/非 object 时，doctor 侧当前仍统一折叠为 `MISSING_REQUIRED_FILE`；已评审为 diagnostics debt，后续在 reason-code matrix 阶段细化，不作为当前阻断项。
 
@@ -68,7 +69,7 @@ archive_ready: false
 ## 2. P1 | Thin Stub Contract
 - [ ] 2.1 按已冻结 schema 落 workspace-local thin stub：`schema_version / stub_version / bundle_version / required_capabilities / locator_mode / legacy_fallback / ignore_mode / written_by_host`
 - [ ] 2.2 落 thin stub 的最小有效性规则、缺失字段降级规则与 schema evolution 兼容策略，并显式区分“root 选择最低有效性”与“preflight 合同有效性”；至少覆盖 `locator_mode` 缺失视为 `global_first`、`bundle_version` 缺失或 `null` 视为 host-delegated、禁用 semver range / `latest` / 空字符串
-  进展记录：当前已落过渡态实现。workspace `.sopify-runtime/manifest.json` 在保持旧 vendored entry 字段兼容的前提下，开始写入 thin stub 字段，并在 `validate.py / inspection.py / bootstrap_workspace.py` 中统一校验默认值与冲突规则；完整 `stub-only` 收口仍待 payload index 与入口链切换后继续推进。
+  进展记录：当前已落过渡态实现。workspace `.sopify-runtime/manifest.json` 在保持旧 vendored entry 字段兼容的前提下，开始写入 thin stub 字段，并在 `validate.py / inspection.py / bootstrap_workspace.py` 中统一校验默认值与冲突规则；legacy helper 兼容重试现已改为先保留 `--request` 再降级到 workspace-only，避免首次写入授权语义被错误放宽。完整 `stub-only` 收口仍待 payload index 与入口链切换后继续推进。
   阶段标签：`B1 compatibility phase`。在本阶段，`stub-only => non-ready` 是预期行为，不视为 defect；`ready` 仍要求 manifest 合同通过且 workspace runtime 文件完整。
 - [ ] 2.3 将 workspace classifier 从“整包文件存在”改为“stub 有效 + global bundle 可解析”
 - [ ] 2.4 拆分三层职责：root 选择最低有效性、workspace stub 校验、global bundle 校验、legacy vendored 校验
@@ -78,19 +79,23 @@ archive_ready: false
 
 ## 3. P2 | Host-Aware Preflight
 - [ ] 3.1 为 preflight 入口补正式 ingress contract：`activation_root / host_id / payload_root` 为必填输入，`requested_root` 为可选 observability 输入且推荐宿主在可确定时提供；不再默认靠目录探测推断宿主
+  进展记录：part1 已把 `activation_root / host_id / payload_root / requested_root` 显式贯通到 `scripts/runtime_gate.py -> runtime/gate.py -> runtime/workspace_preflight.py`，并补齐 host-aware 与 explicit-root 的正反回归。严格的 ingress validator、字段级 violation 合同与 fail-closed 渲染仍留给后续收口。
 - [ ] 3.2 将 payload root 解析责任收拢到 `installer/hosts/*` 与 host base contract
 - [ ] 3.3 移除把 `.codex -> .claude` 固定探测顺序当成最终 payload 选择逻辑的实现
 - [ ] 3.4 固化 `stub -> global bundle -> manifest-first gate/preload -> legacy fallback` 的解析顺序
-  进展记录：当前已支持显式 `payload_root` 与 `host_id` 进入 preflight；在提供显式 ingress 信息时，不再把 `.codex -> .claude` 固定顺序当作最终 payload 选择逻辑。兼容阶段下，legacy home/env 扫描仍保留为 fallback，以避免提前切断现有宿主链路。
+  进展记录：当前已支持显式 `payload_root` 与 `host_id` 进入 preflight；在提供显式 ingress 信息时，不再把 `.codex -> .claude` 固定顺序当作最终 payload 选择逻辑。兼容阶段下，legacy home/env 扫描仍保留为 fallback，以避免提前切断现有宿主链路；同时已补 request-preserving compatibility fallback 与 `host_id=None` 时优先消费 `SOPIFY_PAYLOAD_MANIFEST` 的正向回归。
 - [ ] 3.5 明确 dual-host 同仓库下的选择规则、冲突提示与 `host_mismatch / ingress_contract_invalid` 的产出边界，并让 monorepo root 复用结果进入同一 observability 词汇表
 - [ ] 3.6 确保 gate / preload 的入口仍由 resolved global bundle manifest 暴露，而不是宿主侧硬编码
 
 ## 4. P3 | Payload Index 与 Diagnostics
-- [ ] 4.1 定义 payload-manifest 中的 versioned bundle index schema，与 `bundles/<version>/` 布局对应，并包含 host-delegated 模式所需的唯一 `active_version` 指针；其值格式必须与 thin stub 的 `bundle_version` Exact Pin 一致
+- [x] 4.1 定义 payload-manifest 中的 versioned bundle index schema，与 `bundles/<version>/` 布局对应，并包含 host-delegated 模式所需的唯一 `active_version` 指针；其值格式必须与 thin stub 的 `bundle_version` Exact Pin 一致
 - [ ] 4.2 将 `installer/payload.py` 从单 `bundle/` 假设改为按 `bundle_version` 两态查找目标 bundle：Exact Pin 精确命中，Host-Delegated 读取唯一 `active_version` 指针
-- [ ] 4.3 同步更新 `validate.py`、`inspection.py` 的 bundle discovery 与兼容性判定
+  进展记录：第一组 payload index 实现已把 host payload 默认落点切到 `bundles/<version>/ + active_version`，并保持 `bundle_manifest / bundle_template_dir` 指向 active bundle 以兼容当前 helper 链。显式 `bundle_version` lookup 已进入共享校验/发现层；workspace bootstrap 在 compatibility phase 仍默认消费 `active_version`，待 stub-only 收口后再把 exact-pin 语义完全下沉到 helper。
+- [x] 4.3 同步更新 `validate.py`、`inspection.py` 的 bundle discovery 与兼容性判定
 - [ ] 4.4 同步更新 `scripts/sopify_status.py`、`scripts/sopify_doctor.py` 的可见输出，展示 stub/global/legacy 解析结果，并针对 `global_bundle_missing / global_bundle_incompatible / global_index_corrupted / legacy_fallback_selected` 提供不同的 actionable hint
+  进展记录：底层 status/doctor inspection 已改为解析 versioned payload bundle，workspace/payload/smoke 的 evidence 路径不再写死 `payload_root/bundle`；按 `primary_code` 区分的新提示文案仍待单独收口。
 - [ ] 4.5 同步更新 `scripts/check-install-payload-bundle-smoke.py` 与 distribution 相关校验入口
+  进展记录：repo-local installer 的 post-install smoke 与独立 `check-install-payload-bundle-smoke.py` 已能通过 versioned payload bundle 路径完成校验；剩余工作主要是把这条路径与 4.4 的用户可见输出一起统一成最终 contract。
 - [ ] 4.6 在迁移窗口内兼容旧 `bundle/` 结构，但明确标记为 legacy source，不再作为默认目标态
 - [ ] 4.7 确保 payload index 升级后，installer / doctor / status / smoke 消费的是同一套 reason code 与 source-kind 词汇
 

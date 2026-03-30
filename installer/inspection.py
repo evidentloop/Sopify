@@ -12,6 +12,7 @@ from installer.hosts import iter_host_registrations
 from installer.hosts.base import HostAdapter, HostRegistration
 from installer.models import HostCapability, InstallError
 from installer.validate import (
+    resolve_payload_bundle_root,
     run_bundle_smoke_check,
     validate_bundle_install,
     validate_host_install,
@@ -626,7 +627,7 @@ def _inspect_workspace_bundle(
             check_id="workspace_bundle_manifest",
             status=CHECK_FAIL,
             reason_code="MISSING_REQUIRED_FILE",
-            evidence=tuple(str(path) for path in (payload_root / "payload-manifest.json", payload_root / "bundle" / "manifest.json") if path.exists()),
+            evidence=tuple(str(path) for path in _payload_evidence_paths(payload_root)),
             recommendation=f"Install or refresh the {capability.host_id} payload before inspecting workspace bundle health.",
         )
     try:
@@ -733,8 +734,8 @@ def _inspect_smoke(
             reason_code=REASON_OK,
         )
 
-    bundle_root = adapter.payload_root(home_root) / "bundle"
     try:
+        bundle_root = resolve_payload_bundle_root(adapter.payload_root(home_root))
         stdout = run_bundle_smoke_check(bundle_root)
         evidence = (stdout.splitlines()[0],) if stdout else ()
         return InspectionCheck(
@@ -842,6 +843,24 @@ def _read_json(path: Path) -> dict[str, Any]:
         return json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
         return {}
+
+
+def _payload_evidence_paths(payload_root: Path) -> tuple[Path, ...]:
+    payload_manifest_path = payload_root / "payload-manifest.json"
+    evidence: list[Path] = []
+    if payload_manifest_path.exists():
+        evidence.append(payload_manifest_path)
+        payload_manifest = _read_json(payload_manifest_path)
+        if payload_manifest:
+            try:
+                evidence.append(resolve_payload_bundle_root(payload_root).resolve() / "manifest.json")
+            except InstallError:
+                bundle_manifest = str(payload_manifest.get("bundle_manifest") or "").strip()
+                if bundle_manifest:
+                    candidate = payload_root / bundle_manifest
+                    if candidate.exists():
+                        evidence.append(candidate)
+    return tuple(evidence)
 
 
 def _host_is_absent(*, adapter: HostAdapter, home_root: Path) -> bool:

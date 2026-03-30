@@ -6,6 +6,27 @@ This changelog is maintained manually (not auto-generated).
 
 ## [Unreleased]
 
+## [2026-03-30.133450] - 2026-03-30
+
+### Scripts
+
+- Adjusted maintenance scripts:
+  - `scripts/install_sopify.py`
+
+### Tests
+
+- Updated automated coverage:
+  - `tests/test_installer.py`
+  - `tests/test_runtime_gate.py`
+
+### Changed
+
+- Updated project files:
+  - `installer/hosts/base.py`
+  - `installer/inspection.py`
+  - `installer/payload.py`
+  - `installer/validate.py`
+
 ## [2026-03-30.102148] - 2026-03-30
 
 ### Runtime

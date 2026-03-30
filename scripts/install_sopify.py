@@ -23,7 +23,13 @@ from installer.hosts import get_host_adapter, iter_installable_hosts
 from installer.hosts.base import install_host_assets
 from installer.models import BootstrapResult, InstallError, InstallResult, LANGUAGE_DIRECTORY_MAP, parse_install_target
 from installer.payload import install_global_payload, run_workspace_bootstrap
-from installer.validate import run_bundle_smoke_check, validate_bundle_install, validate_host_install, validate_payload_install
+from installer.validate import (
+    resolve_payload_bundle_root,
+    run_bundle_smoke_check,
+    validate_bundle_install,
+    validate_host_install,
+    validate_payload_install,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -74,7 +80,7 @@ def run_install(*, target_value: str, workspace_value: str | None, repo_root: Pa
     payload_install = install_global_payload(adapter, repo_root=repo_root, home_root=resolved_home)
     verified_host_paths = validate_host_install(adapter, home_root=resolved_home)
     verified_payload_paths = validate_payload_install(payload_install.root)
-    smoke_output = run_bundle_smoke_check(payload_install.root / "bundle")
+    smoke_output = run_bundle_smoke_check(resolve_payload_bundle_root(payload_install.root))
 
     workspace_bootstrap: BootstrapResult | None = None
     bundle_root: Path | None = None

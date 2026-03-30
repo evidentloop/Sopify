@@ -13,12 +13,12 @@ from typing import Any
 from installer.hosts.base import HostAdapter, read_sopify_version
 from installer.models import BootstrapResult, InstallError, InstallPhaseResult
 from installer.runtime_bundle import sync_runtime_bundle
-from installer.validate import validate_payload_install
+from installer.validate import _normalize_payload_bundle_version, resolve_payload_bundle_root, validate_payload_install
 from runtime.state import iso_now
 
 PAYLOAD_MANIFEST_FILENAME = "payload-manifest.json"
 PAYLOAD_DIRNAME = "sopify"
-PAYLOAD_BUNDLE_RELATIVE_PATH = Path("bundle")
+PAYLOAD_BUNDLES_RELATIVE_PATH = Path("bundles")
 PAYLOAD_HELPER_RELATIVE_PATH = Path("helpers") / "bootstrap_workspace.py"
 _REQUIRED_BUNDLE_CAPABILITIES = {
     "bundle_role": "control_plane",
@@ -44,7 +44,7 @@ def install_global_payload(
     """Install or update the host-local Sopify payload used for workspace bootstrap."""
     host_root = adapter.destination_root(home_root)
     payload_root = adapter.payload_root(home_root)
-    desired_version = _source_payload_version(adapter, repo_root)
+    desired_version = _normalize_payload_bundle_version(_source_payload_version(adapter, repo_root))
 
     if _payload_is_current(payload_root, desired_version):
         return InstallPhaseResult(
@@ -55,7 +55,11 @@ def install_global_payload(
         )
 
     action = "updated" if payload_root.exists() else "installed"
-    bundle_root = sync_runtime_bundle(repo_root, host_root, bundle_dirname=str(Path(PAYLOAD_DIRNAME) / PAYLOAD_BUNDLE_RELATIVE_PATH))
+    bundle_root = _install_versioned_runtime_bundle(
+        repo_root=repo_root,
+        host_root=host_root,
+        desired_bundle_version=desired_version,
+    )
     _install_bootstrap_helper(repo_root=repo_root, payload_root=payload_root)
     _write_payload_manifest(payload_root=payload_root, bundle_root=bundle_root, payload_version=desired_version)
     return InstallPhaseResult(
@@ -103,13 +107,14 @@ def _payload_is_current(payload_root: Path, desired_version: str | None) -> bool
         return False
 
     payload_manifest = _read_json(payload_root / PAYLOAD_MANIFEST_FILENAME)
-    bundle_manifest = _read_json(payload_root / PAYLOAD_BUNDLE_RELATIVE_PATH / "manifest.json")
+    bundle_root = resolve_payload_bundle_root(payload_root)
+    bundle_manifest = _read_json(bundle_root / "manifest.json")
     if not payload_manifest or not bundle_manifest:
         return False
 
     return (
         payload_manifest.get("payload_version") == desired_version
-        and payload_manifest.get("bundle_version") == bundle_manifest.get("bundle_version")
+        and payload_manifest.get("active_version", payload_manifest.get("bundle_version")) == bundle_manifest.get("bundle_version")
     )
 
 
@@ -130,19 +135,48 @@ def _install_bootstrap_helper(*, repo_root: Path, payload_root: Path) -> Path:
     return helper_target
 
 
+def _install_versioned_runtime_bundle(
+    *,
+    repo_root: Path,
+    host_root: Path,
+    desired_bundle_version: str | None,
+) -> Path:
+    initial_version = _normalize_payload_bundle_version(desired_bundle_version) or "0.0.0-dev"
+    bundle_root = sync_runtime_bundle(
+        repo_root,
+        host_root,
+        bundle_dirname=str(Path(PAYLOAD_DIRNAME) / PAYLOAD_BUNDLES_RELATIVE_PATH / initial_version),
+    )
+    bundle_manifest = _read_json(bundle_root / "manifest.json")
+    actual_version = _payload_bundle_version_or_default(bundle_manifest.get("bundle_version"), default=initial_version)
+    if actual_version == bundle_root.name:
+        return bundle_root
+
+    target_root = bundle_root.parent / actual_version
+    if target_root.exists():
+        shutil.rmtree(target_root)
+    bundle_root.replace(target_root)
+    return target_root
+
+
 def _write_payload_manifest(*, payload_root: Path, bundle_root: Path, payload_version: str | None) -> Path:
     bundle_manifest = _read_json(bundle_root / "manifest.json")
     if not bundle_manifest:
         raise InstallError(f"Missing bundle manifest for payload generation: {bundle_root / 'manifest.json'}")
+    bundle_version = _payload_bundle_version_or_default(bundle_manifest.get("bundle_version"), default=bundle_root.name or "0.0.0-dev")
+    normalized_payload_version = _normalize_payload_bundle_version(payload_version)
+    bundle_manifest_path = PAYLOAD_BUNDLES_RELATIVE_PATH / bundle_version / "manifest.json"
 
     payload = {
         "schema_version": "1",
-        "payload_version": payload_version or str(bundle_manifest.get("bundle_version") or "0.0.0-dev"),
-        "bundle_version": str(bundle_manifest.get("bundle_version") or "0.0.0-dev"),
+        "payload_version": normalized_payload_version or bundle_version,
+        "bundle_version": bundle_version,
+        "active_version": bundle_version,
         "generated_at": iso_now(),
+        "bundles_dir": str(PAYLOAD_BUNDLES_RELATIVE_PATH),
         "default_bundle_dir": ".sopify-runtime",
-        "bundle_manifest": str(PAYLOAD_BUNDLE_RELATIVE_PATH / "manifest.json"),
-        "bundle_template_dir": str(PAYLOAD_BUNDLE_RELATIVE_PATH),
+        "bundle_manifest": str(bundle_manifest_path),
+        "bundle_template_dir": str(bundle_manifest_path.parent),
         "helper_entry": str(PAYLOAD_HELPER_RELATIVE_PATH),
         "dependency_model": bundle_manifest.get("dependency_model")
         or {
@@ -180,3 +214,13 @@ def _read_json(path: Path) -> dict[str, Any]:
         return json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
         return {}
+
+
+def _payload_bundle_version_or_default(value: Any, *, default: str) -> str:
+    normalized = _normalize_payload_bundle_version(value)
+    if normalized is not None:
+        return normalized
+    fallback = _normalize_payload_bundle_version(default)
+    if fallback is None:
+        raise InstallError("Payload verification failed: bundle_version")
+    return fallback

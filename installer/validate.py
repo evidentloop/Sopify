@@ -15,6 +15,8 @@ _STUB_LOCATOR_MODES = {"global_first", "global_only"}
 _STUB_IGNORE_MODES = {"exclude", "gitignore", "noop"}
 _STUB_REQUIRED_CAPABILITIES = {"runtime_gate", "preferences_preload"}
 _EXACT_BUNDLE_VERSION_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+_DEFAULT_VERSIONED_BUNDLES_DIR = Path("bundles")
+_LEGACY_BUNDLE_MANIFEST_PATH = Path("bundle") / "manifest.json"
 
 
 def validate_host_install(adapter: HostAdapter, *, home_root: Path) -> tuple[Path, ...]:
@@ -42,7 +44,7 @@ def validate_payload_install(payload_root: Path) -> tuple[Path, ...]:
         payload_manifest_path,
         payload_root / "helpers" / "bootstrap_workspace.py",
         bundle_manifest_path,
-        *validate_bundle_install(payload_root / "bundle"),
+        *validate_bundle_install(bundle_manifest_path.parent),
     )
 
 
@@ -87,18 +89,31 @@ def expected_bundle_paths(bundle_root: Path) -> tuple[Path, ...]:
     )
 
 
-def validate_payload_manifests(payload_root: Path) -> tuple[Path, dict[str, Any], Path, dict[str, Any]]:
+def validate_payload_manifests(
+    payload_root: Path,
+    bundle_version: str | None = None,
+) -> tuple[Path, dict[str, Any], Path, dict[str, Any]]:
     """Load the top-level payload manifest plus the global bundle manifest."""
     payload_manifest_path = payload_root / "payload-manifest.json"
     helper_path = payload_root / "helpers" / "bootstrap_workspace.py"
-    bundle_manifest_path = payload_root / "bundle" / "manifest.json"
     if not payload_manifest_path.exists():
         raise InstallError(f"Payload verification failed: {payload_manifest_path}")
     if not helper_path.exists():
         raise InstallError(f"Payload verification failed: {helper_path}")
     payload_manifest = _read_json_object(payload_manifest_path)
+    bundle_manifest_path = _resolve_payload_bundle_manifest_path(
+        payload_root,
+        payload_manifest,
+        bundle_version=bundle_version,
+    )
     bundle_manifest = _read_json_object(bundle_manifest_path)
     return (payload_manifest_path, payload_manifest, bundle_manifest_path, bundle_manifest)
+
+
+def resolve_payload_bundle_root(payload_root: Path, *, bundle_version: str | None = None) -> Path:
+    """Resolve the concrete payload bundle root for the active or requested version."""
+    _payload_manifest_path, payload_manifest = _load_payload_manifest(payload_root)
+    return _resolve_payload_bundle_manifest_path(payload_root, payload_manifest, bundle_version=bundle_version).parent
 
 
 def validate_workspace_bundle_manifest(bundle_root: Path) -> tuple[Path, dict[str, Any]]:
@@ -135,6 +150,81 @@ def _read_json_object(path: Path) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise InstallError(f"JSON verification failed: {path}")
     return payload
+
+
+def _load_payload_manifest(payload_root: Path) -> tuple[Path, dict[str, Any]]:
+    payload_manifest_path = payload_root / "payload-manifest.json"
+    payload_manifest = _read_json_object(payload_manifest_path)
+    return (payload_manifest_path, payload_manifest)
+
+
+def _resolve_payload_bundle_manifest_path(
+    payload_root: Path,
+    payload_manifest: dict[str, Any],
+    *,
+    bundle_version: str | None = None,
+) -> Path:
+    requested_version = _normalize_payload_bundle_version(bundle_version) if bundle_version is not None else None
+    bundles_dir = _bundles_dir_from_manifest(payload_root, payload_manifest)
+    active_version = _payload_active_version(payload_manifest)
+    if requested_version is not None:
+        if bundles_dir is not None:
+            return payload_root / bundles_dir / requested_version / "manifest.json"
+        if active_version == requested_version:
+            return _legacy_bundle_manifest_path(payload_root, payload_manifest)
+        return payload_root / _DEFAULT_VERSIONED_BUNDLES_DIR / requested_version / "manifest.json"
+    if bundles_dir is not None:
+        if active_version is None:
+            raise InstallError("Payload verification failed: active_version")
+        return payload_root / bundles_dir / active_version / "manifest.json"
+    return _legacy_bundle_manifest_path(payload_root, payload_manifest)
+
+
+def _bundles_dir_from_manifest(payload_root: Path, payload_manifest: dict[str, Any]) -> Path | None:
+    return _resolve_payload_relative_path(payload_root, payload_manifest.get("bundles_dir"), field_name="bundles_dir")
+
+
+def _payload_active_version(payload_manifest: dict[str, Any]) -> str | None:
+    if "active_version" in payload_manifest:
+        return _normalize_payload_bundle_version(payload_manifest.get("active_version"))
+    if "bundle_version" in payload_manifest:
+        return _normalize_payload_bundle_version(payload_manifest.get("bundle_version"))
+    return None
+
+
+def _legacy_bundle_manifest_path(payload_root: Path, payload_manifest: dict[str, Any]) -> Path:
+    relative = _resolve_payload_relative_path(payload_root, payload_manifest.get("bundle_manifest"), field_name="bundle_manifest")
+    if relative:
+        return payload_root / relative
+    return payload_root / _LEGACY_BUNDLE_MANIFEST_PATH
+
+
+def _resolve_payload_relative_path(payload_root: Path, value: Any, *, field_name: str) -> Path | None:
+    normalized = str(value or "").strip()
+    if not normalized:
+        return None
+    candidate = Path(normalized)
+    if candidate.is_absolute():
+        raise InstallError(f"Payload verification failed: {field_name}")
+    if ".." in candidate.parts:
+        raise InstallError(f"Payload verification failed: {field_name}")
+    resolved_root = payload_root.resolve()
+    resolved_candidate = (resolved_root / candidate).resolve()
+    try:
+        return resolved_candidate.relative_to(resolved_root)
+    except ValueError as exc:
+        raise InstallError(f"Payload verification failed: {field_name}") from exc
+
+
+def _normalize_payload_bundle_version(value: Any) -> str | None:
+    if value is None:
+        return None
+    normalized = str(value).strip()
+    if not normalized:
+        return None
+    if normalized == "latest" or not _EXACT_BUNDLE_VERSION_RE.match(normalized):
+        raise InstallError("Payload verification failed: bundle_version")
+    return normalized
 
 
 def _normalize_locator_mode(value: Any) -> str:

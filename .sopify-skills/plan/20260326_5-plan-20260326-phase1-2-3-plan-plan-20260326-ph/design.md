@@ -20,6 +20,17 @@
    - B1 只承诺迁移可见性、提示与说明
    - B1 不承诺一键升级器，也不承诺完整 `deactivate / clean / prune`
 
+## Part1 收口状态
+- 已落地：
+  - 首次写入授权前移到 host ingress / workspace preflight，`~go / ~go plan / ~go init` 与 `~compare / ~go finalize / ~go exec` 的首写语义已落白名单/黑名单
+  - brake layer 已覆盖 `不要改 / 先分析 / 只解释 / 不写文件 / explain-only / read-only` 等高确定性 no-write 表达
+  - `activation_root / requested_root / host_id / payload_root` 已贯通 `runtime_gate -> gate -> workspace_preflight`，monorepo root 选择与 invalid ancestor marker fail-closed 已进入实现与回归
+  - thin-stub compatibility phase 已补齐 request-preserving legacy helper fallback，避免只是不支持 `--host-id` 的旧 helper 把非写入请求错误降级为默认授权
+- 仍未在 part1 完成：
+  - `confirm_bootstrap` checkpoint 与 `readonly / non-interactive` 回退
+  - 真正的 `stub-only` workspace ready-path
+  - payload index 与 versioned global bundle discovery
+
 ## 前置门禁 | 状态机 Hotfix
 - `20260327_hotfix` 现已作为本 plan 的前置门禁单独立项，负责修复 stale-state、ghost proposal、checkpoint resolver 分裂与 contradictory handoff
 - 本 plan 不吸收 `runtime/state.py / runtime/context_recovery.py / runtime/router.py / runtime/engine.py / runtime/handoff.py / runtime/_models/proposal.py` 的协商态一致性修复
