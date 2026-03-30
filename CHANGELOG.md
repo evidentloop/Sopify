@@ -6,6 +6,18 @@ This changelog is maintained manually (not auto-generated).
 
 ## [Unreleased]
 
+## [2026-03-30.102148] - 2026-03-30
+
+### Runtime
+
+- Updated runtime internals:
+  - `runtime/workspace_preflight.py`
+
+### Tests
+
+- Updated automated coverage:
+  - `tests/test_runtime_gate.py`
+
 ## [2026-03-28.220226] - 2026-03-28
 
 ### Docs

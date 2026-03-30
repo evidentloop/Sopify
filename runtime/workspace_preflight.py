@@ -276,6 +276,19 @@ def _run_bootstrap_helper_with_compatibility(
     if not _looks_like_legacy_argparse_error(completed):
         return (completed, "contract_v2")
 
+    request_preserving_command = _drop_cli_arg_pairs(command, {"--host-id", "--requested-root"})
+    if request_preserving_command != command:
+        request_preserving_completed = subprocess.run(
+            request_preserving_command,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if not _looks_like_legacy_argparse_error(request_preserving_completed):
+            return (request_preserving_completed, "legacy_request_preserved")
+        if not _stderr_mentions_unrecognized_argument(request_preserving_completed, "--request"):
+            return (request_preserving_completed, "legacy_request_preserved")
+
     legacy_command = [sys.executable, str(helper_path), "--workspace-root", str(workspace_root)]
     legacy_completed = subprocess.run(
         legacy_command,
@@ -291,10 +304,33 @@ def _looks_like_legacy_argparse_error(completed: subprocess.CompletedProcess[str
         return False
     stderr = (completed.stderr or "").strip()
     return "unrecognized arguments:" in stderr and (
-        "--request" in stderr
-        or "--host-id" in stderr
-        or "--requested-root" in stderr
+        _stderr_mentions_unrecognized_argument(completed, "--request")
+        or _stderr_mentions_unrecognized_argument(completed, "--host-id")
+        or _stderr_mentions_unrecognized_argument(completed, "--requested-root")
     )
+
+
+def _stderr_mentions_unrecognized_argument(completed: subprocess.CompletedProcess[str], argument: str) -> bool:
+    stderr = (completed.stderr or "").strip()
+    return "unrecognized arguments:" in stderr and argument in stderr
+
+
+def _drop_cli_arg_pairs(command: list[str], unsupported_args: set[str]) -> list[str]:
+    if len(command) <= 2:
+        return list(command)
+
+    arg_tokens = command[2:]
+    if len(arg_tokens) % 2 != 0:
+        return list(command)
+
+    trimmed_command = list(command[:2])
+    for index in range(0, len(arg_tokens), 2):
+        flag = arg_tokens[index]
+        value = arg_tokens[index + 1]
+        if flag in unsupported_args:
+            continue
+        trimmed_command.extend([flag, value])
+    return trimmed_command
 
 
 __all__ = ["WorkspacePreflightError", "preflight_workspace_runtime"]

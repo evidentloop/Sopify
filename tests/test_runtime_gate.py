@@ -31,6 +31,7 @@ from installer.payload import install_global_payload
 from runtime.models import DecisionOption, DecisionState, PlanArtifact, PlanProposalState, RouteDecision, RunState, RuntimeHandoff
 from runtime.plan_scaffold import create_plan_scaffold
 from runtime.state import StateStore, iso_now, stable_request_sha1
+from runtime.workspace_preflight import _drop_cli_arg_pairs
 
 
 def _rewrite_background_scope(
@@ -207,6 +208,45 @@ def _write_legacy_payload_manifest_for_gate(*, home_root: Path) -> Path:
             },
             ensure_ascii=False,
             indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return payload_manifest_path
+
+
+def _write_host_id_legacy_payload_manifest_for_gate(*, home_root: Path) -> Path:
+    payload_manifest_path = _install_payload_manifest_for_gate(home_root=home_root)
+    payload_root = payload_manifest_path.parent
+    helper_path = payload_root / "helpers" / "bootstrap_workspace.py"
+    helper_impl_path = payload_root / "helpers" / "bootstrap_workspace_impl.py"
+    helper_impl_path.write_text(helper_path.read_text(encoding="utf-8"), encoding="utf-8")
+    helper_path.write_text(
+        "\n".join(
+            [
+                "#!/usr/bin/env python3",
+                "from __future__ import annotations",
+                "import argparse",
+                "import json",
+                "import sys",
+                "from pathlib import Path",
+                "",
+                "HELPER_ROOT = Path(__file__).resolve().parent",
+                "if str(HELPER_ROOT) not in sys.path:",
+                "    sys.path.insert(0, str(HELPER_ROOT))",
+                "",
+                "from bootstrap_workspace_impl import bootstrap_workspace",
+                "",
+                "parser = argparse.ArgumentParser()",
+                "parser.add_argument('--workspace-root', required=True)",
+                "parser.add_argument('--request', default='')",
+                "args = parser.parse_args()",
+                "result = bootstrap_workspace(",
+                "    Path(args.workspace_root).resolve(),",
+                "    request_text=args.request,",
+                ")",
+                "print(json.dumps(result, ensure_ascii=False))",
+            ]
         )
         + "\n",
         encoding="utf-8",
@@ -753,7 +793,76 @@ class RuntimeGateTests(unittest.TestCase):
             )
 
             self.assertEqual(result["status"], "ready")
-            self.assertEqual(result["preflight"]["helper_argv_mode"], "legacy_fallback")
+            self.assertEqual(result["preflight"]["helper_argv_mode"], "legacy_request_preserved")
+
+    def test_gate_preflight_preserves_request_when_helper_only_rejects_host_id(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            workspace = temp_root / "workspace"
+            workspace.mkdir(parents=True, exist_ok=True)
+            payload_manifest_path = _write_host_id_legacy_payload_manifest_for_gate(home_root=temp_root / "home")
+
+            result = enter_runtime_gate(
+                "只解释 runtime gate，不写文件",
+                workspace_root=workspace,
+                payload_manifest_path=payload_manifest_path,
+                user_home=temp_root / "home",
+            )
+
+            self.assertEqual(result["status"], "error")
+            self.assertEqual(result["error_code"], "workspace_first_write_blocked")
+            self.assertEqual(result["preflight"]["action"], "skipped")
+            self.assertEqual(result["preflight"]["reason_code"], "BRAKE_LAYER_BLOCKED")
+            self.assertEqual(result["preflight"]["helper_argv_mode"], "legacy_request_preserved")
+            self.assertFalse((workspace / ".sopify-runtime" / "manifest.json").exists())
+
+    def test_drop_cli_arg_pairs_preserves_request_value_that_matches_removed_flag_name(self) -> None:
+        command = [
+            sys.executable,
+            "helper.py",
+            "--workspace-root",
+            "/ws",
+            "--request",
+            "--host-id",
+            "--host-id",
+            "codex",
+            "--requested-root",
+            "/req",
+        ]
+
+        rewritten = _drop_cli_arg_pairs(command, {"--host-id", "--requested-root"})
+
+        self.assertEqual(
+            rewritten,
+            [
+                sys.executable,
+                "helper.py",
+                "--workspace-root",
+                "/ws",
+                "--request",
+                "--host-id",
+            ],
+        )
+
+    def test_gate_preflight_uses_env_payload_manifest_when_host_id_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            workspace = temp_root / "workspace"
+            workspace.mkdir(parents=True, exist_ok=True)
+            user_home = temp_root / "home"
+            env_home = temp_root / "env-home"
+            env_manifest_path = _install_payload_manifest_for_gate(home_root=env_home)
+
+            with patch.dict(os.environ, {"SOPIFY_PAYLOAD_MANIFEST": str(env_manifest_path)}):
+                result = enter_runtime_gate(
+                    "~go plan demo",
+                    workspace_root=workspace,
+                    user_home=user_home,
+                )
+
+            self.assertEqual(result["status"], "ready")
+            self.assertEqual(result["preflight"]["host_id"], "codex")
+            self.assertEqual(result["preflight"]["payload_root"], str((env_home / ".codex" / "sopify").resolve()))
 
     def test_gate_preflight_reuses_nearest_valid_ancestor_marker(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
