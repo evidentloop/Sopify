@@ -133,6 +133,141 @@ class RouterTests(unittest.TestCase):
             self.assertTrue(route.should_recover_context)
             self.assertFalse(route.should_create_plan)
 
+    def test_active_plan_meta_review_with_followup_edit_does_not_route_to_consult(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            config = load_runtime_config(workspace)
+            store = StateStore(config)
+            store.ensure()
+            plan_artifact = create_plan_scaffold("第一性原理协作规则分层落地", config=config, level="standard")
+            store.set_current_plan(plan_artifact)
+            router = Router(config, state_store=store)
+            skills = SkillRegistry(config, user_home=workspace / "home").discover()
+
+            route = router.classify("review 一下然后改一下 tasks", skills=skills)
+
+            self.assertIn(route.route_name, {"workflow", "light_iterate"})
+
+    def test_active_plan_meta_review_with_punctuated_followup_edit_does_not_route_to_consult(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            config = load_runtime_config(workspace)
+            store = StateStore(config)
+            store.ensure()
+            plan_artifact = create_plan_scaffold("第一性原理协作规则分层落地", config=config, level="standard")
+            store.set_current_plan(plan_artifact)
+            router = Router(config, state_store=store)
+            skills = SkillRegistry(config, user_home=workspace / "home").discover()
+
+            route = router.classify("review 一下，然后改一下 tasks", skills=skills)
+
+            self.assertIn(route.route_name, {"workflow", "light_iterate"})
+
+    def test_active_plan_meta_review_with_reverse_order_edit_does_not_route_to_consult(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            config = load_runtime_config(workspace)
+            store = StateStore(config)
+            store.ensure()
+            plan_artifact = create_plan_scaffold("第一性原理协作规则分层落地", config=config, level="standard")
+            store.set_current_plan(plan_artifact)
+            router = Router(config, state_store=store)
+            skills = SkillRegistry(config, user_home=workspace / "home").discover()
+
+            route = router.classify("改一下 tasks，然后 review 一下", skills=skills)
+
+            self.assertIn(route.route_name, {"workflow", "light_iterate"})
+
+    def test_active_plan_risk_review_without_plan_anchor_stays_light_iterate(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            config = load_runtime_config(workspace)
+            store = StateStore(config)
+            store.ensure()
+            plan_artifact = create_plan_scaffold("第一性原理协作规则分层落地", config=config, level="standard")
+            store.set_current_plan(plan_artifact)
+            router = Router(config, state_store=store)
+            skills = SkillRegistry(config, user_home=workspace / "home").discover()
+
+            route = router.classify("分析下风险", skills=skills)
+
+            self.assertEqual(route.route_name, "light_iterate")
+
+    def test_active_plan_design_risk_without_plan_anchor_stays_light_iterate(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            config = load_runtime_config(workspace)
+            store = StateStore(config)
+            store.ensure()
+            plan_artifact = create_plan_scaffold("第一性原理协作规则分层落地", config=config, level="standard")
+            store.set_current_plan(plan_artifact)
+            router = Router(config, state_store=store)
+            skills = SkillRegistry(config, user_home=workspace / "home").discover()
+
+            route = router.classify("分析下设计风险", skills=skills)
+
+            self.assertEqual(route.route_name, "light_iterate")
+
+    def test_active_plan_meta_review_with_neutral_middle_fragment_and_followup_edit_does_not_route_to_consult(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            config = load_runtime_config(workspace)
+            store = StateStore(config)
+            store.ensure()
+            plan_artifact = create_plan_scaffold("第一性原理协作规则分层落地", config=config, level="standard")
+            store.set_current_plan(plan_artifact)
+            router = Router(config, state_store=store)
+            skills = SkillRegistry(config, user_home=workspace / "home").discover()
+
+            route = router.classify("review 一下，先确认风险，再改一下 tasks", skills=skills)
+
+            self.assertIn(route.route_name, {"workflow", "light_iterate"})
+
+    def test_active_plan_risk_review_with_followup_edit_does_not_route_to_consult(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            config = load_runtime_config(workspace)
+            store = StateStore(config)
+            store.ensure()
+            plan_artifact = create_plan_scaffold("第一性原理协作规则分层落地", config=config, level="standard")
+            store.set_current_plan(plan_artifact)
+            router = Router(config, state_store=store)
+            skills = SkillRegistry(config, user_home=workspace / "home").discover()
+
+            route = router.classify("看下风险，再改一下 tasks", skills=skills)
+
+            self.assertIn(route.route_name, {"workflow", "light_iterate"})
+
+    def test_active_plan_status_review_with_followup_edit_does_not_route_to_consult(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            config = load_runtime_config(workspace)
+            store = StateStore(config)
+            store.ensure()
+            plan_artifact = create_plan_scaffold("第一性原理协作规则分层落地", config=config, level="standard")
+            store.set_current_plan(plan_artifact)
+            router = Router(config, state_store=store)
+            skills = SkillRegistry(config, user_home=workspace / "home").discover()
+
+            route = router.classify("状态如何，再改一下 tasks", skills=skills)
+
+            self.assertIn(route.route_name, {"workflow", "light_iterate"})
+
+    def test_active_plan_natural_status_review_with_followup_edit_does_not_route_to_consult(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            config = load_runtime_config(workspace)
+            store = StateStore(config)
+            store.ensure()
+            plan_artifact = create_plan_scaffold("第一性原理协作规则分层落地", config=config, level="standard")
+            store.set_current_plan(plan_artifact)
+            router = Router(config, state_store=store)
+            skills = SkillRegistry(config, user_home=workspace / "home").discover()
+
+            route = router.classify("看下这个方案状态，再改下 tasks", skills=skills)
+
+            self.assertNotEqual(route.route_name, "consult")
+
     def test_plan_materialization_meta_debug_does_not_hijack_normal_issue_fix_request(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
@@ -233,6 +368,95 @@ class RouterTests(unittest.TestCase):
             self.assertEqual(revise_route.route_name, "plan_proposal_pending")
             self.assertEqual(revise_route.active_run_action, "revise_plan_proposal")
             self.assertIn("feedback", revise_route.reason)
+
+    def test_pending_plan_proposal_treats_minimal_scope_push_as_revise(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            config = load_runtime_config(workspace)
+            store = StateStore(config)
+            store.ensure()
+            router = Router(config, state_store=store)
+            skills = SkillRegistry(config, user_home=workspace / "home").discover()
+
+            run_runtime("实现 runtime plugin bridge", workspace_root=workspace, user_home=workspace / "home")
+
+            revise_route = router.classify("按这个最小范围直接进 3.1 -> 3.6 注意不要过度设计", skills=skills)
+
+            self.assertEqual(revise_route.route_name, "plan_proposal_pending")
+            self.assertEqual(revise_route.active_run_action, "revise_plan_proposal")
+            self.assertIn("feedback", revise_route.reason)
+
+    def test_pending_plan_proposal_mixed_revision_and_question_stays_revise(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            config = load_runtime_config(workspace)
+            store = StateStore(config)
+            store.ensure()
+            router = Router(config, state_store=store)
+            skills = SkillRegistry(config, user_home=workspace / "home").discover()
+
+            run_runtime("实现 runtime plugin bridge", workspace_root=workspace, user_home=workspace / "home")
+
+            revise_route = router.classify(
+                "按这个最小范围直接进 3.1 -> 3.6 确认是否覆盖风险并补一下",
+                skills=skills,
+            )
+
+            self.assertEqual(revise_route.route_name, "plan_proposal_pending")
+            self.assertEqual(revise_route.active_run_action, "revise_plan_proposal")
+            self.assertIn("feedback", revise_route.reason)
+
+    def test_pending_plan_proposal_question_with_constraint_cue_stays_inspect(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            config = load_runtime_config(workspace)
+            store = StateStore(config)
+            store.ensure()
+            router = Router(config, state_store=store)
+            skills = SkillRegistry(config, user_home=workspace / "home").discover()
+
+            run_runtime("实现 runtime plugin bridge", workspace_root=workspace, user_home=workspace / "home")
+
+            question_route = router.classify("为什么先做这个？", skills=skills)
+
+            self.assertEqual(question_route.route_name, "plan_proposal_pending")
+            self.assertEqual(question_route.active_run_action, "inspect_plan_proposal")
+            self.assertIn("waiting for package confirmation", question_route.reason)
+
+    def test_pending_plan_proposal_question_like_constraint_fragment_stays_inspect(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            config = load_runtime_config(workspace)
+            store = StateStore(config)
+            store.ensure()
+            router = Router(config, state_store=store)
+            skills = SkillRegistry(config, user_home=workspace / "home").discover()
+
+            run_runtime("实现 runtime plugin bridge", workspace_root=workspace, user_home=workspace / "home")
+
+            question_route = router.classify("按这个最小范围直接进吗？", skills=skills)
+
+            self.assertEqual(question_route.route_name, "plan_proposal_pending")
+            self.assertEqual(question_route.active_run_action, "inspect_plan_proposal")
+            self.assertIn("waiting for package confirmation", question_route.reason)
+
+    def test_pending_plan_proposal_blocks_go_plan_pass_through(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            config = load_runtime_config(workspace)
+            store = StateStore(config)
+            store.ensure()
+            router = Router(config, state_store=store)
+            skills = SkillRegistry(config, user_home=workspace / "home").discover()
+
+            run_runtime("实现 runtime plugin bridge", workspace_root=workspace, user_home=workspace / "home")
+
+            routed = router.classify("~go plan 按这个最小范围直接进 3.1 -> 3.6", skills=skills)
+
+            self.assertEqual(routed.route_name, "plan_proposal_pending")
+            self.assertEqual(routed.command, "~go plan")
+            self.assertEqual(routed.active_run_action, "inspect_plan_proposal")
+            self.assertIn("before plan_only can continue", routed.reason)
 
     def test_pending_plan_proposal_treats_cancel_prefix_as_cancel_with_negation_guard(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

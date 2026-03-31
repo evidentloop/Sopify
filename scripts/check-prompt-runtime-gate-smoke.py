@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 import re
 import shutil
@@ -73,12 +74,15 @@ def main(argv: list[str] | None = None) -> int:
 
 def run_smoke(*, temp_root: Path) -> dict[str, Any]:
     scenarios: list[dict[str, Any]] = []
+    smoke_home = temp_root / "home"
+    smoke_home.mkdir(parents=True, exist_ok=True)
 
     normal_workspace = temp_root / "normal"
     scenarios.append(
         _run_gate_scenario(
             scenario_id="normal_runtime_followup",
             workspace=normal_workspace,
+            home_root=smoke_home,
             request="~go plan 重构数据库层",
             expected_exit_code=0,
             expected_status="ready",
@@ -94,6 +98,7 @@ def run_smoke(*, temp_root: Path) -> dict[str, Any]:
         _run_gate_scenario(
             scenario_id="protected_plan_asset_runtime_first",
             workspace=protected_plan_workspace,
+            home_root=smoke_home,
             request="分析下 .sopify-skills/plan/20260320_kb_layout_v2/tasks.md 的当前任务，并整理 README 职责表边界",
             expected_exit_code=0,
             expected_status="ready",
@@ -112,6 +117,7 @@ def run_smoke(*, temp_root: Path) -> dict[str, Any]:
         _run_gate_scenario(
             scenario_id="clarification_checkpoint_only",
             workspace=clarification_workspace,
+            home_root=smoke_home,
             request="优化一下",
             expected_exit_code=0,
             expected_status="ready",
@@ -127,6 +133,7 @@ def run_smoke(*, temp_root: Path) -> dict[str, Any]:
         _run_gate_scenario(
             scenario_id="decision_checkpoint_only",
             workspace=decision_workspace,
+            home_root=smoke_home,
             request="~go plan payload 放 host root 还是 workspace/.sopify-runtime",
             expected_exit_code=0,
             expected_status="ready",
@@ -143,6 +150,7 @@ def run_smoke(*, temp_root: Path) -> dict[str, Any]:
         _run_gate_scenario(
             scenario_id="execution_confirm_checkpoint_only",
             workspace=execution_confirm_workspace,
+            home_root=smoke_home,
             request="~go exec",
             expected_exit_code=0,
             expected_status="ready",
@@ -158,6 +166,7 @@ def run_smoke(*, temp_root: Path) -> dict[str, Any]:
         _run_gate_scenario(
             scenario_id="fail_closed_missing_handoff",
             workspace=fail_closed_workspace,
+            home_root=smoke_home,
             request="~go exec",
             expected_exit_code=1,
             expected_status="error",
@@ -181,6 +190,7 @@ def _run_gate_scenario(
     *,
     scenario_id: str,
     workspace: Path,
+    home_root: Path,
     request: str,
     expected_exit_code: int,
     expected_status: str,
@@ -193,7 +203,7 @@ def _run_gate_scenario(
     expected_direct_edit_guard_kind: object = _SKIP_ASSERTION,
 ) -> dict[str, Any]:
     workspace.mkdir(parents=True, exist_ok=True)
-    payload, exit_code = _run_gate_cli(workspace=workspace, request=request)
+    payload, exit_code = _run_gate_cli(workspace=workspace, home_root=home_root, request=request)
 
     state_dir = workspace / ".sopify-skills" / "state"
     receipt_path = state_dir / CURRENT_GATE_RECEIPT_FILENAME
@@ -280,8 +290,10 @@ def _run_gate_scenario(
     }
 
 
-def _run_gate_cli(*, workspace: Path, request: str) -> tuple[dict[str, Any], int]:
+def _run_gate_cli(*, workspace: Path, home_root: Path, request: str) -> tuple[dict[str, Any], int]:
     script_path = REPO_ROOT / "scripts" / "runtime_gate.py"
+    env = dict(os.environ)
+    env["HOME"] = str(home_root)
     completed = subprocess.run(
         [
             sys.executable,
@@ -293,6 +305,7 @@ def _run_gate_cli(*, workspace: Path, request: str) -> tuple[dict[str, Any], int
             request,
         ],
         cwd=REPO_ROOT,
+        env=env,
         capture_output=True,
         text=True,
         check=False,

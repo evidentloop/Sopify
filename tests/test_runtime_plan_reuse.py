@@ -116,6 +116,29 @@ class PlanReuseRuntimeTests(unittest.TestCase):
             assert rebound is not None
             self.assertEqual(rebound.plan_id, current_plan.plan_id)
 
+    def test_active_plan_meta_review_with_explicit_plan_anchor_stays_consult(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            config = load_runtime_config(workspace)
+            store = StateStore(config)
+            store.ensure()
+            current_plan = create_plan_scaffold("第一性原理协作规则分层落地", config=config, level="standard")
+            store.set_current_plan(current_plan)
+
+            result = run_runtime(
+                "分析下这个方案是否认可，说建设性意见",
+                workspace_root=workspace,
+                user_home=workspace / "home",
+            )
+
+            self.assertEqual(result.route.route_name, "consult")
+            self.assertIsNone(result.plan_artifact)
+            self.assertEqual(_plan_dir_count(workspace), 1)
+            rebound = StateStore(load_runtime_config(workspace)).get_current_plan()
+            self.assertIsNotNone(rebound)
+            assert rebound is not None
+            self.assertEqual(rebound.plan_id, current_plan.plan_id)
+
     def test_clarification_answer_reuses_existing_active_plan(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)

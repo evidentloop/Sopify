@@ -81,6 +81,11 @@ _CURRENT_PLAN_ANCHOR_PATTERNS = (
     re.compile(r"(current|active)\s+plan", re.IGNORECASE),
     re.compile(r"(继续|回到|基于|沿用|挂到|并入|写进|写入).*(plan|方案)", re.IGNORECASE),
 )
+_PLAN_PROPOSAL_RETOPIC_PATTERNS = (
+    re.compile(r"^\s*(?:把)?(?:(?:这个|该|当前)\s*)?方案(?:改成|改为|换成|换为)\s*(?P<target>.+?)\s*$", re.IGNORECASE),
+    re.compile(r"^\s*改成新的方案[:：]?\s*(?P<target>.+?)\s*$", re.IGNORECASE),
+    re.compile(r"^\s*(?:change|switch)\s+(?:(?:this|the|current)\s+)?plan\s+to\s+(?P<target>.+?)\s*$", re.IGNORECASE),
+)
 
 _HOST_FACING_TRUTH_KIND_ENGINE_RUNTIME_HANDOFF = "engine_runtime_handoff"
 _HOST_FACING_TRUTH_KIND_PROMOTION_GLOBAL_EXECUTION = "promotion_global_execution"
@@ -147,6 +152,21 @@ def _capture_planning_context(state_store: StateStore) -> _PlanningContext:
         current_decision=state_store.get_current_decision(),
         last_route=state_store.get_last_route(),
     )
+
+
+def _extract_plan_proposal_retopic_target(feedback_text: str) -> str | None:
+    normalized = str(feedback_text or "").strip()
+    if not normalized:
+        return None
+    for pattern in _PLAN_PROPOSAL_RETOPIC_PATTERNS:
+        match = pattern.match(normalized)
+        if match is None:
+            continue
+        target = str(match.group("target") or "").strip().strip(":：").strip()
+        target = target.rstrip("。.!！？?").strip()
+        if target:
+            return target
+    return None
 
 
 def _snapshot_has_global_execution_truth(snapshot: ContextResolvedSnapshot | None) -> bool:
@@ -1752,16 +1772,19 @@ def _handle_plan_proposal_pending(
 
     if action == "revise_plan_proposal":
         merged_request = merge_plan_proposal_request(proposal_state, decision.request_text)
-        next_topic_key, next_plan_id, next_path = reserve_plan_identity(
-            merged_request,
-            config=config,
+        retopic_target = _extract_plan_proposal_retopic_target(decision.request_text)
+        revision_requests_new_identity = (
+            retopic_target is not None
+            or find_plan_by_request_reference(decision.request_text, config=config) is not None
+            or request_explicitly_wants_new_plan(decision.request_text)
         )
-        if next_topic_key != proposal_state.topic_key or next_plan_id != proposal_state.reserved_plan_id or next_path != proposal_state.proposed_path:
+        if revision_requests_new_identity:
+            restart_request = retopic_target or decision.request_text
             state_store.clear_current_plan_proposal()
             notes.append(f"Exited proposal {proposal_state.checkpoint_id} because revision requires a new proposal identity")
             resumed_route = RouteDecision(
                 route_name=proposal_state.resume_route or "workflow",
-                request_text=merged_request,
+                request_text=restart_request,
                 reason="Revision feedback requires a new proposal identity, so planning restarted",
                 complexity="complex" if proposal_state.proposed_level != "light" else "medium",
                 plan_level=proposal_state.proposed_level,
@@ -1801,7 +1824,7 @@ def _handle_plan_proposal_pending(
                     capture_mode=proposal_state.capture_mode,
                 ),
                 reason="Plan proposal revised and is waiting for package confirmation",
-                active_run_action="inspect_plan_proposal",
+                active_run_action="revise_plan_proposal",
             ),
             None,
             notes,

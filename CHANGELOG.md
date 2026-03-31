@@ -6,6 +6,28 @@ This changelog is maintained manually (not auto-generated).
 
 ## [Unreleased]
 
+## [2026-03-31.140148] - 2026-03-31
+
+### Runtime
+
+- Updated runtime internals:
+  - `runtime/engine.py`
+  - `runtime/plan_proposal.py`
+  - `runtime/router.py`
+
+### Scripts
+
+- Adjusted maintenance scripts:
+  - `scripts/check-prompt-runtime-gate-smoke.py`
+
+### Tests
+
+- Updated automated coverage:
+  - `tests/test_runtime_decision.py`
+  - `tests/test_runtime_engine.py`
+  - `tests/test_runtime_plan_reuse.py`
+  - `tests/test_runtime_router.py`
+
 ## [2026-03-30.195249] - 2026-03-30
 
 ### Runtime

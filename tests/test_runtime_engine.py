@@ -107,6 +107,76 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertEqual(_plan_dir_count(workspace), 1)
             self.assertEqual(confirmed.handoff.required_host_action, "review_or_execute_plan")
 
+    def test_proposal_pending_natural_confirm_phrase_materializes_plan(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+
+            proposal = run_runtime("实现 runtime plugin bridge", workspace_root=workspace, user_home=workspace / "home")
+            self.assertEqual(proposal.handoff.required_host_action, "confirm_plan_package")
+
+            confirmed = run_runtime("继续按这个方案走", workspace_root=workspace, user_home=workspace / "home")
+
+            self.assertEqual(confirmed.route.route_name, "plan_only")
+            self.assertIsNotNone(confirmed.plan_artifact)
+            self.assertFalse((workspace / ".sopify-skills" / "state" / "current_plan_proposal.json").exists())
+            self.assertEqual(_plan_dir_count(workspace), 1)
+            self.assertEqual(confirmed.handoff.required_host_action, "review_or_execute_plan")
+
+    def test_proposal_pending_natural_confirm_phrase_with_plan_materializes_plan(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+
+            proposal = run_runtime("实现 runtime plugin bridge", workspace_root=workspace, user_home=workspace / "home")
+            self.assertEqual(proposal.handoff.required_host_action, "confirm_plan_package")
+
+            confirmed = run_runtime("continue with this plan", workspace_root=workspace, user_home=workspace / "home")
+
+            self.assertEqual(confirmed.route.route_name, "plan_only")
+            self.assertIsNotNone(confirmed.plan_artifact)
+            self.assertFalse((workspace / ".sopify-skills" / "state" / "current_plan_proposal.json").exists())
+            self.assertEqual(_plan_dir_count(workspace), 1)
+            self.assertEqual(confirmed.handoff.required_host_action, "review_or_execute_plan")
+
+    def test_proposal_pending_natural_confirm_question_does_not_mutate_request_text(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+
+            proposal = run_runtime("实现 runtime plugin bridge", workspace_root=workspace, user_home=workspace / "home")
+            original = proposal.recovered_context.current_plan_proposal
+
+            followup = run_runtime("继续按这个方案吗？", workspace_root=workspace, user_home=workspace / "home")
+            updated = followup.recovered_context.current_plan_proposal
+
+            self.assertEqual(followup.route.route_name, "plan_proposal_pending")
+            self.assertEqual(followup.route.active_run_action, "inspect_plan_proposal")
+            self.assertEqual(updated.request_text, original.request_text)
+            self.assertEqual(updated.checkpoint_id, original.checkpoint_id)
+            self.assertEqual(updated.proposed_path, original.proposed_path)
+
+    def test_proposal_pending_constraint_followup_question_does_not_mutate_request_text(self) -> None:
+        cases = (
+            "继续按这个方案会有什么风险",
+            "继续按这个方案会有什么风险？",
+            "按这个最小范围会有什么风险",
+            "按这个最小范围会有什么风险？",
+        )
+        for feedback in cases:
+            with self.subTest(feedback=feedback):
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    workspace = Path(temp_dir)
+
+                    proposal = run_runtime("实现 runtime plugin bridge", workspace_root=workspace, user_home=workspace / "home")
+                    original = proposal.recovered_context.current_plan_proposal
+
+                    followup = run_runtime(feedback, workspace_root=workspace, user_home=workspace / "home")
+                    updated = followup.recovered_context.current_plan_proposal
+
+                    self.assertEqual(followup.route.route_name, "plan_proposal_pending")
+                    self.assertEqual(followup.route.active_run_action, "inspect_plan_proposal")
+                    self.assertEqual(updated.request_text, original.request_text)
+                    self.assertEqual(updated.checkpoint_id, original.checkpoint_id)
+                    self.assertEqual(updated.proposed_path, original.proposed_path)
+
     def test_proposal_pending_keeps_finalize_and_compare_at_confirmation_checkpoint(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
@@ -127,6 +197,25 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertEqual(finalize.recovered_context.current_plan_proposal.checkpoint_id, checkpoint_id)
             self.assertEqual(_plan_dir_count(workspace), 0)
 
+    def test_proposal_pending_go_plan_does_not_materialize_new_plan(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+
+            proposal = run_runtime("实现 runtime plugin bridge", workspace_root=workspace, user_home=workspace / "home")
+            checkpoint_id = proposal.recovered_context.current_plan_proposal.checkpoint_id
+
+            followup = run_runtime(
+                "~go plan 按这个最小范围直接进 3.1 -> 3.6 注意不要过度设计",
+                workspace_root=workspace,
+                user_home=workspace / "home",
+            )
+
+            self.assertEqual(followup.route.route_name, "plan_proposal_pending")
+            self.assertIsNone(followup.plan_artifact)
+            self.assertEqual(followup.handoff.required_host_action, "confirm_plan_package")
+            self.assertEqual(followup.recovered_context.current_plan_proposal.checkpoint_id, checkpoint_id)
+            self.assertEqual(_plan_dir_count(workspace), 0)
+
     def test_proposal_pending_question_does_not_mutate_request_text(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
@@ -143,6 +232,149 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertEqual(updated.checkpoint_id, original.checkpoint_id)
             self.assertEqual(updated.proposed_path, original.proposed_path)
 
+    def test_proposal_pending_question_with_constraint_cue_does_not_mutate_request_text(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+
+            proposal = run_runtime("实现 runtime plugin bridge", workspace_root=workspace, user_home=workspace / "home")
+            original = proposal.recovered_context.current_plan_proposal
+
+            followup = run_runtime("为什么先做这个？", workspace_root=workspace, user_home=workspace / "home")
+            updated = followup.recovered_context.current_plan_proposal
+
+            self.assertEqual(followup.route.route_name, "plan_proposal_pending")
+            self.assertEqual(followup.route.active_run_action, "inspect_plan_proposal")
+            self.assertEqual(updated.request_text, original.request_text)
+            self.assertEqual(updated.checkpoint_id, original.checkpoint_id)
+            self.assertEqual(updated.proposed_path, original.proposed_path)
+
+    def test_proposal_pending_implicit_question_like_constraint_without_question_mark_does_not_mutate_request_text(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+
+            proposal = run_runtime("实现 runtime plugin bridge", workspace_root=workspace, user_home=workspace / "home")
+            original = proposal.recovered_context.current_plan_proposal
+
+            followup = run_runtime("按这个最小范围能不能直接进", workspace_root=workspace, user_home=workspace / "home")
+            updated = followup.recovered_context.current_plan_proposal
+
+            self.assertEqual(followup.route.route_name, "plan_proposal_pending")
+            self.assertEqual(followup.route.active_run_action, "inspect_plan_proposal")
+            self.assertEqual(updated.request_text, original.request_text)
+            self.assertEqual(updated.checkpoint_id, original.checkpoint_id)
+            self.assertEqual(updated.proposed_path, original.proposed_path)
+
+    def test_proposal_pending_english_question_like_constraint_does_not_mutate_request_text(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+
+            proposal = run_runtime("实现 runtime plugin bridge", workspace_root=workspace, user_home=workspace / "home")
+            original = proposal.recovered_context.current_plan_proposal
+
+            followup = run_runtime("continue with this?", workspace_root=workspace, user_home=workspace / "home")
+            updated = followup.recovered_context.current_plan_proposal
+
+            self.assertEqual(followup.route.route_name, "plan_proposal_pending")
+            self.assertEqual(followup.route.active_run_action, "inspect_plan_proposal")
+            self.assertEqual(updated.request_text, original.request_text)
+            self.assertEqual(updated.checkpoint_id, original.checkpoint_id)
+            self.assertEqual(updated.proposed_path, original.proposed_path)
+
+    def test_proposal_pending_implicit_question_like_retopic_does_not_mutate_request_text(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+
+            proposal = run_runtime("实现 runtime plugin bridge", workspace_root=workspace, user_home=workspace / "home")
+            original = proposal.recovered_context.current_plan_proposal
+
+            followup = run_runtime("能不能把这个方案改成 runtime gate receipt compaction", workspace_root=workspace, user_home=workspace / "home")
+            updated = followup.recovered_context.current_plan_proposal
+
+            self.assertEqual(followup.route.route_name, "plan_proposal_pending")
+            self.assertEqual(followup.route.active_run_action, "inspect_plan_proposal")
+            self.assertEqual(updated.request_text, original.request_text)
+            self.assertEqual(updated.checkpoint_id, original.checkpoint_id)
+            self.assertEqual(updated.proposed_path, original.proposed_path)
+
+    def test_proposal_pending_question_like_retopic_with_followup_revision_refreshes_request_text(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+
+            proposal = run_runtime("实现 runtime plugin bridge", workspace_root=workspace, user_home=workspace / "home")
+            original = proposal.recovered_context.current_plan_proposal
+
+            followup = run_runtime("是否把这个方案改成 runtime gate receipt compaction 并补一下风险", workspace_root=workspace, user_home=workspace / "home")
+            updated = followup.recovered_context.current_plan_proposal
+
+            self.assertEqual(followup.route.route_name, "plan_proposal_pending")
+            self.assertEqual(followup.route.active_run_action, "revise_plan_proposal")
+            self.assertEqual(updated.checkpoint_id, original.checkpoint_id)
+            self.assertEqual(updated.proposed_path, original.proposed_path)
+            self.assertIn("修订意见", updated.request_text)
+            self.assertIn("是否把这个方案改成 runtime gate receipt compaction 并补一下风险", updated.request_text)
+
+    def test_proposal_pending_start_with_this_question_fail_closes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+
+            proposal = run_runtime("实现 runtime plugin bridge", workspace_root=workspace, user_home=workspace / "home")
+            original = proposal.recovered_context.current_plan_proposal
+
+            followup = run_runtime("start with this?", workspace_root=workspace, user_home=workspace / "home")
+            updated = followup.recovered_context.current_plan_proposal
+
+            self.assertEqual(followup.route.route_name, "plan_proposal_pending")
+            self.assertEqual(followup.route.active_run_action, "inspect_plan_proposal")
+            self.assertEqual(updated.request_text, original.request_text)
+            self.assertEqual(updated.checkpoint_id, original.checkpoint_id)
+            self.assertEqual(updated.proposed_path, original.proposed_path)
+
+    def test_proposal_pending_mixed_revision_and_question_refreshes_request_text(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+
+            revised = run_runtime(
+                "实现 runtime plugin bridge",
+                workspace_root=workspace,
+                user_home=workspace / "home",
+            )
+            mixed = run_runtime(
+                "按这个最小范围直接进 3.1 -> 3.6 确认是否覆盖风险并补一下",
+                workspace_root=workspace,
+                user_home=workspace / "home",
+            )
+            updated = mixed.recovered_context.current_plan_proposal
+
+            self.assertEqual(revised.route.route_name, "plan_proposal_pending")
+            self.assertEqual(mixed.route.route_name, "plan_proposal_pending")
+            self.assertIn("修订意见", updated.request_text)
+            self.assertIn("按这个最小范围直接进 3.1 -> 3.6 确认是否覆盖风险并补一下", updated.request_text)
+
+    def test_proposal_pending_mixed_question_and_revision_refreshes_request_text(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+
+            proposal = run_runtime(
+                "实现 runtime plugin bridge",
+                workspace_root=workspace,
+                user_home=workspace / "home",
+            )
+            original = proposal.recovered_context.current_plan_proposal
+
+            mixed = run_runtime(
+                "为什么先做这个？按这个最小范围直接进 3.1 -> 3.6",
+                workspace_root=workspace,
+                user_home=workspace / "home",
+            )
+            updated = mixed.recovered_context.current_plan_proposal
+
+            self.assertEqual(mixed.route.route_name, "plan_proposal_pending")
+            self.assertEqual(mixed.route.active_run_action, "revise_plan_proposal")
+            self.assertEqual(updated.checkpoint_id, original.checkpoint_id)
+            self.assertEqual(updated.proposed_path, original.proposed_path)
+            self.assertIn("修订意见", updated.request_text)
+            self.assertIn("为什么先做这个？按这个最小范围直接进 3.1 -> 3.6", updated.request_text)
+
     def test_proposal_pending_explicit_revision_refreshes_request_text_without_drifting_identity(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
@@ -158,6 +390,84 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertEqual(updated.proposed_path, original.proposed_path)
             self.assertIn("修订意见", updated.request_text)
             self.assertIn("把风险再展开一点", updated.request_text)
+
+    def test_proposal_pending_retopic_revision_restarts_with_new_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+
+            proposal = run_runtime("实现 runtime plugin bridge", workspace_root=workspace, user_home=workspace / "home")
+            original = proposal.recovered_context.current_plan_proposal
+
+            revised = run_runtime("方案改成 runtime gate receipt compaction", workspace_root=workspace, user_home=workspace / "home")
+            updated = revised.recovered_context.current_plan_proposal
+
+            self.assertEqual(revised.route.route_name, "plan_proposal_pending")
+            self.assertIsNotNone(updated)
+            assert updated is not None
+            self.assertNotEqual(updated.checkpoint_id, original.checkpoint_id)
+            self.assertNotEqual(updated.reserved_plan_id, original.reserved_plan_id)
+            self.assertNotEqual(updated.proposed_path, original.proposed_path)
+            self.assertEqual(updated.request_text, "runtime gate receipt compaction")
+
+            confirmed = run_runtime("继续", workspace_root=workspace, user_home=workspace / "home")
+
+            self.assertEqual(confirmed.route.route_name, "plan_only")
+            self.assertIsNotNone(confirmed.plan_artifact)
+            assert confirmed.plan_artifact is not None
+            self.assertEqual(confirmed.plan_artifact.plan_id, updated.reserved_plan_id)
+            self.assertEqual(confirmed.plan_artifact.path, updated.proposed_path)
+
+    def test_proposal_pending_retopic_revision_with_referential_phrase_restarts_with_new_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+
+            proposal = run_runtime("实现 runtime plugin bridge", workspace_root=workspace, user_home=workspace / "home")
+            original = proposal.recovered_context.current_plan_proposal
+
+            revised = run_runtime("这个方案改成 runtime gate receipt compaction", workspace_root=workspace, user_home=workspace / "home")
+            updated = revised.recovered_context.current_plan_proposal
+
+            self.assertEqual(revised.route.route_name, "plan_proposal_pending")
+            self.assertIsNotNone(updated)
+            assert updated is not None
+            self.assertNotEqual(updated.checkpoint_id, original.checkpoint_id)
+            self.assertNotEqual(updated.reserved_plan_id, original.reserved_plan_id)
+            self.assertNotEqual(updated.proposed_path, original.proposed_path)
+            self.assertEqual(updated.request_text, "runtime gate receipt compaction")
+
+            confirmed = run_runtime("继续", workspace_root=workspace, user_home=workspace / "home")
+
+            self.assertEqual(confirmed.route.route_name, "plan_only")
+            self.assertIsNotNone(confirmed.plan_artifact)
+            assert confirmed.plan_artifact is not None
+            self.assertEqual(confirmed.plan_artifact.plan_id, updated.reserved_plan_id)
+            self.assertEqual(confirmed.plan_artifact.path, updated.proposed_path)
+
+    def test_proposal_pending_english_retopic_revision_restarts_with_new_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+
+            proposal = run_runtime("实现 runtime plugin bridge", workspace_root=workspace, user_home=workspace / "home")
+            original = proposal.recovered_context.current_plan_proposal
+
+            revised = run_runtime("change the plan to runtime gate receipt compaction", workspace_root=workspace, user_home=workspace / "home")
+            updated = revised.recovered_context.current_plan_proposal
+
+            self.assertEqual(revised.route.route_name, "plan_proposal_pending")
+            self.assertIsNotNone(updated)
+            assert updated is not None
+            self.assertNotEqual(updated.checkpoint_id, original.checkpoint_id)
+            self.assertNotEqual(updated.reserved_plan_id, original.reserved_plan_id)
+            self.assertNotEqual(updated.proposed_path, original.proposed_path)
+            self.assertEqual(updated.request_text, "runtime gate receipt compaction")
+
+            confirmed = run_runtime("继续", workspace_root=workspace, user_home=workspace / "home")
+
+            self.assertEqual(confirmed.route.route_name, "plan_only")
+            self.assertIsNotNone(confirmed.plan_artifact)
+            assert confirmed.plan_artifact is not None
+            self.assertEqual(confirmed.plan_artifact.plan_id, updated.reserved_plan_id)
+            self.assertEqual(confirmed.plan_artifact.path, updated.proposed_path)
 
     def test_plan_proposal_handler_can_confirm_from_resolved_snapshot_without_live_state_file(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
