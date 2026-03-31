@@ -41,7 +41,7 @@ decision_checkpoint:
 ## 4. 验证
 - [x] 4.1 增补 prompt-layer 或 runtime 相关测试，至少覆盖：目标模糊触发澄清、存在更短路径时给出替代建议、quick-fix 不被强制拉长。
 - [x] 4.2 为 promotion gate 设计人工评审 rubric，记录“触发是否有帮助”和“是否明显误伤轻场景”。
-- [x] 4.3 用至少 3 类仓库或等价样本跑 pilot，输出一轮可审计评估结果（`45` 样本 / `3` 类环境已完成，聚合结果写入 `evidence/pilot_round1/round1_aggregation.md`；Batch 2/3 先按 post-v1 校准执行，随后已被吸收进独立 decision pass，不再以半完成状态挂在本轮 plan 上）。
+- [x] 4.3 用至少 3 类仓库或等价样本跑 pilot，输出一轮可审计评估结果（`45` 样本 / `3` 类环境已完成，聚合结果写入 `external_archive://pilot_round1/round1_aggregation.md`；Batch 2/3 先按 post-v1 校准执行，随后已被吸收进独立 decision pass，不再以半完成状态挂在本轮 plan 上）。
 
 ## 5. 文档
 - [x] 5.1 更新 `/Users/weixin.li/Desktop/vs-code-extension/sopify-skills/README.md` 与 `/Users/weixin.li/Desktop/vs-code-extension/sopify-skills/README_EN.md`，补充“分层矩阵”和“何时提升到底层”的说明。

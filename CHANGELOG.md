@@ -6,6 +6,162 @@ This changelog is maintained manually (not auto-generated).
 
 ## [Unreleased]
 
+## [2026-03-31.154241] - 2026-03-31
+
+### Scripts
+
+- Adjusted maintenance scripts:
+  - `scripts/install_sopify.py`
+
+### Tests
+
+- Updated automated coverage:
+  - `tests/test_installer_validate.py`
+
+### Changed
+
+- Updated project files:
+  - `installer/inspection.py`
+  - `installer/validate.py`
+
+## [2026-03-31.143816] - 2026-03-31
+
+### Scripts
+
+- Adjusted maintenance scripts:
+  - `scripts/check-runtime-smoke.sh`
+
+### Tests
+
+- Updated automated coverage:
+  - `tests/test_installer_validate.py`
+
+### Changed
+
+- Updated project files:
+  - `installer/validate.py`
+
+## [2026-03-31.142215] - 2026-03-31
+
+### Changed
+
+- Updated project files:
+  - `CHANGELOG.md`
+
+## [2026-03-31.140148] - 2026-03-31
+
+### Runtime
+
+- Updated runtime internals:
+  - `runtime/engine.py`
+  - `runtime/plan_proposal.py`
+  - `runtime/router.py`
+
+### Scripts
+
+- Adjusted maintenance scripts:
+  - `scripts/check-prompt-runtime-gate-smoke.py`
+
+### Tests
+
+- Updated automated coverage:
+  - `tests/test_runtime_decision.py`
+  - `tests/test_runtime_engine.py`
+  - `tests/test_runtime_plan_reuse.py`
+  - `tests/test_runtime_router.py`
+
+## [2026-03-30.195249] - 2026-03-30
+
+### Runtime
+
+- Updated runtime internals:
+  - `runtime/workspace_preflight.py`
+
+### Scripts
+
+- Adjusted maintenance scripts:
+  - `scripts/install_sopify.py`
+
+### Tests
+
+- Updated automated coverage:
+  - `tests/test_installer.py`
+  - `tests/test_installer_status_doctor.py`
+  - `tests/test_runtime_gate.py`
+
+### Changed
+
+- Updated project files:
+  - `installer/bootstrap_workspace.py`
+  - `installer/hosts/__init__.py`
+  - `installer/inspection.py`
+  - `installer/payload.py`
+  - `installer/validate.py`
+
+## [2026-03-30.142244] - 2026-03-30
+
+### Tests
+
+- Updated automated coverage:
+  - `tests/test_installer_status_doctor.py`
+
+### Changed
+
+- Updated project files:
+  - `installer/inspection.py`
+
+## [2026-03-30.134624] - 2026-03-30
+
+### Scripts
+
+- Adjusted maintenance scripts:
+  - `scripts/check-install-payload-bundle-smoke.py`
+
+### Tests
+
+- Updated automated coverage:
+  - `tests/test_distribution.py`
+  - `tests/test_installer_status_doctor.py`
+
+### Changed
+
+- Updated project files:
+  - `installer/distribution.py`
+  - `installer/inspection.py`
+
+## [2026-03-30.133450] - 2026-03-30
+
+### Scripts
+
+- Adjusted maintenance scripts:
+  - `scripts/install_sopify.py`
+
+### Tests
+
+- Updated automated coverage:
+  - `tests/test_installer.py`
+  - `tests/test_runtime_gate.py`
+
+### Changed
+
+- Updated project files:
+  - `installer/hosts/base.py`
+  - `installer/inspection.py`
+  - `installer/payload.py`
+  - `installer/validate.py`
+
+## [2026-03-30.102148] - 2026-03-30
+
+### Runtime
+
+- Updated runtime internals:
+  - `runtime/workspace_preflight.py`
+
+### Tests
+
+- Updated automated coverage:
+  - `tests/test_runtime_gate.py`
+
 ## [2026-03-28.220226] - 2026-03-28
 
 ### Docs
@@ -372,12 +528,13 @@ This changelog is maintained manually (not auto-generated).
   - `.sopify-skills/history/2026-03/20260320_prompt_runtime_gate/tasks.md`
   - `.sopify-skills/history/2026-03/20260321_go-plan/background.md`
   - `.sopify-skills/history/2026-03/20260321_go-plan/design.md`
-  - `.sopify-skills/history/2026-03/20260321_go-plan/evidence/pilot_round1/freyr-h5pages/batch2_observations.md`
-  - `.sopify-skills/history/2026-03/20260321_go-plan/evidence/pilot_round1/freyr-h5pages/batch2_stopcheck.md`
-  - `.sopify-skills/history/2026-03/20260321_go-plan/evidence/pilot_round1/round1_aggregation.md`
-  - `.sopify-skills/history/2026-03/20260321_go-plan/evidence/pilot_round1/rs-sdk/batch3_observations.md`
-  - `.sopify-skills/history/2026-03/20260321_go-plan/evidence/pilot_round1/sopify-skills/batch1_observations.md`
-  - `.sopify-skills/history/2026-03/20260321_go-plan/evidence/pilot_round1/sopify-skills/batch1_stopcheck.md`
+  - `external_archive://pilot_round1/freyr-h5pages/batch2_observations.md`
+  - `external_archive://pilot_round1/freyr-h5pages/batch2_stopcheck.md`
+  - `external_archive://pilot_round1/round1_aggregation.md`
+  - `external_archive://pilot_round1/rs-sdk/batch3_observations.md`
+  - `external_archive://pilot_round1/sopify-skills/batch1_observations.md`
+  - `external_archive://pilot_round1/sopify-skills/batch1_stopcheck.md`
+  - `(2026-03-31 note) the above local evidence bundle was externalized; see .sopify-skills/history/2026-03/20260321_go-plan/evidence_archive_notice.md`
   - `.sopify-skills/history/2026-03/20260321_go-plan/issue_meta_review_no_new_plan.md`
   - `.sopify-skills/history/2026-03/20260321_go-plan/issue_raise_plan_reuse_fix_to_8_5.md`
   - `.sopify-skills/history/2026-03/20260321_go-plan/issue_single_active_plan_reuse_with_topic_key.md`

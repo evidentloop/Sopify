@@ -41,6 +41,26 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional override for the installed payload manifest used by workspace preflight.",
     )
     enter.add_argument(
+        "--activation-root",
+        default=None,
+        help="Optional explicit activation root passed through the ingress contract.",
+    )
+    enter.add_argument(
+        "--payload-root",
+        default=None,
+        help="Optional explicit payload root passed through the ingress contract.",
+    )
+    enter.add_argument(
+        "--host-id",
+        default=None,
+        help="Optional explicit host id passed through the ingress contract.",
+    )
+    enter.add_argument(
+        "--requested-root",
+        default=None,
+        help="Optional host-requested root used for observability only.",
+    )
+    enter.add_argument(
         "--session-id",
         default=None,
         help="Optional stable session id reused by the host across turns.",
@@ -64,6 +84,10 @@ def main(argv: list[str] | None = None) -> int:
         workspace_root=Path(args.workspace_root).resolve(),
         global_config_path=args.global_config_path,
         payload_manifest_path=args.payload_manifest_path,
+        activation_root=args.activation_root,
+        payload_root=args.payload_root,
+        host_id=args.host_id,
+        requested_root=args.requested_root,
         session_id=args.session_id,
         write_receipt=not args.no_receipt,
     )

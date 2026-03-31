@@ -81,6 +81,11 @@ _CURRENT_PLAN_ANCHOR_PATTERNS = (
     re.compile(r"(current|active)\s+plan", re.IGNORECASE),
     re.compile(r"(继续|回到|基于|沿用|挂到|并入|写进|写入).*(plan|方案)", re.IGNORECASE),
 )
+_PLAN_PROPOSAL_RETOPIC_PATTERNS = (
+    re.compile(r"^\s*(?:把)?(?:(?:这个|该|当前)\s*)?方案(?:改成|改为|换成|换为)\s*(?P<target>.+?)\s*$", re.IGNORECASE),
+    re.compile(r"^\s*改成新的方案[:：]?\s*(?P<target>.+?)\s*$", re.IGNORECASE),
+    re.compile(r"^\s*(?:change|switch)\s+(?:(?:this|the|current)\s+)?plan\s+to\s+(?P<target>.+?)\s*$", re.IGNORECASE),
+)
 
 _HOST_FACING_TRUTH_KIND_ENGINE_RUNTIME_HANDOFF = "engine_runtime_handoff"
 _HOST_FACING_TRUTH_KIND_PROMOTION_GLOBAL_EXECUTION = "promotion_global_execution"
@@ -147,6 +152,21 @@ def _capture_planning_context(state_store: StateStore) -> _PlanningContext:
         current_decision=state_store.get_current_decision(),
         last_route=state_store.get_last_route(),
     )
+
+
+def _extract_plan_proposal_retopic_target(feedback_text: str) -> str | None:
+    normalized = str(feedback_text or "").strip()
+    if not normalized:
+        return None
+    for pattern in _PLAN_PROPOSAL_RETOPIC_PATTERNS:
+        match = pattern.match(normalized)
+        if match is None:
+            continue
+        target = str(match.group("target") or "").strip().strip(":：").strip()
+        target = target.rstrip("。.!！？?").strip()
+        if target:
+            return target
+    return None
 
 
 def _snapshot_has_global_execution_truth(snapshot: ContextResolvedSnapshot | None) -> bool:
@@ -393,16 +413,9 @@ def _promote_review_state_to_global_execution(
         return (False, [])
 
     notes: list[str] = []
-    existing_owner = existing_global_run
-    if (
-        existing_owner is not None
-        and existing_owner.owner_session_id
-        and session_id
-        and existing_owner.owner_session_id != session_id
-    ):
-        notes.append(
-            f"Soft ownership warning: overwriting global execution context owned by session {existing_owner.owner_session_id}"
-        )
+    owner_warning = _soft_execution_ownership_warning(existing_global_run=existing_global_run, session_id=session_id)
+    if owner_warning is not None:
+        notes.append(owner_warning)
 
     # Promotion is the explicit handoff point from session review state into the
     # single global execution truth used by execution-confirm / resume / finalize.
@@ -429,6 +442,24 @@ def _promote_review_state_to_global_execution(
     return (True, notes)
 
 
+def _soft_execution_ownership_warning(
+    *,
+    existing_global_run: RunState | None,
+    session_id: str | None,
+) -> str | None:
+    if (
+        existing_global_run is not None
+        and existing_global_run.owner_session_id
+        and session_id
+        and existing_global_run.owner_session_id != session_id
+    ):
+        return (
+            f"Soft ownership warning: overwriting global execution context "
+            f"owned by session {existing_global_run.owner_session_id}"
+        )
+    return None
+
+
 def _set_execution_run_state(
     state_store: StateStore,
     run_state: RunState,
@@ -439,6 +470,47 @@ def _set_execution_run_state(
         state_store.set_current_run(run_state)
         return
     state_store.set_current_run(_with_global_run_ownership(run_state, session_id=session_id))
+
+
+def _persist_execution_gate_checkpoint(
+    *,
+    state_store: StateStore,
+    config: RuntimeConfig,
+    current_plan: PlanArtifact,
+    next_run_state: RunState,
+    gate_decision: DecisionState,
+) -> tuple[StateStore, list[str]]:
+    # Execution-gate checkpoints are part of the single execution truth used by
+    # confirm/resume flows. When planning runs inside a session review scope, we
+    # still persist the gate checkpoint globally so later recovery does not see
+    # a session-scoped execution decision that fails provenance loading.
+    notes: list[str] = []
+    execution_store = state_store
+    if state_store.session_id is not None:
+        execution_store = StateStore(config)
+        execution_store.ensure()
+        owner_warning = _soft_execution_ownership_warning(
+            existing_global_run=execution_store.get_current_run(),
+            session_id=state_store.session_id,
+        )
+        if owner_warning is not None:
+            notes.append(owner_warning)
+        execution_store.set_current_plan(current_plan)
+    _set_execution_run_state(
+        execution_store,
+        next_run_state,
+        session_id=state_store.session_id,
+    )
+    execution_store.set_current_decision(gate_decision)
+    if execution_store is not state_store:
+        # Once execution truth is promoted globally, the review-scoped run and
+        # handoff are stale carriers. Keeping them would let snapshot recovery
+        # pick `confirm_execute` from the session side while a global
+        # `confirm_decision` checkpoint already exists, which immediately
+        # fail-closes into a state conflict on the next runtime turn.
+        state_store.clear_current_run()
+        state_store.clear_current_handoff()
+    return (execution_store, notes)
 
 
 def _with_global_run_ownership(run_state: RunState, *, session_id: str | None) -> RunState:
@@ -1700,16 +1772,19 @@ def _handle_plan_proposal_pending(
 
     if action == "revise_plan_proposal":
         merged_request = merge_plan_proposal_request(proposal_state, decision.request_text)
-        next_topic_key, next_plan_id, next_path = reserve_plan_identity(
-            merged_request,
-            config=config,
+        retopic_target = _extract_plan_proposal_retopic_target(decision.request_text)
+        revision_requests_new_identity = (
+            retopic_target is not None
+            or find_plan_by_request_reference(decision.request_text, config=config) is not None
+            or request_explicitly_wants_new_plan(decision.request_text)
         )
-        if next_topic_key != proposal_state.topic_key or next_plan_id != proposal_state.reserved_plan_id or next_path != proposal_state.proposed_path:
+        if revision_requests_new_identity:
+            restart_request = retopic_target or decision.request_text
             state_store.clear_current_plan_proposal()
             notes.append(f"Exited proposal {proposal_state.checkpoint_id} because revision requires a new proposal identity")
             resumed_route = RouteDecision(
                 route_name=proposal_state.resume_route or "workflow",
-                request_text=merged_request,
+                request_text=restart_request,
                 reason="Revision feedback requires a new proposal identity, so planning restarted",
                 complexity="complex" if proposal_state.proposed_level != "light" else "medium",
                 plan_level=proposal_state.proposed_level,
@@ -1749,7 +1824,7 @@ def _handle_plan_proposal_pending(
                     capture_mode=proposal_state.capture_mode,
                 ),
                 reason="Plan proposal revised and is waiting for package confirmation",
-                active_run_action="inspect_plan_proposal",
+                active_run_action="revise_plan_proposal",
             ),
             None,
             notes,
@@ -2742,8 +2817,16 @@ def _apply_execution_gate_to_plan(
             config=config,
         )
         if gate_decision is not None:
-            state_store.set_current_run(next_run_state)
-            state_store.set_current_decision(gate_decision)
+            checkpoint_store, checkpoint_notes = _persist_execution_gate_checkpoint(
+                state_store=state_store,
+                config=config,
+                current_plan=plan_artifact,
+                next_run_state=next_run_state,
+                gate_decision=gate_decision,
+            )
+            notes.extend(checkpoint_notes)
+            if checkpoint_store is not state_store:
+                notes.append("Promoted execution gate checkpoint to global execution truth")
             notes.append(f"Execution gate requested a new decision: {gate_decision.decision_id}")
             return (
                 _decision_pending_route(decision, reason="Execution gate found a blocking risk that still requires confirmation"),

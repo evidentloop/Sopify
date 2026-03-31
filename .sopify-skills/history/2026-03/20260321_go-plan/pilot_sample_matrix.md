@@ -137,5 +137,5 @@ The next artifacts should build on this file:
 1. trigger matrix
 2. human review rubric
 3. `pilot_round1_review_sheet.md` as the row-level first-round pilot run log
-4. `evidence/pilot_round1/**` as the completed cross-repo evidence set
+4. `external_archive://pilot_round1/**` as the completed cross-repo evidence set
 5. standalone decision-pass closure after the full-round evidence

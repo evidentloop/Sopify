@@ -46,6 +46,77 @@ class DecisionContractTests(unittest.TestCase):
         self.assertEqual(parse_plan_proposal_response("取消这个 checkpoint！").action, "cancel")
         self.assertEqual(parse_plan_proposal_response("取消这个 checkpoint…").action, "cancel")
 
+    def test_plan_proposal_question_like_constraint_short_circuit_stays_local(self) -> None:
+        self.assertEqual(parse_plan_proposal_response("continue with this?").action, "inspect")
+        self.assertNotEqual(parse_plan_proposal_response("this is it continue with this").action, "inspect")
+
+    def test_plan_proposal_natural_confirm_phrase_prefers_confirm(self) -> None:
+        self.assertEqual(parse_plan_proposal_response("继续按这个方案").action, "confirm")
+        self.assertEqual(parse_plan_proposal_response("继续按这个方案走").action, "confirm")
+        self.assertEqual(parse_plan_proposal_response("continue with this").action, "confirm")
+        self.assertEqual(parse_plan_proposal_response("continue with this plan").action, "confirm")
+
+    def test_plan_proposal_natural_confirm_with_explicit_revision_stays_revise(self) -> None:
+        self.assertEqual(parse_plan_proposal_response("继续按这个方案，补一下风险").action, "revise")
+
+    def test_plan_proposal_natural_confirm_question_stays_local(self) -> None:
+        self.assertEqual(parse_plan_proposal_response("继续按这个方案？").action, "inspect")
+        self.assertEqual(parse_plan_proposal_response("继续按这个方案吗？").action, "inspect")
+
+    def test_plan_proposal_constraint_followup_question_stays_local(self) -> None:
+        cases = (
+            "继续按这个方案会有什么风险",
+            "继续按这个方案会有什么风险？",
+            "按这个最小范围会有什么风险",
+            "按这个最小范围会有什么风险？",
+        )
+        for text in cases:
+            with self.subTest(text=text):
+                self.assertEqual(parse_plan_proposal_response(text).action, "inspect")
+
+    def test_plan_proposal_implicit_question_like_constraint_without_question_mark_stays_local(self) -> None:
+        self.assertEqual(parse_plan_proposal_response("按这个最小范围能不能直接进").action, "inspect")
+        self.assertEqual(parse_plan_proposal_response("按这个最小范围是否直接进").action, "inspect")
+
+    def test_plan_proposal_plain_retopic_phrase_prefers_revision(self) -> None:
+        cases = (
+            "方案改成 runtime gate receipt compaction",
+            "这个方案改成 runtime gate receipt compaction",
+            "change the plan to runtime gate receipt compaction",
+            "switch this plan to runtime gate receipt compaction",
+        )
+        for text in cases:
+            with self.subTest(text=text):
+                self.assertEqual(parse_plan_proposal_response(text).action, "revise")
+
+    def test_plan_proposal_question_like_retopic_stays_local(self) -> None:
+        cases = (
+            "这个方案改成 runtime gate receipt compaction？",
+            "change the plan to runtime gate receipt compaction?",
+            "能不能把这个方案改成 runtime gate receipt compaction",
+            "是否把这个方案改成 runtime gate receipt compaction",
+            "这个方案能不能改成 runtime gate receipt compaction",
+        )
+        for text in cases:
+            with self.subTest(text=text):
+                self.assertEqual(parse_plan_proposal_response(text).action, "inspect")
+
+    def test_plan_proposal_question_like_retopic_with_followup_revision_prefers_revision(self) -> None:
+        cases = (
+            "是否把这个方案改成 runtime gate receipt compaction 并补一下风险",
+            "这个方案能不能改成 runtime gate receipt compaction 再补一下风险",
+            "can we change the plan to runtime gate receipt compaction and add risk notes",
+        )
+        for text in cases:
+            with self.subTest(text=text):
+                self.assertEqual(parse_plan_proposal_response(text).action, "revise")
+
+    def test_plan_proposal_mixed_question_and_revision_prefers_revision(self) -> None:
+        self.assertEqual(
+            parse_plan_proposal_response("为什么先做这个？按这个最小范围直接进 3.1 -> 3.6").action,
+            "revise",
+        )
+
     def test_decision_policy_keeps_current_planning_semantic_baseline(self) -> None:
         route = RouteDecision(
             route_name="plan_only",

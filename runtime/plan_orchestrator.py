@@ -61,12 +61,14 @@ def normalize_planning_request(raw_text: str) -> str:
 def preflight_workspace_runtime(
     workspace_root: Path,
     *,
+    request_text: str = "",
     payload_manifest_path: str | Path | None = None,
 ) -> Mapping[str, Any] | None:
     """Backwards-compatible wrapper around shared workspace preflight."""
     try:
         return _shared_preflight_workspace_runtime(
             workspace_root,
+            request_text=request_text,
             payload_manifest_path=payload_manifest_path,
         )
     except WorkspacePreflightError as exc:
@@ -89,7 +91,7 @@ def run_plan_loop(
     workspace = Path(workspace_root).resolve()
     config = load_runtime_config(workspace, global_config_path=global_config_path)
     request = normalize_planning_request(raw_request)
-    preflight = preflight_workspace_runtime(workspace, payload_manifest_path=payload_manifest_path)
+    preflight = preflight_workspace_runtime(workspace, request_text=request, payload_manifest_path=payload_manifest_path)
 
     if not bridge_loop:
         result = run_runtime(request, workspace_root=workspace, global_config_path=global_config_path)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Iterator
 
 from installer.models import HostCapability
@@ -49,3 +50,17 @@ def iter_host_registrations() -> Iterator[HostRegistration]:
     """Yield every full host registration entry."""
     for registration in _REGISTRATIONS.values():
         yield registration
+
+
+def resolve_host_payload_root(*, home_root: Path, host_id: str) -> Path:
+    """Resolve the registered payload root for one host."""
+    return get_host_adapter(host_id).payload_root(home_root)
+
+
+def iter_host_payload_manifest_candidates(*, home_root: Path) -> Iterator[tuple[str, Path]]:
+    """Yield registered payload manifest candidates rooted under one home directory."""
+    for registration in _REGISTRATIONS.values():
+        yield (
+            registration.capability.host_id,
+            registration.adapter.payload_root(home_root) / "payload-manifest.json",
+        )

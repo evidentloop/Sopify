@@ -43,7 +43,7 @@ class HostAdapter:
         payload_root = self.payload_root(home_root)
         return (
             payload_root / "payload-manifest.json",
-            payload_root / "bundle" / "manifest.json",
+            payload_root / "bundles",
             payload_root / "helpers" / "bootstrap_workspace.py",
         )
 

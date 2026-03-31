@@ -136,8 +136,55 @@ _PLAN_META_REVIEW_ANCHORS = (
     re.compile(r"\bplan\b", re.IGNORECASE),
     re.compile(r"方案", re.IGNORECASE),
 )
+_ACTIVE_PLAN_META_REVIEW_ANCHORS = (
+    *_PLAN_META_REVIEW_ANCHORS,
+    re.compile(r"\bcurrent\s+plan\b", re.IGNORECASE),
+    re.compile(r"\bplan\s*(id|path|title)\b", re.IGNORECASE),
+    re.compile(r"\b(?:current\s+plan|plan)\b.*\b(?:tasks?|background|design)\b", re.IGNORECASE),
+    re.compile(r"\b(?:tasks?|background|design)\b.*\b(?:current\s+plan|plan)\b", re.IGNORECASE),
+    re.compile(r"(?:当前方案|这个方案|该方案|方案).*(?:任务|背景|设计)", re.IGNORECASE),
+    re.compile(r"(?:任务|背景|设计).*(?:当前方案|这个方案|该方案|方案)", re.IGNORECASE),
+)
 _PLAN_META_REVIEW_EDIT_PATTERNS = (
     re.compile(r"(整理|更新|同步|写入|落地|修改|实现|修复|补充|重写|合并|merge|edit|change|update)", re.IGNORECASE),
+)
+_ACTIVE_PLAN_META_REVIEW_CUES = (
+    "review",
+    "分析下",
+    "评估下",
+    "解释下",
+    "看看",
+    "critique",
+    "风险",
+    "risk",
+    "score",
+    "评分",
+    "打分",
+    "优化点",
+    "状态",
+    "当前状态",
+    "现在状态",
+    "状态如何",
+    "有什么问题",
+    "还有什么问题",
+)
+_ACTIVE_PLAN_FOLLOWUP_EDIT_CUES = (
+    "改一下",
+    "改下",
+    "改成",
+    "改为",
+    "修改",
+    "补一下",
+    "补下",
+    "修一下",
+    "修下",
+    "调整",
+    "edit",
+    "change",
+    "update",
+    "fix",
+    "adjust",
+    "modify",
 )
 _PLAN_MATERIALIZATION_META_DEBUG_PATTERNS = (
     re.compile(r"(为什么|为何|why).*(生成|创建|create).*(plan|方案)", re.IGNORECASE),
@@ -453,7 +500,10 @@ class Router:
                 )
             )
 
-        if _is_consultation(text):
+        if _is_consultation(text) and not _should_bypass_consult_for_active_plan_followup_edit(
+            text,
+            current_plan=current_plan,
+        ):
             return RouteDecision(
                 route_name="consult",
                 request_text=text,
@@ -726,8 +776,6 @@ def _classify_pending_plan_proposal(
     skills: Iterable[SkillMeta],
 ) -> RouteDecision | None:
     if command_decision is not None:
-        if command_decision.route_name in {"plan_only", "workflow", "light_iterate"}:
-            return None
         return RouteDecision(
             route_name="plan_proposal_pending",
             request_text=text,
@@ -1072,16 +1120,57 @@ def _has_tradeoff_or_contract_split(text: str) -> bool:
 def _looks_like_plan_meta_review(text: str, *, current_plan) -> bool:
     if not text.strip():
         return False
-    has_plan_anchor = current_plan is not None or _is_protected_plan_asset_request(text)
-    if not has_plan_anchor:
-        return False
     if not any(pattern.search(text) is not None for pattern in _PLAN_META_REVIEW_PATTERNS):
         return False
     if any(pattern.search(text) is not None for pattern in _PLAN_META_REVIEW_EDIT_PATTERNS):
         return False
+    if current_plan is not None:
+        if _active_plan_meta_review_has_followup_edit(text):
+            return False
+        return any(pattern.search(text) is not None for pattern in _ACTIVE_PLAN_META_REVIEW_ANCHORS)
     if _is_protected_plan_asset_request(text):
         return True
     return any(pattern.search(text) is not None for pattern in _PLAN_META_REVIEW_ANCHORS)
+
+
+def _active_plan_meta_review_has_followup_edit(text: str) -> bool:
+    fragments = _split_active_plan_review_fragments(text)
+    review_seen = False
+    edit_seen = False
+    for fragment in fragments:
+        lowered = fragment.casefold()
+        has_review = any(cue.casefold() in lowered for cue in _ACTIVE_PLAN_META_REVIEW_CUES)
+        has_edit = any(cue.casefold() in lowered for cue in _ACTIVE_PLAN_FOLLOWUP_EDIT_CUES)
+        if has_review and has_edit:
+            return True
+        if (review_seen and has_edit) or (edit_seen and has_review):
+            return True
+        review_seen = review_seen or has_review
+        edit_seen = edit_seen or has_edit
+    return False
+
+
+def _should_bypass_consult_for_active_plan_followup_edit(text: str, *, current_plan) -> bool:
+    if current_plan is None:
+        return False
+    return _active_plan_meta_review_has_followup_edit(text)
+
+
+def _split_active_plan_review_fragments(text: str) -> tuple[str, ...]:
+    fragments: list[str] = []
+    current: list[str] = []
+    for char in str(text or ""):
+        if char in ",，;；:：.!！？?\n":
+            fragment = "".join(current).strip()
+            if fragment:
+                fragments.append(fragment)
+            current = []
+            continue
+        current.append(char)
+    fragment = "".join(current).strip()
+    if fragment:
+        fragments.append(fragment)
+    return tuple(fragments)
 
 
 def _match_analyze_challenge_label(text: str) -> str | None:

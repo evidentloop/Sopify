@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import shutil
 import sys
 import tempfile
 import unittest
@@ -15,7 +16,7 @@ from installer.hosts.base import install_host_assets
 from installer.hosts.claude import CLAUDE_ADAPTER
 from installer.hosts.codex import CODEX_ADAPTER
 from installer.inspection import build_doctor_payload, build_status_payload, render_status_text
-from installer.payload import install_global_payload, run_workspace_bootstrap
+from installer.payload import _REQUIRED_BUNDLE_CAPABILITIES, install_global_payload, run_workspace_bootstrap
 from installer.validate import validate_host_install, validate_payload_install
 from scripts.sopify_doctor import main as doctor_main
 from scripts.sopify_status import main as status_main
@@ -118,9 +119,12 @@ class StatusDoctorContractTests(unittest.TestCase):
             self.assertFalse(payload["workspace_state"]["requested"])
             self.assertEqual(payload["workspace_state"]["bootstrap_mode"], "on_first_project_trigger")
             self.assertEqual(payload["hosts"][0]["state"]["workspace_bundle_healthy"], "not_requested")
+            self.assertEqual(payload["hosts"][0]["payload_bundle"]["source_kind"], "global_active")
+            self.assertEqual(payload["hosts"][0]["payload_bundle"]["reason_code"], "PAYLOAD_BUNDLE_READY")
             rendered = render_status_text(payload)
             self.assertIn("requested: no", rendered)
             self.assertIn("will bootstrap on first project trigger", rendered)
+            self.assertIn("payload_bundle=global_active (PAYLOAD_BUNDLE_READY)", rendered)
 
     def test_doctor_payload_supports_workspace_not_requested(self) -> None:
         with tempfile.TemporaryDirectory() as home_dir:
@@ -138,6 +142,107 @@ class StatusDoctorContractTests(unittest.TestCase):
             )
             self.assertEqual(workspace_check["status"], "skip")
             self.assertEqual(workspace_check["reason_code"], "WORKSPACE_NOT_REQUESTED")
+            payload_bundle_check = next(
+                check
+                for check in payload["checks"]
+                if check["host_id"] == "codex" and check["check_id"] == "payload_bundle_resolution"
+            )
+            self.assertEqual(payload_bundle_check["status"], "pass")
+            self.assertEqual(payload_bundle_check["reason_code"], "PAYLOAD_BUNDLE_READY")
+            self.assertEqual(payload_bundle_check["source_kind"], "global_active")
+
+    def test_status_and_doctor_surface_legacy_payload_bundle_layout(self) -> None:
+        with tempfile.TemporaryDirectory() as home_dir:
+            home_root = Path(home_dir)
+
+            install_host_assets(CODEX_ADAPTER, repo_root=REPO_ROOT, home_root=home_root, language_directory="CN")
+            install_global_payload(CODEX_ADAPTER, repo_root=REPO_ROOT, home_root=home_root)
+
+            payload_root = CODEX_ADAPTER.payload_root(home_root)
+            payload_manifest = json.loads((payload_root / "payload-manifest.json").read_text(encoding="utf-8"))
+            active_version = payload_manifest["active_version"]
+            legacy_bundle_root = payload_root / "bundle"
+            shutil.copytree(payload_root / "bundles" / active_version, legacy_bundle_root)
+            _write_json(
+                payload_root / "payload-manifest.json",
+                {
+                    "schema_version": "1",
+                    "payload_version": active_version,
+                    "bundle_version": active_version,
+                    "bundle_manifest": "bundle/manifest.json",
+                    "bundle_template_dir": "bundle",
+                    "helper_entry": "helpers/bootstrap_workspace.py",
+                },
+            )
+
+            status_payload = build_status_payload(home_root=home_root, workspace_root=None)
+            self.assertEqual(status_payload["hosts"][0]["payload_bundle"]["source_kind"], "legacy_layout")
+            self.assertEqual(status_payload["hosts"][0]["payload_bundle"]["reason_code"], "LEGACY_FALLBACK_SELECTED")
+            rendered = render_status_text(status_payload)
+            self.assertIn("payload_bundle=legacy_layout (LEGACY_FALLBACK_SELECTED)", rendered)
+
+            doctor_payload = build_doctor_payload(home_root=home_root, workspace_root=None)
+            payload_bundle_check = next(
+                check
+                for check in doctor_payload["checks"]
+                if check["host_id"] == "codex" and check["check_id"] == "payload_bundle_resolution"
+            )
+            self.assertEqual(payload_bundle_check["status"], "warn")
+            self.assertEqual(payload_bundle_check["reason_code"], "LEGACY_FALLBACK_SELECTED")
+            self.assertEqual(payload_bundle_check["source_kind"], "legacy_layout")
+
+    def test_status_and_doctor_fail_closed_for_non_object_payload_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as home_dir:
+            home_root = Path(home_dir)
+
+            install_host_assets(CODEX_ADAPTER, repo_root=REPO_ROOT, home_root=home_root, language_directory="CN")
+            install_global_payload(CODEX_ADAPTER, repo_root=REPO_ROOT, home_root=home_root)
+
+            payload_root = CODEX_ADAPTER.payload_root(home_root)
+            (payload_root / "payload-manifest.json").write_text("[1]", encoding="utf-8")
+
+            status_payload = build_status_payload(home_root=home_root, workspace_root=None)
+            self.assertEqual(status_payload["hosts"][0]["payload_bundle"]["source_kind"], "unresolved")
+            self.assertEqual(status_payload["hosts"][0]["payload_bundle"]["reason_code"], "GLOBAL_INDEX_CORRUPTED")
+
+            doctor_payload = build_doctor_payload(home_root=home_root, workspace_root=None)
+            payload_bundle_check = next(
+                check
+                for check in doctor_payload["checks"]
+                if check["host_id"] == "codex" and check["check_id"] == "payload_bundle_resolution"
+            )
+            self.assertEqual(payload_bundle_check["status"], "fail")
+            self.assertEqual(payload_bundle_check["reason_code"], "GLOBAL_INDEX_CORRUPTED")
+            self.assertEqual(payload_bundle_check["source_kind"], "unresolved")
+
+    def test_status_and_doctor_fail_closed_for_versioned_layout_missing_active_version(self) -> None:
+        with tempfile.TemporaryDirectory() as home_dir:
+            home_root = Path(home_dir)
+
+            install_host_assets(CODEX_ADAPTER, repo_root=REPO_ROOT, home_root=home_root, language_directory="CN")
+            install_global_payload(CODEX_ADAPTER, repo_root=REPO_ROOT, home_root=home_root)
+
+            payload_root = CODEX_ADAPTER.payload_root(home_root)
+            payload_manifest = json.loads((payload_root / "payload-manifest.json").read_text(encoding="utf-8"))
+            payload_manifest.pop("active_version", None)
+            (payload_root / "payload-manifest.json").write_text(
+                json.dumps(payload_manifest, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+
+            status_payload = build_status_payload(home_root=home_root, workspace_root=None)
+            self.assertEqual(status_payload["hosts"][0]["payload_bundle"]["source_kind"], "global_active")
+            self.assertEqual(status_payload["hosts"][0]["payload_bundle"]["reason_code"], "GLOBAL_INDEX_CORRUPTED")
+
+            doctor_payload = build_doctor_payload(home_root=home_root, workspace_root=None)
+            payload_bundle_check = next(
+                check
+                for check in doctor_payload["checks"]
+                if check["host_id"] == "codex" and check["check_id"] == "payload_bundle_resolution"
+            )
+            self.assertEqual(payload_bundle_check["status"], "fail")
+            self.assertEqual(payload_bundle_check["reason_code"], "GLOBAL_INDEX_CORRUPTED")
+            self.assertEqual(payload_bundle_check["source_kind"], "global_active")
 
     def test_status_json_contains_required_contract_and_workspace_state(self) -> None:
         with tempfile.TemporaryDirectory() as home_dir, tempfile.TemporaryDirectory() as workspace_dir:
@@ -269,6 +374,146 @@ class StatusDoctorContractTests(unittest.TestCase):
             self.assertEqual(payload["state"]["overall_status"], "ready")
             self.assertEqual(payload["state"]["workspace_bundle_healthy_hosts"], ["codex"])
             self.assertEqual(payload["hosts"][0]["state"]["workspace_bundle_healthy"], "yes")
+
+    def test_status_and_doctor_treat_stub_only_workspace_as_ready_when_global_bundle_resolves(self) -> None:
+        with tempfile.TemporaryDirectory() as home_dir, tempfile.TemporaryDirectory() as workspace_dir:
+            home_root = Path(home_dir)
+            workspace_root = Path(workspace_dir)
+
+            install_host_assets(CODEX_ADAPTER, repo_root=REPO_ROOT, home_root=home_root, language_directory="CN")
+            install_global_payload(CODEX_ADAPTER, repo_root=REPO_ROOT, home_root=home_root)
+            run_workspace_bootstrap(CODEX_ADAPTER.payload_root(home_root), workspace_root)
+
+            bundle_root = workspace_root / ".sopify-runtime"
+            for name in ("runtime", "scripts", "tests"):
+                target = bundle_root / name
+                if target.exists():
+                    import shutil
+
+                    shutil.rmtree(target)
+
+            status_payload = build_status_payload(home_root=home_root, workspace_root=workspace_root)
+            self.assertEqual(status_payload["hosts"][0]["state"]["workspace_bundle_healthy"], "yes")
+
+            doctor_payload = build_doctor_payload(home_root=home_root, workspace_root=workspace_root)
+            workspace_check = next(
+                check
+                for check in doctor_payload["checks"]
+                if check["host_id"] == "codex" and check["check_id"] == "workspace_bundle_manifest"
+            )
+            self.assertEqual(workspace_check["status"], "pass")
+            self.assertEqual(workspace_check["reason_code"], "WORKSPACE_BUNDLE_READY")
+
+    def test_doctor_resolves_workspace_capabilities_from_global_bundle_when_workspace_manifest_is_stub_only(self) -> None:
+        with tempfile.TemporaryDirectory() as home_dir, tempfile.TemporaryDirectory() as workspace_dir:
+            home_root = Path(home_dir)
+            workspace_root = Path(workspace_dir)
+
+            install_host_assets(CODEX_ADAPTER, repo_root=REPO_ROOT, home_root=home_root, language_directory="CN")
+            install_global_payload(CODEX_ADAPTER, repo_root=REPO_ROOT, home_root=home_root)
+            run_workspace_bootstrap(CODEX_ADAPTER.payload_root(home_root), workspace_root)
+
+            workspace_manifest = json.loads((workspace_root / ".sopify-runtime" / "manifest.json").read_text(encoding="utf-8"))
+            self.assertNotIn("capabilities", workspace_manifest)
+            self.assertNotIn("limits", workspace_manifest)
+
+            doctor_payload = build_doctor_payload(home_root=home_root, workspace_root=workspace_root)
+            handoff_check = next(
+                check
+                for check in doctor_payload["checks"]
+                if check["host_id"] == "codex" and check["check_id"] == "workspace_handoff_first"
+            )
+            preload_check = next(
+                check
+                for check in doctor_payload["checks"]
+                if check["host_id"] == "codex" and check["check_id"] == "workspace_preferences_preload"
+            )
+            self.assertEqual(handoff_check["status"], "pass")
+            self.assertEqual(handoff_check["reason_code"], "ok")
+            self.assertEqual(preload_check["status"], "pass")
+            self.assertEqual(preload_check["reason_code"], "ok")
+
+    def test_doctor_uses_workspace_fallback_decision_when_selected_global_bundle_is_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as home_dir, tempfile.TemporaryDirectory() as workspace_dir:
+            home_root = Path(home_dir)
+            workspace_root = Path(workspace_dir)
+
+            install_host_assets(CODEX_ADAPTER, repo_root=REPO_ROOT, home_root=home_root, language_directory="CN")
+            install_global_payload(CODEX_ADAPTER, repo_root=REPO_ROOT, home_root=home_root)
+            run_workspace_bootstrap(CODEX_ADAPTER.payload_root(home_root), workspace_root)
+
+            payload_root = CODEX_ADAPTER.payload_root(home_root)
+            payload_manifest = json.loads((payload_root / "payload-manifest.json").read_text(encoding="utf-8"))
+            selected_version = str(payload_manifest["active_version"])
+            selected_bundle_root = payload_root / "bundles" / selected_version
+            bundle_root = workspace_root / ".sopify-runtime"
+
+            workspace_manifest_path = bundle_root / "manifest.json"
+            workspace_manifest = json.loads(workspace_manifest_path.read_text(encoding="utf-8"))
+            workspace_manifest["legacy_fallback"] = True
+            workspace_manifest_path.write_text(json.dumps(workspace_manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            for name in ("runtime", "scripts", "tests"):
+                shutil.copytree(selected_bundle_root / name, bundle_root / name)
+
+            shutil.rmtree(selected_bundle_root)
+
+            doctor_payload = build_doctor_payload(home_root=home_root, workspace_root=workspace_root)
+            workspace_check = next(
+                check
+                for check in doctor_payload["checks"]
+                if check["host_id"] == "codex" and check["check_id"] == "workspace_bundle_manifest"
+            )
+            handoff_check = next(
+                check
+                for check in doctor_payload["checks"]
+                if check["host_id"] == "codex" and check["check_id"] == "workspace_handoff_first"
+            )
+            preload_check = next(
+                check
+                for check in doctor_payload["checks"]
+                if check["host_id"] == "codex" and check["check_id"] == "workspace_preferences_preload"
+            )
+            payload_bundle_check = next(
+                check
+                for check in doctor_payload["checks"]
+                if check["host_id"] == "codex" and check["check_id"] == "payload_bundle_resolution"
+            )
+
+            self.assertEqual(workspace_check["reason_code"], "LEGACY_FALLBACK_SELECTED")
+            self.assertEqual(handoff_check["status"], "pass")
+            self.assertEqual(handoff_check["reason_code"], "ok")
+            self.assertEqual(preload_check["status"], "pass")
+            self.assertEqual(preload_check["reason_code"], "ok")
+            self.assertEqual(payload_bundle_check["reason_code"], "GLOBAL_BUNDLE_MISSING")
+
+    def test_status_and_doctor_surface_partial_bundle_damage_as_replace_required(self) -> None:
+        with tempfile.TemporaryDirectory() as home_dir, tempfile.TemporaryDirectory() as workspace_dir:
+            home_root = Path(home_dir)
+            workspace_root = Path(workspace_dir)
+
+            install_host_assets(CODEX_ADAPTER, repo_root=REPO_ROOT, home_root=home_root, language_directory="CN")
+            install_global_payload(CODEX_ADAPTER, repo_root=REPO_ROOT, home_root=home_root)
+            run_workspace_bootstrap(CODEX_ADAPTER.payload_root(home_root), workspace_root)
+
+            payload_root = CODEX_ADAPTER.payload_root(home_root)
+            payload_manifest = json.loads((payload_root / "payload-manifest.json").read_text(encoding="utf-8"))
+            active_version = payload_manifest["active_version"]
+            bundle_root = workspace_root / ".sopify-runtime"
+            for name in ("runtime", "scripts", "tests"):
+                shutil.copytree(payload_root / "bundles" / active_version / name, bundle_root / name)
+            (bundle_root / "scripts" / "runtime_gate.py").unlink()
+
+            doctor_payload = build_doctor_payload(home_root=home_root, workspace_root=workspace_root)
+            workspace_check = next(
+                check
+                for check in doctor_payload["checks"]
+                if check["host_id"] == "codex" and check["check_id"] == "workspace_bundle_manifest"
+            )
+            self.assertEqual(workspace_check["status"], "fail")
+            self.assertEqual(workspace_check["reason_code"], "MISSING_REQUIRED_FILE")
+            self.assertNotIn("B1 compatibility phase", workspace_check["recommendation"])
+            self.assertIn("Workspace bundle is missing required files", workspace_check["recommendation"])
+            self.assertIn("scripts/runtime_gate.py", workspace_check["recommendation"])
 
     def test_status_cli_json_output_contains_hosts_and_workspace_state(self) -> None:
         with tempfile.TemporaryDirectory() as home_dir, tempfile.TemporaryDirectory() as workspace_dir:
