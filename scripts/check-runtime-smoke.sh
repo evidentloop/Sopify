@@ -61,13 +61,27 @@ OUTPUT="$(
     --workspace-root "$WORK_DIR" \
     --no-color \
     "$SMOKE_REQUEST"
-)"
+)" || {
+  status=$?
+  echo "Smoke check failed: runtime entry exited with status $status." >&2
+  if [[ -n "${OUTPUT:-}" ]]; then
+    printf '%s\n' "$OUTPUT" >&2
+  fi
+  exit 1
+}
 GATE_OUTPUT="$(
   python3 "$RUNTIME_GATE_ENTRY" \
     enter \
     --workspace-root "$WORK_DIR" \
     --request "$SMOKE_REQUEST"
-)"
+)" || {
+  status=$?
+  echo "Smoke check failed: runtime gate entry exited with status $status." >&2
+  if [[ -n "${GATE_OUTPUT:-}" ]]; then
+    printf '%s\n' "$GATE_OUTPUT" >&2
+  fi
+  exit 1
+}
 
 PLAN_DIR="$WORK_DIR/.sopify-skills/plan"
 STATE_FILE="$WORK_DIR/.sopify-skills/state/current_plan.json"

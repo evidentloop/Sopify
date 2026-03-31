@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import re
+import shlex
 import subprocess
 from typing import Any
 
@@ -54,16 +55,88 @@ def run_bundle_smoke_check(bundle_root: Path) -> str:
     if not smoke_script.is_file():
         raise InstallError(f"Missing bundle smoke script: {smoke_script}")
 
+    command = ["bash", str(smoke_script)]
     completed = subprocess.run(
-        ["bash", str(smoke_script)],
+        command,
         capture_output=True,
         text=True,
         check=False,
     )
     if completed.returncode != 0:
-        details = completed.stderr.strip() or completed.stdout.strip() or "unknown smoke failure"
+        details = _format_smoke_failure_details(
+            completed=completed,
+            command=command,
+            smoke_script=smoke_script,
+        )
         raise InstallError(f"Bundle smoke check failed: {details}")
     return completed.stdout.strip()
+
+
+def _format_smoke_failure_details(
+    *,
+    completed: subprocess.CompletedProcess[str],
+    command: list[str],
+    smoke_script: Path,
+) -> str:
+    details = [
+        f"exit_status={completed.returncode}",
+        f"command={_render_command(command)}",
+    ]
+    stderr = completed.stderr.strip()
+    stdout = completed.stdout.strip()
+    if stderr:
+        details.append(f"stderr={stderr}")
+    if stdout:
+        details.append(f"stdout={stdout}")
+    if stderr or stdout:
+        return "; ".join(details)
+
+    # Some old bundle smoke scripts can fail under `set -e` before emitting
+    # stderr/stdout. Re-run with `bash -x` to capture the last subcommand.
+    debug_command = ["bash", "-x", str(smoke_script)]
+    debug_completed = subprocess.run(
+        debug_command,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    details.append(f"debug_exit_status={debug_completed.returncode}")
+    details.append(f"debug_command={_render_command(debug_command)}")
+
+    debug_stderr = debug_completed.stderr.strip()
+    debug_stdout = debug_completed.stdout.strip()
+    last_subcommand = _extract_last_xtrace_subcommand(debug_stderr)
+    if last_subcommand:
+        details.append(f"last_subcommand={last_subcommand}")
+    if debug_stderr:
+        details.append(f"xtrace_tail={_tail_lines(debug_stderr, limit=40)}")
+    elif debug_stdout:
+        details.append(f"debug_stdout_tail={_tail_lines(debug_stdout, limit=20)}")
+    else:
+        details.append("debug_output=empty")
+    return "; ".join(details)
+
+
+def _render_command(command: list[str]) -> str:
+    return " ".join(shlex.quote(part) for part in command)
+
+
+def _extract_last_xtrace_subcommand(stderr: str) -> str | None:
+    for line in reversed(stderr.splitlines()):
+        stripped = line.strip()
+        if not stripped.startswith("+"):
+            continue
+        normalized = stripped.lstrip("+").strip()
+        if normalized:
+            return normalized
+    return None
+
+
+def _tail_lines(text: str, *, limit: int) -> str:
+    lines = text.splitlines()
+    if len(lines) <= limit:
+        return "\n".join(lines)
+    return "\n".join(lines[-limit:])
 
 
 def expected_bundle_paths(bundle_root: Path) -> tuple[Path, ...]:

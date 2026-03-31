@@ -6,6 +6,23 @@ This changelog is maintained manually (not auto-generated).
 
 ## [Unreleased]
 
+## [2026-03-31.143816] - 2026-03-31
+
+### Scripts
+
+- Adjusted maintenance scripts:
+  - `scripts/check-runtime-smoke.sh`
+
+### Tests
+
+- Updated automated coverage:
+  - `tests/test_installer_validate.py`
+
+### Changed
+
+- Updated project files:
+  - `installer/validate.py`
+
 ## [2026-03-31.142215] - 2026-03-31
 
 ### Changed
