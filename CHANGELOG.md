@@ -6,6 +6,31 @@ This changelog is maintained manually (not auto-generated).
 
 ## [Unreleased]
 
+## [2026-04-02.224459] - 2026-04-02
+
+### Docs
+
+- Refined public documentation:
+  - `README.md`
+  - `README.zh-CN.md`
+
+### Scripts
+
+- Adjusted maintenance scripts:
+  - `scripts/check-install-payload-bundle-smoke.py`
+  - `scripts/release-preflight.sh`
+
+### Tests
+
+- Updated automated coverage:
+  - `tests/test_bundle_smoke.py`
+  - `tests/test_distribution.py`
+
+### Changed
+
+- Updated project files:
+  - `.sopify-skills/plan/20260326_5-plan-20260326-phase1-2-3-plan-plan-20260326-ph/tasks.md`
+
 ## [2026-04-02.162241] - 2026-04-02
 
 ### Runtime

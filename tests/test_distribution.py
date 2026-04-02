@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from io import StringIO
+import json
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -13,11 +15,14 @@ if str(REPO_ROOT) not in sys.path:
 
 from installer.distribution import (
     DistributionError,
+    DistributionInstallReport,
     DistributionRequest,
     DistributionSourceMetadata,
     render_distribution_result,
     run_distribution_install,
 )
+from installer.hosts.codex import CODEX_ADAPTER
+from installer.inspection import build_doctor_payload, build_status_payload
 from scripts.install_sopify import run_install
 
 
@@ -105,6 +110,62 @@ class DistributionFacadeTests(unittest.TestCase):
             self.assertIn("payload bundle: source_kind=global_active, reason_code=PAYLOAD_BUNDLE_READY", rendered)
             self.assertIn("workspace: will bootstrap on first project trigger", rendered)
             self.assertIn("workspace bundle: skip (WORKSPACE_NOT_REQUESTED)", rendered)
+
+    def test_distribution_render_surfaces_legacy_payload_fallback_for_on_demand_workspace(self) -> None:
+        with tempfile.TemporaryDirectory() as home_dir:
+            home_root = Path(home_dir)
+            request = DistributionRequest(
+                target="codex:zh-CN",
+                workspace=None,
+                ref_override=None,
+                interactive=False,
+                source_channel="repo-local",
+                source_metadata=DistributionSourceMetadata(
+                    resolved_ref="working-tree",
+                    asset_name="scripts/install_sopify.py",
+                ),
+            )
+
+            report = run_distribution_install(
+                request=request,
+                repo_root=REPO_ROOT,
+                home_root=home_root,
+                install_executor=run_install,
+            )
+            payload_root = CODEX_ADAPTER.payload_root(home_root)
+            payload_manifest = json.loads((payload_root / "payload-manifest.json").read_text(encoding="utf-8"))
+            active_version = payload_manifest["active_version"]
+            shutil.copytree(payload_root / "bundles" / active_version, payload_root / "bundle")
+            (payload_root / "payload-manifest.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": "1",
+                        "payload_version": active_version,
+                        "bundle_version": active_version,
+                        "bundle_manifest": "bundle/manifest.json",
+                        "bundle_template_dir": "bundle",
+                        "helper_entry": "helpers/bootstrap_workspace.py",
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            legacy_report = DistributionInstallReport(
+                request=report.request,
+                install_result=report.install_result,
+                status_payload=build_status_payload(home_root=home_root, workspace_root=None),
+                doctor_payload=build_doctor_payload(home_root=home_root, workspace_root=None),
+                next_step=report.next_step,
+            )
+
+            rendered = render_distribution_result(legacy_report)
+
+            self.assertIn("payload bundle: source_kind=legacy_layout, reason_code=LEGACY_FALLBACK_SELECTED", rendered)
+            self.assertIn("payload outcome: legacy_fallback_selected [warn]", rendered)
+            self.assertIn("payload hint:", rendered)
+            self.assertIn("workspace: will bootstrap on first project trigger", rendered)
 
     def test_distribution_install_with_workspace_reports_prewarmed_bundle(self) -> None:
         with tempfile.TemporaryDirectory() as home_dir, tempfile.TemporaryDirectory() as workspace_dir:

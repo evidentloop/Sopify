@@ -37,10 +37,11 @@ archive_ready: false
   `20260327_hotfix` 的文档边界、冻结结论与 blocked/parallel-allowed 标签已完成同步；真实 `runtime_gate` smoke 已通过，现可优先恢复 `4.3 / 4.4 / 4.5 / 5.4` 这组此前被门禁压住的切片。
 
 ## 0.A 实施顺序约束
-- [ ] 0.A.1 以已冻结 stub schema、Primary Outcome Contract、Host Ingress Contract 与 payload index contract 为先，bootstrap / preflight / diagnostics 全部按同一套 contract 落实现
-- [ ] 0.A.2 `workspace classifier`、`validate`、`inspection` 三处必须同轮收口，禁止只改单点判定器
-- [ ] 0.A.3 `host-aware preflight` 与 `payload index` 必须在 `doctor/status/smoke` 之前稳定，否则 diagnostics 会持续漂移；其中 payload-manifest 的 host-delegated 指针字段名固定为 `active_version`
-- [ ] 0.A.4 测试、迁移说明、自检脚本放在最后收口，但 `primary_code` 矩阵与 hint contract 必须先补齐再补测试
+- [x] 0.A.1 以已冻结 stub schema、Primary Outcome Contract、Host Ingress Contract 与 payload index contract 为先，bootstrap / preflight / diagnostics 全部按同一套 contract 落实现
+- [x] 0.A.2 `workspace classifier`、`validate`、`inspection` 三处必须同轮收口，禁止只改单点判定器
+- [x] 0.A.3 `host-aware preflight` 与 `payload index` 必须在 `doctor/status/smoke` 之前稳定，否则 diagnostics 会持续漂移；其中 payload-manifest 的 host-delegated 指针字段名固定为 `active_version`
+- [x] 0.A.4 测试、迁移说明、自检脚本放在最后收口，但 `primary_code` 矩阵与 hint contract 必须先补齐再补测试
+  收口记录：当前实现已按同一套 contract 贯通 `bootstrap / workspace_preflight / validate / inspection / status / doctor / smoke`；`workspace classifier / validate / inspection` 已同轮落地，payload-manifest 的 host-delegated 指针固定为 `active_version`，并在 reason-code / hint contract 稳定后补齐迁移说明、自检脚本与预发校验。
 
 ## 0.B | 首次写入许可模型
 - [x] 0.B.1 按已冻结结论落首次写入许可模型的入口边界与触发优先级：显式强意图命令、`confirm_bootstrap` checkpoint、禁止纯语义自动 bootstrap，并明确 `~go / ~go plan` 何时可直接落 thin stub
@@ -134,46 +135,55 @@ archive_ready: false
   进展更新：公开 prompt、`CONTRIBUTING_CN.md` 与 `scripts/check-runtime-smoke.sh` 已同步改成 thin-stub + selected global bundle / workspace preflight 模型；bundle manifest 继续承载 `limits.*`，workspace stub 显式保持无 helper 入口，smoke 改为同时校验这两层职责不混淆。
 
 ## 4.A | CLI Rendering Layer
-- [ ] 4.A.1 冻结 CLI 渲染适配层边界：只消费 `primary_code + action_level + evidence` 与 `violations[]`，不反向定义新的机器字段
-- [ ] 4.A.2 为 `ingress_contract_invalid` 设计终端友好渲染：把 `activation_root / host_id / payload_root` 的 violation 渲染成字段级高亮与明确 remediation，不直接裸打嵌套 JSON 错误树
-- [ ] 4.A.3 为 `global_bundle_missing / global_bundle_incompatible / global_index_corrupted / legacy_fallback_selected` 定义分码渲染文案，保证 `status / doctor / CLI 面板` 行为一致
-- [ ] 4.A.4 保留原始结构化 contract 的 debug / `--json` 出口，避免 CLI 友好文案反向污染 IDE / 自动化消费路径
-- [ ] 4.A.5 为终端渲染补示例或快照，覆盖“普通用户视图”和“调试原始视图”两层输出
+- [x] 4.A.1 冻结 CLI 渲染适配层边界：只消费 `primary_code + action_level + evidence` 与 `violations[]`，不反向定义新的机器字段
+- [x] 4.A.2 为 `ingress_contract_invalid` 设计终端友好渲染：把 `activation_root / host_id / payload_root` 的 violation 渲染成字段级高亮与明确 remediation，不直接裸打嵌套 JSON 错误树
+- [x] 4.A.3 为 `global_bundle_missing / global_bundle_incompatible / global_index_corrupted / legacy_fallback_selected` 定义分码渲染文案，保证 `status / doctor / CLI 面板` 行为一致
+- [x] 4.A.4 保留原始结构化 contract 的 debug / `--json` 出口，避免 CLI 友好文案反向污染 IDE / 自动化消费路径
+- [x] 4.A.5 为终端渲染补示例或快照，覆盖“普通用户视图”和“调试原始视图”两层输出
+  收口结论：按 B1 边界，CLI 渲染层以“关键出口可读、可定位、可给下一步，同时保留 JSON 机器契约”为完成标准。`runtime gate` 已对 `ingress_contract_invalid` 输出字段级 remediation；`status / doctor` 已对 `global_bundle_* / legacy_fallback_selected / runtime quarantine / state_conflict` 提供人类可读摘要；`runtime --json` 与 `status/doctor --format json` 保留原始 contract。`status` 中 `workspace_hint` 的对称提示与 `runtime_notes` 的文本透出不纳入 B1 DoD，转入 post-B1 polish。
 
 ## 5. P4 | Compatibility / Observability / Tests
 说明：`5.1 / 5.2` 是 `5.3 / 5.A.*` 的前置物；未补齐默认主码集合、diagnostic-only 集合与 hint contract 前，不得启动 P4 测试。
 - [x] 5.1 冻结结果码分层：`default primary codes = stub_selected / stub_invalid / global_bundle_missing / global_bundle_incompatible / global_index_corrupted / legacy_fallback_selected / host_mismatch / ingress_contract_invalid / root_confirm_required / readonly / non_interactive`；`diagnostic-only identifiers（仅经 evidence / warning surface 暴露，不作为默认首屏主码） = non_git_workspace / ignore_written / root_reuse_ancestor_marker / invalid_ancestor_marker / legacy_fallback_blocked`
   进展记录：文档矩阵已冻结；当前实现已把 `stub_selected / stub_invalid / global bundle failures / legacy_fallback_selected / root_confirm_required / readonly / non_interactive` 接入 bootstrap / preflight / inspection 的主结果面，并把 `non_git_workspace / root_reuse_ancestor_marker / invalid_ancestor_marker` 压回 evidence。
-- [ ] 5.2 将 `default primary codes + action_level + typed evidence` 接入 bootstrap、preflight、validate、inspection、status、doctor 与 CLI 渲染层的输出面，并为 `diagnostic-only identifiers` 冻结 evidence / warning surface 与 reason-code-specific 的用户可见 hint 分类；不新增新的稳定机器字段
-  进展记录：当前已接入 `bootstrap / workspace_preflight / runtime_gate / inspection / doctor tests` 的主结果与 evidence 语义，并把 `stub_invalid / global bundle failures` 的 recommendation 文案收成更直接的用户口径；`action_level` 统一命名与剩余 `status / doctor` 终端文案细化仍待后续切片补齐。
-- [ ] 5.3 补回归测试矩阵：new workspace、legacy vendored workspace、dual-host same repo、non-git workspace、commit-lock mode、monorepo nearest-ancestor-marker reuse、monorepo invalid-nearest-ancestor-marker fail-closed、monorepo explicit-root override；其中 dual-host same repo 只断言 `host_mismatch + typed evidence`，不绑定提示文案模板；non-git workspace 断言“写入前触发 `confirm_bootstrap` + 写入后只在 evidence / warning 中暴露 `non_git_workspace + ignore_mode=noop`”，不要求其成为默认首屏主码
-  进展记录：当前已补 non-git 行的两段式回归：`~go plan` 在非 Git 首写时阻断并返回 `confirm_bootstrap_required`，`~go init` 成功后回到 `stub_selected + non_git_workspace/ignore_mode=noop`；同时已补 `commit-lock` mode 的 helper / gate 回归：`~go init commit-lock` 落 `.gitignore`，后续显式 `~go init` 可切回 `.git/info/exclude`。剩余 dual-host 与 monorepo 相关行仍待补齐。
-- [ ] 5.4 补 smoke 验证矩阵：一次安装、bootstrap、global bundle 解析、fallback visibility、默认入口不变
-- [ ] 5.5 更新迁移说明：新仓库、已 bootstrap 仓库、旧 vendored 仓库分别怎么过渡，并确保迁移说明与 `doctor / status` 的 actionable hint 一致；本轮仅补可见性与说明，不提供一键迁移器
-- [ ] 5.6 更新安装输出与自检脚本，确保用户能看到“当前走的是 stub/global/legacy 哪条路径”
-  进展记录：已冻结 installer surface 收口方向：`--workspace` 保留 internal / maintainer prewarm，不作为 B1 默认用户路径；若要正式支持 monorepo `activation_root` / root confirm UX，放到 post-B1 单独立项。
+- [x] 5.2 将 `default primary codes + action_level + typed evidence` 接入 bootstrap、preflight、validate、inspection、status、doctor 与 CLI 渲染层的输出面，并为 `diagnostic-only identifiers` 冻结 evidence / warning surface 与 reason-code-specific 的用户可见 hint 分类；不新增新的稳定机器字段
+  收口记录：当前已将 `default primary codes + action_level + typed evidence` 接入 `bootstrap / workspace_preflight / validate / inspection / runtime_gate / status / doctor` 的输出面，并以功能性 CLI 收口完成 B1。当前不把“所有 hint 完全对称渲染”或“workspace_state 全量文本化”作为 B1 通过条件；剩余 `workspace_hint / runtime_notes` 文本 polish 进入 post-B1 backlog。
+- [x] 5.3 补回归测试矩阵：new workspace、legacy vendored workspace、dual-host same repo、non-git workspace、commit-lock mode、monorepo nearest-ancestor-marker reuse、monorepo invalid-nearest-ancestor-marker fail-closed、monorepo explicit-root override；其中 dual-host same repo 只断言 `host_mismatch + typed evidence`，不绑定提示文案模板；non-git workspace 断言“写入前触发 `confirm_bootstrap` + 写入后只在 evidence / warning 中暴露 `non_git_workspace + ignore_mode=noop`”，不要求其成为默认首屏主码
+  进展记录：`tests/test_runtime_gate.py` 现已覆盖 non-git 两段式首写、`commit-lock`、dual-host `host_mismatch + typed evidence`、nearest valid ancestor marker reuse、explicit-root override 与 invalid ancestor marker fail-closed；`tests/test_installer.py` / `tests/test_installer_status_doctor.py` 同步守住 legacy vendored fallback 与 global bundle 失效分支。
+- [x] 5.4 补 smoke 验证矩阵：一次安装、bootstrap、global bundle 解析、fallback visibility、默认入口不变
+  进展记录：`scripts/check-install-payload-bundle-smoke.py` 现同时校验 install -> payload bundle -> trigger-time bootstrap、legacy fallback visibility、以及默认入口 / `runtime_gate_entry` 不变；`scripts/check-prompt-runtime-gate-smoke.py` 与 `scripts/check-runtime-smoke.sh` 一起接入 `scripts/release-preflight.sh`。
+- [x] 5.5 更新迁移说明：新仓库、已 bootstrap 仓库、旧 vendored 仓库分别怎么过渡，并确保迁移说明与 `doctor / status` 的 actionable hint 一致；本轮仅补可见性与说明，不提供一键迁移器
+  进展记录：`README.md` / `README.zh-CN.md` 已明确区分新仓库、已 bootstrap 仓库、旧 vendored 仓库的迁移路径，并补 maintainer smoke 命令，口径与 `status / doctor` 的 `stub_selected / legacy_fallback_selected / global_bundle_*` 提示对齐。
+- [x] 5.6 更新安装输出与自检脚本，确保用户能看到“当前走的是 stub/global/legacy 哪条路径”
+  进展记录：distribution install 输出与 `scripts/check-install-payload-bundle-smoke.py` 现在都显式暴露 `global_active / legacy_layout / stub_selected / legacy_fallback_selected` 路径；`tests/test_distribution.py` 与 `tests/test_bundle_smoke.py` 持续回归这一可见性。若后续要正式支持 monorepo `activation_root` / root confirm UX，仍放到 post-B1 单独立项。
 - [x] 5.7 已确定移出本轮：installer 三入口 Python 最低版本 preflight 不纳入当前 B1 主线与 `feature/plan-b1-bootstrap-policy` 分支策略；后续如需推进，单独立项并补对应回归
 
 ## 5.A 验证分层
-- [ ] 5.A.1 单测先覆盖 contract 与判定器：stub validity、payload index、host-aware resolution、fallback gating、`ingress_contract_invalid` 的 `violations[]` 顺序与短路规则，以及 CLI 渲染层的字段级映射；dual-host 相关断言只覆盖 `host_mismatch + typed evidence`，不覆盖提示文案模板；non-git 相关断言只覆盖写入前 `confirm_bootstrap` 触发原因与写入后 `evidence / warning` 暴露，不把 `non_git_workspace` 绑定成默认主码
-  进展记录：本轮已补 `stub_selected / stub_invalid` 语义回归、legacy fallback 主链、`root_confirm_required / readonly / non_interactive` 首写阻断、以及 non-git 的“写入前 `confirm_bootstrap_required` / 写入后只走 `evidence`”双段式断言；`ingress_contract_invalid` 的 `violations[]` 和 dual-host `host_mismatch` 仍待后续切片补齐。
-- [ ] 5.A.2 集成测试覆盖 bootstrap -> preflight -> gate entry 的主链，不允许只测单函数
-- [ ] 5.A.3 smoke 最后验证“一次安装 + 多仓触发 bootstrap + 默认入口不变”
+- [x] 5.A.1 单测先覆盖 contract 与判定器：stub validity、payload index、host-aware resolution、fallback gating、`ingress_contract_invalid` 的 `violations[]` 顺序与短路规则，以及 CLI 渲染层的字段级映射；dual-host 相关断言只覆盖 `host_mismatch + typed evidence`，不覆盖提示文案模板；non-git 相关断言只覆盖写入前 `confirm_bootstrap` 触发原因与写入后 `evidence / warning` 暴露，不把 `non_git_workspace` 绑定成默认主码
+  进展记录：`tests/test_runtime_gate.py` 已覆盖 `ingress_contract_invalid` 的字段级 `violations[]` 顺序与短路、dual-host `host_mismatch` typed evidence、non-git 两段式首写、以及 ancestor marker / explicit-root 解析；`tests/test_installer.py` 与 `tests/test_installer_status_doctor.py` 继续覆盖 stub validity、payload index 与 legacy fallback gating。
+- [x] 5.A.2 集成测试覆盖 bootstrap -> preflight -> gate entry 的主链，不允许只测单函数
+  进展记录：`tests/test_runtime_gate.py` 的入口集成场景与 `scripts/check-prompt-runtime-gate-smoke.py` 共同覆盖 bootstrap -> preflight -> gate entry 主链，并验证 handoff / response-mode / gate receipt 对齐。
+- [x] 5.A.3 smoke 最后验证“一次安装 + 多仓触发 bootstrap + 默认入口不变”
+  进展记录：`scripts/check-install-payload-bundle-smoke.py` 校验安装与首次触发 bootstrap；`scripts/check-prompt-runtime-gate-smoke.py` 校验 prompt-level gate；`scripts/check-runtime-smoke.sh` 校验 bundle/runtime 资产。三者现统一接入 `scripts/release-preflight.sh`。
 
 ## 6. 总验收门
-- [ ] 6.1 新 workspace 默认不再复制重型 vendored runtime bundle
-- [ ] 6.2 旧 workspace 仍能运行，且 fallback 可见
-- [ ] 6.3 `doctor / status / smoke` 与新 payload index 结构保持一致
-- [ ] 6.4 program plan 与 child plan 的优先级、边界、依赖保持一致
-- [ ] 6.5 dual-host 同仓库不再靠目录探测顺序选 payload
-- [ ] 6.6 git 仓库默认不制造 repo-level 脏 diff；commit-lock mode 行为可解释、可控
-- [ ] 6.7 monorepo 首次激活默认不静默爬升到 `repo-root`；仅在最近的有效 ancestor marker 命中时复用上层，命中无效 ancestor marker 时立即 `fail-closed` 回退 `cwd`
-- [ ] 6.8 本轮没有把 `A / B2 / C / B3` 的任务或语义，或 `execution gate / risk classifier` 的误报修复偷偷并入 B1
+- [x] 6.1 新 workspace 默认不再复制重型 vendored runtime bundle
+- [x] 6.2 旧 workspace 仍能运行，且 fallback 可见
+- [x] 6.3 `doctor / status / smoke` 与新 payload index 结构保持一致
+- [x] 6.4 program plan 与 child plan 的优先级、边界、依赖保持一致
+- [x] 6.5 dual-host 同仓库不再靠目录探测顺序选 payload
+- [x] 6.6 git 仓库默认不制造 repo-level 脏 diff；commit-lock mode 行为可解释、可控
+- [x] 6.7 monorepo 首次激活默认不静默爬升到 `repo-root`；仅在最近的有效 ancestor marker 命中时复用上层，命中无效 ancestor marker 时立即 `fail-closed` 回退 `cwd`
+- [x] 6.8 本轮没有把 `A / B2 / C / B3` 的任务或语义，或 `execution gate / risk classifier` 的误报修复偷偷并入 B1
+  验收结论：`release-preflight` 已覆盖完整单测、install/bootstrap smoke、prompt runtime gate smoke、bundle runtime smoke 与 skill eval gate；结合子 plan 与总纲同步回填，B1 现按“control-plane + compatibility + 功能性 CLI 渲染完成，剩余 polish 后置”的口径收口。本轮 backlog 只保留 `Migration Utility / prune / CLI polish`，不把 `Plan A / B2 / C / B3` 或 `execution gate / risk classifier` 误报修复并入 B1。
 
 ## 7. Post-B1 Backlog
 - Direct switch preparation checklist
   - host first-hop 改造完成，不再依赖 workspace-local scripts 作为默认入口
   - `no workspace scripts` smoke 全绿
+- CLI polish
+  - `status` 补 `workspace_bundle` recommendation 的对称文本提示
+  - 评估 `runtime_notes` 在 `status/doctor` 文本层的可见性策略
   - 回滚验证通过
   - 仅在上述门槛都满足后，才允许把 `stub-only` 从 non-ready 提升为 ready
 - Migration Utility

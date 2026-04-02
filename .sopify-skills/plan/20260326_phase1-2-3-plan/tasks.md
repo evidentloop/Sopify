@@ -27,7 +27,8 @@ archive_ready: false
 
 ## 3. 后续子 plan 入口
 - [x] 3.1 先完成 `20260327_hotfix`，作为状态机一致性前置门禁
-- [ ] 3.2 在 3.1 解除状态链路阻塞后继续 `20260326_5-plan-20260326-phase1-2-3-plan-plan-20260326-ph`，作为升级版 Plan B1（global bundle + thin stub/pin + ignore + compatibility）
+- [x] 3.2 在 3.1 解除状态链路阻塞后继续 `20260326_5-plan-20260326-phase1-2-3-plan-plan-20260326-ph`，作为升级版 Plan B1（global bundle + thin stub/pin + ignore + compatibility）
+  收口记录：升级版 Plan B1 已完成 `global bundle + thin stub/pin + ignore + compatibility` 主线收口，并按“关键诊断出口可读、可定位、可给下一步，同时保留 JSON 机器契约”的口径接受 CLI 渲染层功能性完成；剩余 `workspace_hint / runtime_notes` 文本 polish 已降级为 post-B1 backlog。
 - [ ] 3.3 在 3.2 的 control-plane contract 稳定后推进 Plan A 子 plan
 - [ ] 3.4 在 Plan A 与 3.2 的对外语义都稳定后推进 Plan D 子 plan
 - [ ] 3.5 在 control-plane decoupling 稳定后，再评估是否需要推进 Plan B2
@@ -38,7 +39,8 @@ archive_ready: false
 - [ ] 4.1 为每个后续子 plan 显式写出 non-goals，避免范围滑移
 - [ ] 4.2 为每个后续子 plan 显式写出 acceptance gate
 - [x] 4.3 在 `20260327_hotfix` 中冻结 `snapshot-only resolver / proposal session-only / state_conflict + abort / unique handoff exit`
-- [ ] 4.4 在升级版 Plan B1 中将 thin stub 校验、dual-host host-aware、payload index、ignore 默认值、legacy fallback reason code 作为硬门禁
+- [x] 4.4 在升级版 Plan B1 中将 thin stub 校验、dual-host host-aware、payload index、ignore 默认值、legacy fallback reason code 作为硬门禁
+  验收记录：上述硬门禁已在 B1 子 plan 中通过实现、回归与 smoke 验证收口；program plan 与 child plan 现已同步该验收结论，后续只保留 post-B1 polish，不再回流到 B1 主线。
 - [ ] 4.5 在 Plan A 子 plan 启动前登记 carry-over recall debt 与明确 non-goals，明确挂住 2026-03-31 这轮 `A-1 / A-3 / A-4 / A-5` 追溯样本（如“还剩什么需要你确认”“为啥被网关卡住”“不要建包，只做确认项分析”“取消这个 proposal checkpoint”），避免把 Plan H correctness hotfix 与后续语义召回增强混做一轮
 - [ ] 4.6 为 Plan A 子 plan 明确启动触发条件（真实漏判样本 / 用户反馈阈值），并要求先补齐 `A-1 / A-3 / A-4 / A-5` 的正反例矩阵与状态不变量断言（`required_host_action / checkpoint_id / current_plan_proposal / current_decision / plan/` 副作用），避免长期后延或提前侵入 B1 窗口
 - [ ] 4.7 在 Plan A 中冻结 `ExecutionGate` 核心字段名与 `gate_status` 值集
