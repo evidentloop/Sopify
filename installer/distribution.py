@@ -142,6 +142,10 @@ def render_distribution_result(report: DistributionInstallReport) -> str:
     install_result = report.install_result
     selected_host = _select_host_status(report.status_payload, install_result.target)
     selected_checks = _select_host_checks(report.doctor_payload, install_result.target)
+    payload_bundle = selected_host.get("payload_bundle") or {}
+    workspace_bundle = selected_host.get("workspace_bundle") or {}
+    payload_outcome = _render_outcome_summary(payload_bundle)
+    workspace_outcome = _render_outcome_summary(workspace_bundle)
     workspace_line = _render_workspace_line(install_result)
     lines = [
         "Sopify already current:" if _is_noop_install(install_result) else "Installed Sopify successfully:",
@@ -162,8 +166,8 @@ def render_distribution_result(report: DistributionInstallReport) -> str:
         "Verification:",
         (
             "  payload bundle: source_kind={source_kind}, reason_code={reason_code}".format(
-                source_kind=(selected_host.get("payload_bundle") or {}).get("source_kind", "unresolved"),
-                reason_code=(selected_host.get("payload_bundle") or {}).get("reason_code", "GLOBAL_INDEX_CORRUPTED"),
+                source_kind=payload_bundle.get("source_kind", "unresolved"),
+                reason_code=payload_bundle.get("reason_code", "GLOBAL_INDEX_CORRUPTED"),
             )
         ),
         (
@@ -174,6 +178,14 @@ def render_distribution_result(report: DistributionInstallReport) -> str:
             )
         ),
     ]
+    if payload_outcome:
+        lines.append(f"  payload outcome: {payload_outcome}")
+    if payload_bundle.get("recommendation"):
+        lines.append(f"  payload hint: {payload_bundle['recommendation']}")
+    if workspace_outcome:
+        lines.append(f"  workspace outcome: {workspace_outcome}")
+    if workspace_bundle.get("recommendation"):
+        lines.append(f"  workspace hint: {workspace_bundle['recommendation']}")
     lines.extend(
         f"  - {_CHECK_LABELS.get(check['check_id'], check['check_id'])}: {check['status']} ({check['reason_code']})"
         for check in selected_checks
@@ -399,3 +411,13 @@ def _is_noop_install(install_result: InstallResult) -> bool:
 def _first_smoke_line(smoke_output: str) -> str:
     first_line = smoke_output.splitlines()[0].strip() if smoke_output else ""
     return first_line or "(no smoke output)"
+
+
+def _render_outcome_summary(payload: dict[str, object]) -> str:
+    primary_code = str(payload.get("primary_code") or "").strip()
+    action_level = str(payload.get("action_level") or "").strip()
+    if not primary_code and not action_level:
+        return ""
+    if primary_code and action_level:
+        return f"{primary_code} [{action_level}]"
+    return primary_code or action_level

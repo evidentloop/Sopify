@@ -1044,6 +1044,16 @@ class RuntimeGateTests(unittest.TestCase):
             self.assertEqual(result["error_code"], "workspace_preflight_failed")
             self.assertIn("does not match", result["message"])
             self.assertIn("SOPIFY_PAYLOAD_MANIFEST", result["message"])
+            self.assertEqual(result["preflight"]["primary_code"], "host_mismatch")
+            self.assertEqual(result["preflight"]["action_level"], "fail_closed")
+            self.assertEqual(
+                result["preflight"]["evidence"],
+                {
+                    "requested_host_id": "claude",
+                    "selected_host_id": "codex",
+                    "selection_source": f"SOPIFY_PAYLOAD_MANIFEST {(codex_payload / 'payload-manifest.json').resolve()}",
+                },
+            )
 
     def test_gate_preflight_missing_host_payload_still_allows_explicit_payload_root_escape_hatch(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1087,6 +1097,49 @@ class RuntimeGateTests(unittest.TestCase):
             self.assertEqual(result["error_code"], "workspace_preflight_failed")
             self.assertIn("explicit payload_root", result["message"])
             self.assertIn("does not match", result["message"])
+            self.assertEqual(result["preflight"]["primary_code"], "host_mismatch")
+            self.assertEqual(result["preflight"]["action_level"], "fail_closed")
+            self.assertEqual(
+                result["preflight"]["evidence"],
+                {
+                    "requested_host_id": "claude",
+                    "selected_host_id": "codex",
+                    "selection_source": f"explicit payload_root {codex_payload.resolve()}",
+                },
+            )
+
+    def test_gate_preflight_reports_host_mismatch_with_typed_evidence_for_dual_host_same_repo(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            workspace = temp_root / "repo" / "packages" / "feature"
+            workspace.mkdir(parents=True, exist_ok=True)
+            (temp_root / "repo" / ".git").mkdir(parents=True, exist_ok=True)
+            home = temp_root / "home"
+            CODEX_ADAPTER.destination_root(home).mkdir(parents=True, exist_ok=True)
+            CLAUDE_ADAPTER.destination_root(home).mkdir(parents=True, exist_ok=True)
+            install_global_payload(CODEX_ADAPTER, repo_root=REPO_ROOT, home_root=home)
+            claude_payload = install_global_payload(CLAUDE_ADAPTER, repo_root=REPO_ROOT, home_root=home).root
+
+            result = enter_runtime_gate(
+                "~go plan demo",
+                workspace_root=workspace,
+                host_id="codex",
+                payload_root=claude_payload,
+                user_home=home,
+            )
+
+            self.assertEqual(result["status"], "error")
+            self.assertEqual(result["error_code"], "workspace_preflight_failed")
+            self.assertEqual(result["preflight"]["primary_code"], "host_mismatch")
+            self.assertEqual(result["preflight"]["action_level"], "fail_closed")
+            self.assertEqual(
+                result["preflight"]["evidence"],
+                {
+                    "requested_host_id": "codex",
+                    "selected_host_id": "claude",
+                    "selection_source": f"explicit payload_root {claude_payload.resolve()}",
+                },
+            )
 
     def test_gate_preflight_exposes_global_bundle_root_from_payload_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1245,7 +1298,90 @@ class RuntimeGateTests(unittest.TestCase):
 
             self.assertEqual(result["status"], "error")
             self.assertEqual(result["error_code"], "workspace_preflight_failed")
-            self.assertIn("Invalid payload manifest", result["message"])
+            self.assertIn("readable Sopify payload manifest", result["message"])
+            self.assertEqual(result["preflight"]["primary_code"], "ingress_contract_invalid")
+            self.assertEqual(result["preflight"]["action_level"], "fail_closed")
+            self.assertEqual(
+                result["preflight"]["evidence"],
+                {
+                    "violations": [
+                        {
+                            "field": "payload_root",
+                            "error_kind": "unreadable",
+                            "provided_value": str(codex_payload.resolve()),
+                        }
+                    ]
+                },
+            )
+
+    def test_gate_preflight_short_circuits_ingress_violations_at_activation_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            workspace = temp_root / "workspace"
+            workspace.mkdir(parents=True, exist_ok=True)
+            invalid_activation_root = temp_root / "activation-root.txt"
+            invalid_activation_root.write_text("x", encoding="utf-8")
+
+            result = enter_runtime_gate(
+                "~go plan demo",
+                workspace_root=workspace,
+                activation_root=invalid_activation_root,
+                host_id="unsupported-host",
+                payload_root=temp_root / "missing-payload",
+                user_home=temp_root / "home",
+            )
+
+            self.assertEqual(result["status"], "error")
+            self.assertEqual(result["error_code"], "workspace_preflight_failed")
+            self.assertIn("Explicit activation_root is not a directory", result["message"])
+            self.assertEqual(result["preflight"]["primary_code"], "ingress_contract_invalid")
+            self.assertEqual(result["preflight"]["action_level"], "fail_closed")
+            self.assertEqual(
+                result["preflight"]["evidence"],
+                {
+                    "violations": [
+                        {
+                            "field": "activation_root",
+                            "error_kind": "not_found",
+                            "provided_value": str(invalid_activation_root),
+                            "actual_kind": "file",
+                        }
+                    ]
+                },
+            )
+
+    def test_gate_preflight_short_circuits_ingress_violations_at_host_id_before_payload_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            workspace = temp_root / "workspace"
+            workspace.mkdir(parents=True, exist_ok=True)
+
+            result = enter_runtime_gate(
+                "~go plan demo",
+                workspace_root=workspace,
+                activation_root=workspace,
+                host_id="unsupported-host",
+                payload_root=temp_root / "missing-payload",
+                user_home=temp_root / "home",
+            )
+
+            self.assertEqual(result["status"], "error")
+            self.assertEqual(result["error_code"], "workspace_preflight_failed")
+            self.assertIn("Unsupported host_id", result["message"])
+            self.assertEqual(result["preflight"]["primary_code"], "ingress_contract_invalid")
+            self.assertEqual(result["preflight"]["action_level"], "fail_closed")
+            self.assertEqual(
+                result["preflight"]["evidence"],
+                {
+                    "violations": [
+                        {
+                            "field": "host_id",
+                            "error_kind": "invalid_value",
+                            "provided_value": "unsupported-host",
+                        }
+                    ]
+                },
+            )
 
     def test_gate_preflight_falls_back_when_helper_rejects_host_id_only(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1438,6 +1574,31 @@ class RuntimeGateTests(unittest.TestCase):
             self.assertEqual(result["preflight"]["activation_root"], str(ancestor_root.resolve()))
             self.assertEqual(result["preflight"]["requested_root"], str(workspace.resolve()))
             self.assertEqual(result["preflight"]["root_resolution_source"], "ancestor_marker")
+
+    def test_gate_preflight_explicit_activation_root_overrides_valid_ancestor_marker(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            workspace = temp_root / "repo" / "packages" / "feature"
+            workspace.mkdir(parents=True, exist_ok=True)
+            ancestor_root = temp_root / "repo"
+            (ancestor_root / ".git").mkdir(parents=True, exist_ok=True)
+            marker_path = ancestor_root / ".sopify-runtime" / "manifest.json"
+            marker_path.parent.mkdir(parents=True, exist_ok=True)
+            marker_path.write_text(json.dumps({"schema_version": "1"}, ensure_ascii=False) + "\n", encoding="utf-8")
+            payload_manifest_path = _install_payload_manifest_for_gate(home_root=temp_root / "home")
+
+            result = enter_runtime_gate(
+                "~go init",
+                workspace_root=workspace,
+                activation_root=workspace,
+                payload_manifest_path=payload_manifest_path,
+                user_home=temp_root / "home",
+            )
+
+            self.assertEqual(result["status"], "ready")
+            self.assertEqual(result["preflight"]["activation_root"], str(workspace.resolve()))
+            self.assertEqual(result["preflight"]["root_resolution_source"], "explicit_root")
+            self.assertTrue((workspace / ".sopify-runtime" / "manifest.json").exists())
 
     def test_gate_preflight_invalid_ancestor_marker_falls_closed_to_cwd(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -2158,6 +2319,38 @@ class RuntimeGateTests(unittest.TestCase):
             self.assertEqual(payload["status"], "ready")
             self.assertEqual(payload["allowed_response_mode"], NORMAL_RUNTIME_FOLLOWUP)
             self.assertIn("handoff", payload)
+
+    def test_runtime_gate_cli_text_renders_field_level_ingress_details(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir) / "workspace"
+            workspace.mkdir(parents=True, exist_ok=True)
+            invalid_activation_root = Path(temp_dir) / "activation-root.txt"
+            invalid_activation_root.write_text("x", encoding="utf-8")
+            script_path = REPO_ROOT / "scripts" / "runtime_gate.py"
+
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    str(script_path),
+                    "enter",
+                    "--workspace-root",
+                    str(workspace),
+                    "--request",
+                    "~go plan demo",
+                    "--activation-root",
+                    str(invalid_activation_root),
+                    "--format",
+                    "text",
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            self.assertEqual(completed.returncode, 1, msg=completed.stderr)
+            self.assertIn("preflight_outcome: ingress_contract_invalid [fail_closed]", completed.stdout)
+            self.assertIn("activation_root: not_found (file)", completed.stdout)
+            self.assertIn("hint: Point activation_root to an existing directory.", completed.stdout)
 
     def test_prompt_runtime_gate_smoke_script_passes(self) -> None:
         script_path = REPO_ROOT / "scripts" / "check-prompt-runtime-gate-smoke.py"

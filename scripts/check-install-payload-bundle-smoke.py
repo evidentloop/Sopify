@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Smoke-check installer, global payload, and vendored bundle in isolation."""
+"""Smoke-check installer, global payload bundle, and workspace thin stub in isolation."""
 
 from __future__ import annotations
 
@@ -18,14 +18,22 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from installer.hosts import get_host_adapter
+from installer.inspection import build_status_payload
 from installer.inspection import inspect_payload_bundle_resolution
 from installer.models import InstallError, parse_install_target
-from installer.validate import run_bundle_smoke_check, validate_bundle_install, validate_host_install, validate_payload_install
+from installer.validate import (
+    resolve_payload_bundle_root,
+    run_bundle_smoke_check,
+    validate_bundle_install,
+    validate_host_install,
+    validate_payload_install,
+    validate_workspace_stub_manifest,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Run an isolated smoke check for install -> payload -> bundle bootstrap."
+        description="Run an isolated smoke check for install -> global payload bundle -> workspace stub bootstrap."
     )
     parser.add_argument(
         "--target",
@@ -108,9 +116,19 @@ def run_smoke(*, target_value: str, temp_root: Path) -> dict[str, Any]:
         raise RuntimeError(f"Unexpected payload bundle reason_code: {payload_bundle.reason_code!r}")
 
     bootstrap_stdout = _run_workspace_bootstrap(helper_path=helper_path, workspace_root=workspace_root)
-    bundle_paths = validate_bundle_install(bundle_root)
-    smoke_stdout = run_bundle_smoke_check(bundle_root)
-    bundle_manifest = json.loads((bundle_root / "manifest.json").read_text(encoding="utf-8"))
+    workspace_stub_path, workspace_manifest = validate_workspace_stub_manifest(bundle_root)
+    global_bundle_root = resolve_payload_bundle_root(payload_root)
+    global_bundle_paths = validate_bundle_install(global_bundle_root)
+    smoke_stdout = run_bundle_smoke_check(
+        global_bundle_root,
+        payload_manifest_path=payload_root / "payload-manifest.json",
+    )
+    status_payload = build_status_payload(home_root=temp_home, workspace_root=workspace_root)
+    host_status = next(
+        host for host in status_payload["hosts"] if host["host_id"] == target.host
+    )
+    workspace_bundle = host_status.get("workspace_bundle") or {}
+    bundle_manifest = json.loads((global_bundle_root / "manifest.json").read_text(encoding="utf-8"))
     default_entry = str(bundle_manifest.get("default_entry") or "")
     plan_only_entry = str(bundle_manifest.get("plan_only_entry") or "")
     runtime_gate_entry = str(bundle_manifest.get("limits", {}).get("runtime_gate_entry") or "")
@@ -124,6 +142,12 @@ def run_smoke(*, target_value: str, temp_root: Path) -> dict[str, Any]:
         raise RuntimeError(f"Unexpected runtime_gate_entry: {runtime_gate_entry!r}")
     if entry_guard.get("default_runtime_entry") != default_entry:
         raise RuntimeError("Manifest limits.entry_guard.default_runtime_entry drifted from default_entry.")
+    if workspace_bundle.get("reason_code") != "STUB_SELECTED":
+        raise RuntimeError(
+            "Unexpected workspace bundle reason_code after bootstrap: {!r}".format(
+                workspace_bundle.get("reason_code")
+            )
+        )
 
     return {
         "passed": True,
@@ -134,7 +158,16 @@ def run_smoke(*, target_value: str, temp_root: Path) -> dict[str, Any]:
         "host_root": str(host_root),
         "payload_root": str(payload_root),
         "bundle_root": str(bundle_root),
+        "global_bundle_root": str(global_bundle_root),
         "payload_bundle": payload_bundle.to_status_dict(),
+        "workspace_bundle": workspace_bundle,
+        "path_summary": {
+            "payload_source_kind": payload_bundle.source_kind,
+            "payload_reason_code": payload_bundle.reason_code,
+            "payload_outcome": _render_outcome_summary(payload_bundle.to_status_dict()) or None,
+            "workspace_reason_code": workspace_bundle.get("reason_code"),
+            "workspace_outcome": _render_outcome_summary(workspace_bundle) or None,
+        },
         "checks": {
             "single_install_command_only": True,
             "workspace_bundle_absent_before_trigger": True,
@@ -142,6 +175,7 @@ def run_smoke(*, target_value: str, temp_root: Path) -> dict[str, Any]:
             "default_runtime_entry_preserved": True,
             "plan_only_helper_preserved": True,
             "runtime_gate_entry_preserved": True,
+            "workspace_stub_selected_after_bootstrap": True,
             "bundle_smoke_passed": True,
         },
         "manifest": {
@@ -156,7 +190,8 @@ def run_smoke(*, target_value: str, temp_root: Path) -> dict[str, Any]:
         "verified_paths": {
             "host": [str(path) for path in host_paths],
             "payload": [str(path) for path in payload_paths],
-            "bundle": [str(path) for path in bundle_paths],
+            "workspace_stub": [str(workspace_stub_path)],
+            "global_bundle": [str(path) for path in global_bundle_paths],
         },
     }
 
@@ -192,6 +227,16 @@ def _run_workspace_bootstrap(*, helper_path: Path, workspace_root: Path) -> str:
         details = completed.stderr.strip() or completed.stdout.strip() or "unknown bootstrap failure"
         raise InstallError(f"Workspace bootstrap helper failed: {details}")
     return completed.stdout.strip()
+
+
+def _render_outcome_summary(payload: dict[str, object]) -> str:
+    primary_code = str(payload.get("primary_code") or "").strip()
+    action_level = str(payload.get("action_level") or "").strip()
+    if not primary_code and not action_level:
+        return ""
+    if primary_code and action_level:
+        return f"{primary_code} [{action_level}]"
+    return primary_code or action_level
 
 
 if __name__ == "__main__":

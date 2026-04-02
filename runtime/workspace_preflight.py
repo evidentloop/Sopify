@@ -13,6 +13,12 @@ from typing import Any, Iterator, Mapping
 try:
     from installer.hosts import iter_host_payload_manifest_candidates, resolve_host_payload_root
     from installer.models import InstallError
+    from installer.outcome_contract import (
+        ACTION_FAIL_CLOSED,
+        action_level_for,
+        annotate_outcome_payload,
+        primary_code_for_reason,
+    )
     from installer.validate import resolve_payload_bundle_manifest_path, validate_workspace_stub_manifest
 except ModuleNotFoundError as exc:
     if not str(exc.name or "").startswith("installer"):
@@ -20,6 +26,8 @@ except ModuleNotFoundError as exc:
 
     class InstallError(RuntimeError):
         """Vendored runtime fallback when installer package is unavailable."""
+
+    ACTION_FAIL_CLOSED = "fail_closed"
 
     _FALLBACK_HOST_PAYLOAD_ROOTS = {
         "codex": (".codex", "sopify"),
@@ -179,12 +187,161 @@ except ModuleNotFoundError as exc:
             raise InstallError("Stub verification failed: ignore_mode")
         return normalized
 
+    def primary_code_for_reason(reason_code: str | None) -> str | None:
+        normalized = str(reason_code or "").strip().upper()
+        mapping = {
+            "STUB_SELECTED": "stub_selected",
+            "STUB_INVALID": "stub_invalid",
+            "GLOBAL_BUNDLE_MISSING": "global_bundle_missing",
+            "GLOBAL_BUNDLE_INCOMPATIBLE": "global_bundle_incompatible",
+            "GLOBAL_INDEX_CORRUPTED": "global_index_corrupted",
+            "LEGACY_FALLBACK_SELECTED": "legacy_fallback_selected",
+            "HOST_MISMATCH": "host_mismatch",
+            "INGRESS_CONTRACT_INVALID": "ingress_contract_invalid",
+            "ROOT_CONFIRM_REQUIRED": "root_confirm_required",
+            "READONLY": "readonly",
+            "NON_INTERACTIVE": "non_interactive",
+        }
+        return mapping.get(normalized)
+
+    def action_level_for(reason_code: str | None, *, primary_code: str | None = None) -> str | None:
+        normalized_primary = str(primary_code or "").strip()
+        primary_actions = {
+            "stub_selected": "continue",
+            "stub_invalid": "fail_closed",
+            "global_bundle_missing": "fail_closed",
+            "global_bundle_incompatible": "fail_closed",
+            "global_index_corrupted": "fail_closed",
+            "legacy_fallback_selected": "warn",
+            "host_mismatch": "fail_closed",
+            "ingress_contract_invalid": "fail_closed",
+            "root_confirm_required": "confirm",
+            "readonly": "fail_closed",
+            "non_interactive": "fail_closed",
+        }
+        if normalized_primary:
+            return primary_actions.get(normalized_primary)
+        normalized_reason = str(reason_code or "").strip().upper()
+        if normalized_reason == "CONFIRM_BOOTSTRAP_REQUIRED":
+            return "confirm"
+        fallback_primary = primary_code_for_reason(normalized_reason)
+        if fallback_primary is None:
+            return None
+        return primary_actions.get(fallback_primary)
+
+    def annotate_outcome_payload(
+        payload: dict[str, Any],
+        *,
+        reason_code: str | None = None,
+        message_hint: str | None = None,
+    ) -> dict[str, Any]:
+        effective_reason = str(reason_code or payload.get("reason_code") or "").strip()
+        primary_code = primary_code_for_reason(effective_reason)
+        action_level = action_level_for(effective_reason, primary_code=primary_code)
+        if primary_code:
+            payload.setdefault("primary_code", primary_code)
+        if action_level:
+            payload.setdefault("action_level", action_level)
+        normalized_hint = str(message_hint or payload.get("message_hint") or "").strip()
+        if normalized_hint:
+            payload.setdefault("message_hint", normalized_hint)
+        return payload
+
 _LEGACY_WORKSPACE_RUNTIME_GATE_ENTRY = "scripts/runtime_gate.py"
 _LEGACY_WORKSPACE_PREFERENCES_PRELOAD_ENTRY = "scripts/preferences_preload_runtime.py"
 
 
 class WorkspacePreflightError(RuntimeError):
     """Raised when workspace runtime preflight cannot complete safely."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        reason_code: str = "WORKSPACE_PREFLIGHT_FAILED",
+        preflight_payload: Mapping[str, Any] | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.reason_code = reason_code
+        self.preflight_payload = dict(preflight_payload or {})
+
+
+def _preflight_error_payload(
+    *,
+    reason_code: str,
+    message: str,
+    evidence: object | None = None,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "action": "failed",
+        "reason_code": reason_code,
+        "message": message,
+    }
+    if evidence not in (None, (), [], {}):
+        payload["evidence"] = evidence
+    return annotate_outcome_payload(payload, reason_code=reason_code, message_hint=message)
+
+
+def _ingress_violation(
+    *,
+    field: str,
+    error_kind: str,
+    provided_value: str | None = None,
+    actual_kind: str | None = None,
+    detail: str | None = None,
+) -> dict[str, str]:
+    payload = {
+        "field": field,
+        "error_kind": error_kind,
+    }
+    if provided_value:
+        payload["provided_value"] = provided_value
+    if actual_kind:
+        payload["actual_kind"] = actual_kind
+    if detail:
+        payload["detail"] = detail
+    return payload
+
+
+def _raise_ingress_contract_invalid(message: str, *, violations: list[dict[str, str]]) -> None:
+    raise WorkspacePreflightError(
+        message,
+        reason_code="INGRESS_CONTRACT_INVALID",
+        preflight_payload=_preflight_error_payload(
+            reason_code="INGRESS_CONTRACT_INVALID",
+            message=message,
+            evidence={"violations": violations},
+        ),
+    )
+
+
+def _raise_host_mismatch(
+    *,
+    requested_host_id: str,
+    selected_host_id: str,
+    selection_source: str,
+) -> None:
+    message = (
+        "Ingress host_id '{}' does not match the payload selected from {} (resolved host '{}'). "
+        "Pass the matching payload_root or omit host_id.".format(
+            requested_host_id,
+            selection_source,
+            selected_host_id,
+        )
+    )
+    raise WorkspacePreflightError(
+        message,
+        reason_code="HOST_MISMATCH",
+        preflight_payload=_preflight_error_payload(
+            reason_code="HOST_MISMATCH",
+            message=message,
+            evidence={
+                "requested_host_id": requested_host_id,
+                "selected_host_id": selected_host_id,
+                "selection_source": selection_source,
+            },
+        ),
+    )
 
 
 def preflight_workspace_runtime(
@@ -207,20 +364,51 @@ def preflight_workspace_runtime(
     """
 
     resolved_workspace_root = workspace_root.resolve()
-    activation_root_path = Path(activation_root).expanduser().resolve() if activation_root is not None else resolved_workspace_root
+    activation_root_path = resolved_workspace_root
+    if activation_root is not None:
+        explicit_activation_root = Path(activation_root).expanduser()
+        if not explicit_activation_root.exists():
+            _raise_ingress_contract_invalid(
+                f"Explicit activation_root does not exist: {explicit_activation_root}",
+                violations=[
+                    _ingress_violation(
+                        field="activation_root",
+                        error_kind="not_found",
+                        provided_value=str(explicit_activation_root),
+                    )
+                ],
+            )
+        if not explicit_activation_root.is_dir():
+            actual_kind = "other"
+            if explicit_activation_root.is_file():
+                actual_kind = "file"
+            elif explicit_activation_root.is_symlink():
+                actual_kind = "broken_symlink"
+            _raise_ingress_contract_invalid(
+                f"Explicit activation_root is not a directory: {explicit_activation_root}",
+                violations=[
+                    _ingress_violation(
+                        field="activation_root",
+                        error_kind="not_found",
+                        provided_value=str(explicit_activation_root),
+                        actual_kind=actual_kind,
+                    )
+                ],
+            )
+        activation_root_path = explicit_activation_root.resolve()
     repo_root = Path(__file__).resolve().parents[1]
     bundle_root = resolved_workspace_root / ".sopify-runtime"
     requested_root_path = Path(requested_root).expanduser().resolve() if requested_root is not None else resolved_workspace_root
     root_resolution_source = "cwd"
     if repo_root == bundle_root:
-        return {
+        return annotate_outcome_payload({
             "action": "skipped",
             "reason_code": "RUNNING_FROM_WORKSPACE_BUNDLE",
             "message": "Current entry is already running from the workspace bundle; host preflight remains authoritative.",
             "activation_root": str(activation_root_path),
             "requested_root": str(requested_root_path),
             "root_resolution_source": root_resolution_source,
-        }
+        }, message_hint="Current entry is already running from the workspace bundle; host preflight remains authoritative.")
 
     detected_host_id = str(host_id or "").strip() or None
     home_root = Path(user_home).expanduser().resolve() if user_home is not None else Path.home()
@@ -231,14 +419,14 @@ def preflight_workspace_runtime(
         home_root=home_root,
     )
     if payload_resolution is None:
-        return {
+        return annotate_outcome_payload({
             "action": "skipped",
             "reason_code": "PAYLOAD_MANIFEST_NOT_FOUND",
             "message": "No installed host payload was found; continuing with repo-local entry.",
             "activation_root": str(activation_root_path),
             "requested_root": str(requested_root_path),
             "root_resolution_source": root_resolution_source,
-        }
+        }, message_hint="No installed host payload was found; continuing with repo-local entry.")
 
     payload_manifest = payload_resolution["payload_manifest"]
     payload_manifest_file = payload_resolution["payload_manifest_file"]
@@ -288,6 +476,7 @@ def preflight_workspace_runtime(
         message = str(result.get("message") or completed.stderr.strip() or stdout or "unknown bootstrap failure")
         raise WorkspacePreflightError(f"Workspace preflight failed: {message}")
     payload = dict(result)
+    annotate_outcome_payload(payload, message_hint=str(payload.get("message") or ""))
     # Root disambiguation must stay purely about picking a directory. If the
     # helper is still asking the host to choose a root, do not backfill the
     # default cwd activation root here or we leak a fake selection.
@@ -341,7 +530,16 @@ def _ensure_supported_host_id(*, requested_host_id: str | None, home_root: Path)
     try:
         resolve_host_payload_root(home_root=home_root, host_id=requested_host_id)
     except ValueError as exc:
-        raise WorkspacePreflightError(f"Unsupported host_id: {requested_host_id}") from exc
+        _raise_ingress_contract_invalid(
+            f"Unsupported host_id: {requested_host_id}",
+            violations=[
+                _ingress_violation(
+                    field="host_id",
+                    error_kind="invalid_value",
+                    provided_value=requested_host_id,
+                )
+            ],
+        )
 
 
 def _validate_host_id_alignment(
@@ -352,13 +550,10 @@ def _validate_host_id_alignment(
 ) -> None:
     if requested_host_id is None or selected_host_id is None or requested_host_id == selected_host_id:
         return
-    raise WorkspacePreflightError(
-        "Ingress host_id '{}' does not match the payload selected from {} (resolved host '{}'). "
-        "Pass the matching payload_root or omit host_id.".format(
-            requested_host_id,
-            selection_source,
-            selected_host_id,
-        )
+    _raise_host_mismatch(
+        requested_host_id=requested_host_id,
+        selected_host_id=selected_host_id,
+        selection_source=selection_source,
     )
 
 
@@ -382,11 +577,60 @@ def _load_explicit_payload_manifest(path: Path) -> tuple[dict[str, Any], Path, s
 
 
 def _load_payload_manifest_from_root(payload_root: Path) -> tuple[dict[str, Any], Path]:
+    if not payload_root.exists():
+        _raise_ingress_contract_invalid(
+            f"Explicit payload_root not found: {payload_root}",
+            violations=[
+                _ingress_violation(
+                    field="payload_root",
+                    error_kind="not_found",
+                    provided_value=str(payload_root),
+                )
+            ],
+        )
+    if not payload_root.is_dir():
+        actual_kind = "other"
+        if payload_root.is_file():
+            actual_kind = "file"
+        elif payload_root.is_symlink():
+            actual_kind = "broken_symlink"
+        _raise_ingress_contract_invalid(
+            f"Explicit payload_root is not a directory: {payload_root}",
+            violations=[
+                _ingress_violation(
+                    field="payload_root",
+                    error_kind="not_found",
+                    provided_value=str(payload_root),
+                    actual_kind=actual_kind,
+                )
+            ],
+        )
     manifest_path = payload_root / "payload-manifest.json"
-    payload = _read_json_object(manifest_path, error_prefix="Invalid payload manifest")
+    try:
+        payload = _read_json_object(manifest_path, error_prefix="Invalid payload manifest")
+    except WorkspacePreflightError:
+        _raise_ingress_contract_invalid(
+            f"Payload root does not contain a readable Sopify payload manifest: {payload_root}",
+            violations=[
+                _ingress_violation(
+                    field="payload_root",
+                    error_kind="unreadable",
+                    provided_value=str(payload_root),
+                )
+            ],
+        )
     helper_entry = payload.get("helper_entry")
     if not isinstance(helper_entry, str) or not helper_entry.strip():
-        raise WorkspacePreflightError(f"Payload manifest is missing helper_entry: {manifest_path}")
+        _raise_ingress_contract_invalid(
+            f"Payload root does not contain a valid Sopify payload manifest: {payload_root}",
+            violations=[
+                _ingress_violation(
+                    field="payload_root",
+                    error_kind="unreadable",
+                    provided_value=str(payload_root),
+                )
+            ],
+        )
     return (payload, manifest_path)
 
 

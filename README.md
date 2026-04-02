@@ -8,7 +8,7 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 [![Docs](https://img.shields.io/badge/docs-CC%20BY%204.0-green.svg)](./LICENSE-docs)
-[![Version](https://img.shields.io/badge/version-2026--04--02.094312-orange.svg)](#version-history)
+[![Version](https://img.shields.io/badge/version-2026--04--02.130950-orange.svg)](#version-history)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
 English · [简体中文](./README.zh-CN.md) · [Quick Start](#quick-start) · [Configuration](#configuration) · [Contributors](./CONTRIBUTORS.md)
@@ -91,6 +91,7 @@ Installer behavior:
 - Prewarms `.sopify-runtime/` when `--workspace` is provided
 - Use `python3 scripts/sopify_status.py --format text` to inspect the support matrix and current workspace state
 - Use `python3 scripts/sopify_doctor.py --format text` to inspect payload, bundle, and smoke diagnostics
+- `status` / `doctor` surface the current path directly: `payload bundle: source_kind=global_active|legacy_layout|unresolved`, `payload outcome: ...`, and `workspace outcome: stub_selected [continue]` when a workspace stub is healthy
 
 ### Choose an Entry by Task Size
 
@@ -299,6 +300,14 @@ Use `--workspace` only for maintainer validation, CI, or when you explicitly wan
 ```bash
 python3 scripts/install_sopify.py --target codex:en-US --workspace /path/to/project
 ```
+
+### Q: How do I migrate existing repositories?
+
+Use `python3 scripts/sopify_status.py --format text` first, then `python3 scripts/sopify_doctor.py --format text` if the workspace still looks suspicious.
+
+- New repositories: no manual migration is needed. A normal install is already complete, and Sopify bootstraps `.sopify-runtime/` on the first project trigger.
+- Already bootstrapped repositories: keep the existing `.sopify-runtime/`. A healthy thin-stub workspace should show `workspace outcome: stub_selected [continue]`.
+- Old vendored repositories: still supported, but no one-click migrator is provided in this release. If `status` / `doctor` show `legacy_fallback_selected [warn]`, refresh the local install and trigger Sopify in that repository again. If the surface instead shows `global_bundle_missing`, `global_bundle_incompatible`, or `global_index_corrupted`, repair the installed payload first and retry.
 
 ### Q: How do I reset learned preferences?
 

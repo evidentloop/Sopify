@@ -134,6 +134,7 @@ class DistributionFacadeTests(unittest.TestCase):
             self.assertEqual(report.status_payload["hosts"][0]["state"]["workspace_bundle_healthy"], "yes")
             rendered = render_distribution_result(report)
             self.assertIn(f"workspace: pre-warmed at {workspace_root.resolve()}", rendered)
+            self.assertIn("workspace outcome: stub_selected [continue]", rendered)
             self.assertIn("workspace bundle: pass (STUB_SELECTED)", rendered)
 
     def test_distribution_install_rejects_ambiguous_nested_workspace_prewarm(self) -> None:

@@ -15,7 +15,7 @@ from installer.hosts import get_host_capability, iter_declared_hosts, iter_insta
 from installer.hosts.base import install_host_assets
 from installer.hosts.claude import CLAUDE_ADAPTER
 from installer.hosts.codex import CODEX_ADAPTER
-from installer.inspection import build_doctor_payload, build_status_payload, render_status_text
+from installer.inspection import build_doctor_payload, build_status_payload, render_doctor_text, render_status_text
 from installer.payload import _REQUIRED_BUNDLE_CAPABILITIES, install_global_payload, run_workspace_bootstrap
 from installer.validate import validate_host_install, validate_payload_install
 from scripts.sopify_doctor import main as doctor_main
@@ -182,8 +182,11 @@ class StatusDoctorContractTests(unittest.TestCase):
             status_payload = build_status_payload(home_root=home_root, workspace_root=None)
             self.assertEqual(status_payload["hosts"][0]["payload_bundle"]["source_kind"], "legacy_layout")
             self.assertEqual(status_payload["hosts"][0]["payload_bundle"]["reason_code"], "LEGACY_FALLBACK_SELECTED")
+            self.assertEqual(status_payload["hosts"][0]["payload_bundle"]["primary_code"], "legacy_fallback_selected")
+            self.assertEqual(status_payload["hosts"][0]["payload_bundle"]["action_level"], "warn")
             rendered = render_status_text(status_payload)
             self.assertIn("payload_bundle=legacy_layout (LEGACY_FALLBACK_SELECTED)", rendered)
+            self.assertIn("payload_outcome: legacy_fallback_selected [warn]", rendered)
 
             doctor_payload = build_doctor_payload(home_root=home_root, workspace_root=None)
             payload_bundle_check = next(
@@ -194,6 +197,9 @@ class StatusDoctorContractTests(unittest.TestCase):
             self.assertEqual(payload_bundle_check["status"], "warn")
             self.assertEqual(payload_bundle_check["reason_code"], "LEGACY_FALLBACK_SELECTED")
             self.assertEqual(payload_bundle_check["source_kind"], "legacy_layout")
+            self.assertEqual(payload_bundle_check["primary_code"], "legacy_fallback_selected")
+            self.assertEqual(payload_bundle_check["action_level"], "warn")
+            self.assertIn("outcome: legacy_fallback_selected [warn]", render_doctor_text(doctor_payload))
 
     def test_status_and_doctor_fail_closed_for_non_object_payload_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as home_dir:
@@ -208,6 +214,9 @@ class StatusDoctorContractTests(unittest.TestCase):
             status_payload = build_status_payload(home_root=home_root, workspace_root=None)
             self.assertEqual(status_payload["hosts"][0]["payload_bundle"]["source_kind"], "unresolved")
             self.assertEqual(status_payload["hosts"][0]["payload_bundle"]["reason_code"], "GLOBAL_INDEX_CORRUPTED")
+            self.assertEqual(status_payload["hosts"][0]["payload_bundle"]["primary_code"], "global_index_corrupted")
+            self.assertEqual(status_payload["hosts"][0]["payload_bundle"]["action_level"], "fail_closed")
+            self.assertIn("payload_outcome: global_index_corrupted [fail_closed]", render_status_text(status_payload))
 
             doctor_payload = build_doctor_payload(home_root=home_root, workspace_root=None)
             payload_bundle_check = next(
@@ -218,6 +227,9 @@ class StatusDoctorContractTests(unittest.TestCase):
             self.assertEqual(payload_bundle_check["status"], "fail")
             self.assertEqual(payload_bundle_check["reason_code"], "GLOBAL_INDEX_CORRUPTED")
             self.assertEqual(payload_bundle_check["source_kind"], "unresolved")
+            self.assertEqual(payload_bundle_check["primary_code"], "global_index_corrupted")
+            self.assertEqual(payload_bundle_check["action_level"], "fail_closed")
+            self.assertIn("outcome: global_index_corrupted [fail_closed]", render_doctor_text(doctor_payload))
 
     def test_status_and_doctor_fail_closed_for_versioned_layout_missing_active_version(self) -> None:
         with tempfile.TemporaryDirectory() as home_dir:
@@ -275,6 +287,7 @@ class StatusDoctorContractTests(unittest.TestCase):
                 set(payload["hosts"][0]["state"].keys()),
                 {"installed", "configured", "workspace_bundle_healthy"},
             )
+            self.assertIn("workspace_bundle", payload["hosts"][0])
             self.assertEqual(payload["hosts"][0]["state"]["configured"], "yes")
             self.assertEqual(payload["hosts"][0]["state"]["workspace_bundle_healthy"], "no")
             self.assertNotIn("verified", payload["hosts"][0]["state"])
@@ -398,6 +411,9 @@ class StatusDoctorContractTests(unittest.TestCase):
 
             status_payload = build_status_payload(home_root=home_root, workspace_root=workspace_root)
             self.assertEqual(status_payload["hosts"][0]["state"]["workspace_bundle_healthy"], "yes")
+            self.assertEqual(status_payload["hosts"][0]["workspace_bundle"]["primary_code"], "stub_selected")
+            self.assertEqual(status_payload["hosts"][0]["workspace_bundle"]["action_level"], "continue")
+            self.assertIn("workspace_outcome: stub_selected [continue]", render_status_text(status_payload))
 
             doctor_payload = build_doctor_payload(home_root=home_root, workspace_root=workspace_root)
             workspace_check = next(
@@ -407,8 +423,11 @@ class StatusDoctorContractTests(unittest.TestCase):
             )
             self.assertEqual(workspace_check["status"], "pass")
             self.assertEqual(workspace_check["reason_code"], "STUB_SELECTED")
+            self.assertEqual(workspace_check["primary_code"], "stub_selected")
+            self.assertEqual(workspace_check["action_level"], "continue")
             self.assertIn("NON_GIT_WORKSPACE", workspace_check["evidence"])
             self.assertIn("ignore_mode=noop", workspace_check["evidence"])
+            self.assertIn("outcome: stub_selected [continue]", render_doctor_text(doctor_payload))
 
     def test_doctor_resolves_workspace_capabilities_from_global_bundle_when_workspace_manifest_is_stub_only(self) -> None:
         with tempfile.TemporaryDirectory() as home_dir, tempfile.TemporaryDirectory() as workspace_dir:

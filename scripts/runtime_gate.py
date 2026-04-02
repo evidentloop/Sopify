@@ -13,6 +13,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from runtime.gate import enter_runtime_gate
+from runtime.gate_output import render_gate_text
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -76,6 +77,12 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Skip writing .sopify-skills/state/current_gate_receipt.json.",
     )
+    enter.add_argument(
+        "--format",
+        choices=("json", "text"),
+        default="json",
+        help="Render the gate contract as JSON or a terminal-friendly text view. Defaults to json.",
+    )
     return parser
 
 
@@ -98,7 +105,10 @@ def main(argv: list[str] | None = None) -> int:
         session_id=args.session_id,
         write_receipt=not args.no_receipt,
     )
-    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    if args.format == "text":
+        print(render_gate_text(payload))
+    else:
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0 if payload.get("status") == "ready" else 1
 
 

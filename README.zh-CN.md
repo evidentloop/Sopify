@@ -8,7 +8,7 @@
 
 [![许可证](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 [![文档](https://img.shields.io/badge/docs-CC%20BY%204.0-green.svg)](./LICENSE-docs)
-[![版本](https://img.shields.io/badge/version-2026--04--02.094312-orange.svg)](#版本历史)
+[![版本](https://img.shields.io/badge/version-2026--04--02.130950-orange.svg)](#版本历史)
 [![欢迎PR](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING_CN.md)
 
 [English](./README.md) · 简体中文 · [快速开始](#快速开始) · [配置说明](#配置说明) · [贡献者](./CONTRIBUTORS.md)
@@ -91,6 +91,7 @@ python3 scripts/install_sopify.py --target claude:en-US --workspace /path/to/pro
 - 传入 `--workspace` 时，会额外预热目标仓库的 `.sopify-runtime/`
 - 可用 `python3 scripts/sopify_status.py --format text` 查看支持矩阵与当前 workspace 状态
 - 可用 `python3 scripts/sopify_doctor.py --format text` 查看 payload / bundle / smoke 诊断结果
+- `status` / `doctor` 会直接展示当前路径：`payload bundle: source_kind=global_active|legacy_layout|unresolved`，以及 `payload outcome`、`workspace outcome: stub_selected [continue]` 这类结果行
 
 ### 根据任务规模选入口
 
@@ -299,6 +300,14 @@ plan:
 ```bash
 python3 scripts/install_sopify.py --target codex:zh-CN --workspace /path/to/project
 ```
+
+### Q: 已有仓库怎么迁移？
+
+先跑 `python3 scripts/sopify_status.py --format text`，如果现场仍然可疑，再跑 `python3 scripts/sopify_doctor.py --format text`。
+
+- 新仓库：不需要手动迁移。默认安装已经完整，首次在项目里触发 Sopify 时会自动 bootstrap `.sopify-runtime/`。
+- 已经 bootstrap 过的仓库：保留现有 `.sopify-runtime/` 即可。健康的 thin stub workspace 应显示 `workspace outcome: stub_selected [continue]`。
+- 旧的 vendored 仓库：当前版本仍兼容，但不提供一键迁移器。如果 `status` / `doctor` 出现 `legacy_fallback_selected [warn]`，先刷新本地安装，再回到该仓库重新触发 Sopify；如果出现的是 `global_bundle_missing`、`global_bundle_incompatible` 或 `global_index_corrupted`，则先修复已安装 payload，再重试。
 
 ### Q: 用户偏好如何重置？
 

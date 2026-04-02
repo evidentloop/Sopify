@@ -201,6 +201,8 @@ def enter_runtime_gate(
             )
         )
     except (ConfigError, ValueError, WorkspacePreflightError) as exc:
+        if isinstance(exc, WorkspacePreflightError) and exc.preflight_payload:
+            contract["preflight"] = dict(exc.preflight_payload)
         contract.update(
             {
                 "status": "error",

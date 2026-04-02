@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 from installer.bootstrap_workspace import (
     DIAGNOSTIC_NON_GIT_WORKSPACE,
@@ -17,6 +17,7 @@ from installer.bootstrap_workspace import (
 from installer.hosts import iter_host_registrations
 from installer.hosts.base import HostAdapter, HostRegistration
 from installer.models import HostCapability, InstallError
+from installer.outcome_contract import annotate_outcome_payload, diagnostic_identifiers_from_evidence
 from installer.validate import (
     resolve_payload_bundle_root,
     run_bundle_smoke_check,
@@ -94,7 +95,7 @@ class InspectionCheck:
             payload["evidence"] = list(self.evidence)
         if self.recommendation:
             payload["recommendation"] = self.recommendation
-        return payload
+        return annotate_outcome_payload(payload, reason_code=self.reason_code, message_hint=self.recommendation)
 
 
 @dataclass(frozen=True)
@@ -121,7 +122,7 @@ class PayloadBundleResolution:
             payload["bundle_manifest_path"] = str(self.bundle_manifest_path)
         if self.recommendation:
             payload["recommendation"] = self.recommendation
-        return payload
+        return annotate_outcome_payload(payload, reason_code=self.reason_code, message_hint=self.recommendation)
 
     def to_check(self, *, host_id: str) -> InspectionCheck:
         evidence = tuple(
@@ -176,6 +177,7 @@ class HostInspection:
                 "workspace_bundle_healthy": workspace_bundle_healthy,
             },
             "payload_bundle": self.payload_bundle.to_status_dict(),
+            "workspace_bundle": self.workspace_bundle.to_dict(),
         }
 
     def doctor_checks(self) -> tuple[InspectionCheck, ...]:
@@ -424,6 +426,7 @@ def render_status_text(payload: dict[str, object]) -> str:
     for host in payload["hosts"]:
         state = host["state"]
         payload_bundle = host.get("payload_bundle") or {}
+        workspace_bundle = host.get("workspace_bundle") or {}
         lines.append(
             "  - {host_id}: tier={support_tier}, installed={installed}, configured={configured}, workspace_bundle_healthy={workspace_bundle_healthy}, payload_bundle={payload_source_kind} ({payload_reason_code})".format(
                 host_id=host["host_id"],
@@ -435,6 +438,15 @@ def render_status_text(payload: dict[str, object]) -> str:
                 payload_reason_code=payload_bundle.get("reason_code", REASON_GLOBAL_INDEX_CORRUPTED),
             )
         )
+        workspace_summary = _render_outcome_summary(workspace_bundle)
+        if workspace_summary:
+            lines.append(f"    workspace_outcome: {workspace_summary}")
+        payload_summary = _render_outcome_summary(payload_bundle)
+        if payload_summary:
+            lines.append(f"    payload_outcome: {payload_summary}")
+        warning_identifiers = diagnostic_identifiers_from_evidence(workspace_bundle.get("evidence") or ())
+        if warning_identifiers:
+            lines.append(f"    workspace_warning: {', '.join(warning_identifiers)}")
         if payload_bundle.get("recommendation"):
             lines.append(f"    payload_hint: {payload_bundle['recommendation']}")
     workspace_state = payload["workspace_state"]
@@ -498,13 +510,51 @@ def render_doctor_text(payload: dict[str, object]) -> str:
         prefix = f"{check.get('host_id')}:" if check.get("host_id") else ""
         source_suffix = f" [{check['source_kind']}]" if check.get("source_kind") else ""
         line = f"  - {prefix}{check['check_id']} -> {check['status']} ({check['reason_code']}){source_suffix}"
+        outcome_summary = _render_outcome_summary(check)
+        if outcome_summary:
+            line += f" | outcome: {outcome_summary}"
         if check.get("recommendation"):
             line += f" | {check['recommendation']}"
         display_evidence = _displayable_evidence(check.get("evidence") or ())
         if display_evidence:
             line += f" | evidence: {', '.join(display_evidence)}"
         lines.append(line)
+        for detail in _render_structured_evidence_lines(check.get("evidence")):
+            lines.append(f"    {detail}")
     return "\n".join(lines)
+
+
+def _render_outcome_summary(payload: Mapping[str, object]) -> str:
+    primary_code = str(payload.get("primary_code") or "").strip()
+    action_level = str(payload.get("action_level") or "").strip()
+    if not primary_code and not action_level:
+        return ""
+    if primary_code and action_level:
+        return f"{primary_code} [{action_level}]"
+    return primary_code or action_level
+
+
+def _render_structured_evidence_lines(evidence: object) -> tuple[str, ...]:
+    if not isinstance(evidence, Mapping):
+        return ()
+    violations = evidence.get("violations")
+    if not isinstance(violations, list):
+        return ()
+    rendered: list[str] = []
+    for item in violations:
+        if not isinstance(item, Mapping):
+            continue
+        field_name = str(item.get("field") or "unknown")
+        error_kind = str(item.get("error_kind") or "invalid_value")
+        actual_kind = str(item.get("actual_kind") or "").strip()
+        detail = str(item.get("detail") or "").strip()
+        message = f"{field_name}: {error_kind}"
+        if actual_kind:
+            message += f" ({actual_kind})"
+        if detail:
+            message += f" - {detail}"
+        rendered.append(message)
+    return tuple(rendered)
 
 
 def _inspect_runtime_workspace_state(workspace_root: Path) -> dict[str, object]:
