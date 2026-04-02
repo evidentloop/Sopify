@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -19,6 +21,25 @@ SMOKE_REQUEST = "~go plan 重构数据库层"
 
 
 class BundleSmokeTests(unittest.TestCase):
+    def test_install_payload_bundle_smoke_script_passes(self) -> None:
+        script_path = REPO_ROOT / "scripts" / "check-install-payload-bundle-smoke.py"
+
+        completed = subprocess.run(
+            [sys.executable, str(script_path)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, msg=completed.stderr)
+        payload = json.loads(completed.stdout)
+        self.assertTrue(payload["passed"])
+        self.assertEqual(payload["script"], "scripts/check-install-payload-bundle-smoke.py")
+        self.assertTrue(payload["checks"]["single_install_command_only"])
+        self.assertTrue(payload["install_surface"]["checks"]["install_output_exposes_global_path"])
+        self.assertTrue(payload["legacy_fallback_visibility"]["checks"]["legacy_workspace_fallback_visible"])
+        self.assertTrue(payload["legacy_fallback_visibility"]["checks"]["global_bundle_missing_visible"])
+
     def test_import_runtime_entry(self) -> None:
         self.assertTrue(callable(run_runtime))
 
