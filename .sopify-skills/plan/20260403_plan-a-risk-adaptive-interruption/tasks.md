@@ -65,12 +65,18 @@ plan_status: design_active
 - [ ] 2.1 显式补齐本子 plan 的 non-goals 清单
 - [x] 2.2 已拍板：`plan_proposal_pending + command prefix` 保持显式 fail-close，不视为自动继续；并与 parser 收口任务解耦
 - [x] 2.3 已拍板：`analysis-only / no-write / no-package` 在各类 pending checkpoint 下默认出口为 `consult_readonly`（只分析，不执行）
+- [x] 2.4 已拍板：宿主侧动作只能沿 machine contract 已显式收敛出的 `required_host_action` 继续；machine truth 不允许时，必须继续停留在当前 checkpoint 链并保持 fail-close，不得自动推进
+- [x] 2.5 已拍板：唯一允许的可回答型最终降级，仅限稳定只读可答场景，出口为 `continue_host_consult / consult_readonly`；该出口只读，不提交 checkpoint、不推进 run stage、不物化 plan、不触发执行
+- [x] 2.6 已拍板：当 gate contract 满足 `status=ready` 且 `gate_passed=true` 时，宿主对外响应默认复用 Sopify 标准标题/footer 模板；`allowed_response_mode` 只影响正文类型与下一步提示，不影响是否套用模板
 
 验收标准：
 
 - 本 plan 中不再把产品行为拍板项混入 parser 设计任务
 - 同一问题不会同时出现在“已定约束”和“待决问题”
 - `analysis-only` 刹车后进入 `consult_readonly` 时，`current_decision/current_plan_proposal/current_run.stage` 保持不变
+- 宿主后续动作不存在“未闭环时自动继续”的隐式出口
+- `continue_host_consult / consult_readonly` 的只读出口副作用边界明确
+- `status=ready && gate_passed=true` 的宿主对外响应默认套用标准标题/footer 模板
 
 ## C. 架构设计收敛
 

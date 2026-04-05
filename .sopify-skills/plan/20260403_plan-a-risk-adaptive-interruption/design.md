@@ -638,8 +638,10 @@ SignalPriorityResolution:
 
 1. 命中 `analysis-only / no-write / no-package` 且处于 pending checkpoint 时，默认改道到 `consult_readonly`。
 2. `consult_readonly` 固定为只读分析出口：不提交 checkpoint 选项、不推进 run stage、不物化 plan、不触发执行。
-3. 若输入同时包含显式推进动作（如 `continue`、`1/2`、`option_x`、`cancel`），仍按 checkpoint 决策链处理，不走只读咨询降级。
-4. `plan_proposal_pending + command prefix` 不视为自动继续信号，保持显式 fail-close；用户必须先完成当前 checkpoint 的确认或修订。
+3. 宿主侧动作只能沿 `required_host_action` 继续；machine truth 不允许时，必须继续停留在当前 checkpoint 链并保持 fail-close，不得自动推进。仅在稳定只读可答时，才允许降级到 `continue_host_consult / consult_readonly`，且该出口只读、不提交、不推进、不执行；其余未唯一化场景仍停留在 `inspect / explicit_choice_required / stay_blocked` 等安全槽位。
+4. 当 gate contract 满足 `status=ready` 且 `gate_passed=true` 时，宿主对外响应默认复用 Sopify 标准标题/footer 模板；`allowed_response_mode` 只影响正文类型与下一步提示，不影响是否套用模板。
+5. 若输入同时包含显式推进动作（如 `continue`、`1/2`、`option_x`、`cancel`），仍按 checkpoint 决策链处理，不走只读咨询降级。
+6. `plan_proposal_pending + command prefix` 不视为自动继续信号，保持显式 fail-close；用户必须先完成当前 checkpoint 的确认或修订。
 
 ## 已拍板范围归属
 
