@@ -92,6 +92,18 @@ def _resolve_runner(preferred: str) -> tuple[str, str | None]:
 def _load_and_evaluate_contracts(
     args: argparse.Namespace,
 ) -> tuple[dict[str, object], dict[str, object], dict[str, object], list[dict[str, object]]]:
+    tables, recovery_table, case_matrix = _load_contract_assets(args)
+    results = evaluate_case_matrix(
+        case_matrix,
+        decision_tables=tables,
+        recovery_table=recovery_table,
+    )
+    return tables, recovery_table, case_matrix, results
+
+
+def _load_contract_assets(
+    args: argparse.Namespace,
+) -> tuple[dict[str, object], dict[str, object], dict[str, object]]:
     if args.asset:
         from runtime.decision_tables import load_decision_tables
 
@@ -115,12 +127,7 @@ def _load_and_evaluate_contracts(
         args.case_matrix,
         schema_path=args.recovery_schema,
     )
-    results = evaluate_case_matrix(
-        case_matrix,
-        decision_tables=tables,
-        recovery_table=recovery_table,
-    )
-    return tables, recovery_table, case_matrix, results
+    return tables, recovery_table, case_matrix
 
 
 def _run_pytest_entry(args: argparse.Namespace) -> tuple[int, str]:
@@ -161,6 +168,7 @@ def main(argv: list[str] | None = None) -> int:
     resolved_runner, fallback_reason = _resolve_runner(args.runner)
 
     try:
+        case_count = 0
         if resolved_runner == "pytest":
             pytest_return_code, pytest_output = _run_pytest_entry(args)
             if pytest_return_code != 0:
@@ -168,8 +176,11 @@ def main(argv: list[str] | None = None) -> int:
                 raise FailureRecoveryError(
                     f"Pytest fail-close matrix entry failed at {Path(args.pytest_entry).resolve()}{detail}"
                 )
-
-        tables, recovery_table, case_matrix, results = _load_and_evaluate_contracts(args)
+            tables, recovery_table, case_matrix = _load_contract_assets(args)
+            case_count = len(case_matrix["cases"])
+        else:
+            tables, recovery_table, case_matrix, results = _load_and_evaluate_contracts(args)
+            case_count = len(results)
     except (DecisionTableError, FailureRecoveryError) as exc:
         print(f"Fail-close contract check failed: {exc}")
         if _is_missing_default_case_matrix(args.case_matrix, error_text=str(exc)):
@@ -186,7 +197,7 @@ def main(argv: list[str] | None = None) -> int:
         f"(schema: {tables['schema_source_path']}), "
         f"failure_recovery={recovery_table['schema_version']} @ {recovery_table['source_path']} "
         f"(schema: {recovery_table['schema_source_path']}), "
-        f"case_matrix={case_matrix['source_path']} ({len(results)} cases), "
+        f"case_matrix={case_matrix['source_path']} ({case_count} cases), "
         f"runner={resolved_runner}"
     )
     if fallback_reason:
