@@ -17,12 +17,12 @@ plan_status: design_active
 
 ## 当前状态
 
-- 本 plan 仍以设计收敛为主，不进入大范围代码实施；当前允许的代码类动作只限于 P0 受控 spike 的资产化、验证与账本对齐。
+- 本 plan 的 A/B/C 治理闭环已收口，已达到 `Ready-for-V1-Execution`；后续允许按 v1 file map / allowlist 进入受控 implementation，不再继续停留在纯设计收敛。
 - 当前 session-scope handoff 已恢复为 `review_or_execute_plan`，并给出 `run_stage=ready_for_execution`；这是 runtime 当前轮的 plan review / execution confirm 入口，不等同于本清单中的里程碑 `Ready-for-V1-Execution`。
 - 全局 `current_run / current_handoff / current_decision` 仍保留旧的 `decision_pending / auth_boundary` carrier；该现象应视为 `6.4~6.6 / 19.x` 的 legacy/quarantine debt，而不是重新打开认证边界拍板。
-- P0 底座已扩展并已验证：`decision_tables + signal_priority_table + embedded failure_recovery_table + side_effect_mapping_table + host_message_templates + schema + A-1~A-8 case matrix + unittest/CI/preflight` 已资产化收口；剩余缺口收敛为 `streak runtime wiring / quarantine escape hatch runtime wiring / sample invariant gate`。
-- 后续允许持续迭代 `background.md / design.md / tasks.md`，直到进入真正开工窗口。
-- 在进入正式 implementation 之前，允许先做文档 freeze/账本对齐 patch 与 `feature/context-boundary-core` 受控 spike；该 spike 身份固定为 `tracked spike / non-checkpoint-credit / no runtime wiring`，不计入任何 Checkpoint 完成。
+- P0 底座已扩展并已验证：`decision_tables + signal_priority_table + embedded failure_recovery_table + side_effect_mapping_table + host_message_templates + schema + A-1~A-8 case matrix + unittest/CI/preflight` 已资产化收口；A/B/C 对应的 PR 模板、commit trailer 与 CI/preflight 强检也已接通。
+- 后续文档更新以实施期账本维护为主，不再阻断 v1 implementation 启动。
+- `feature/context-boundary-core` 的历史 spike 身份仍保留为 `tracked spike / non-checkpoint-credit / no runtime wiring`；但其资产已通过 A/B/C 治理门并并入当前单一账本。
 
 **导航：** Checkpoint A 前的颗粒度补齐范围，以 design.md §分支拆分、分批合并与 Checkpoint 卡点 和各 Checkpoint 必填决策为准；本任务清单各条任务是执行真相源。
 
@@ -30,7 +30,7 @@ plan_status: design_active
 
 | 解锁目标 | 前置条件 | 当前状态 |
 |---------|---------|---------|
-| Ready-for-V1-Execution | boundary-core + v1-guard-rails + sample-invariant-gate + v1-scope-finalize \| Checkpoint A/B/C | ⬜ 未就绪 |
+| Ready-for-V1-Execution | boundary-core + v1-guard-rails + sample-invariant-gate + v1-scope-finalize \| Checkpoint A/B/C | ✅ 就绪 |
 | Ready-for-V2-Trial | v1 rollout 观察期 + vnext-gate \| Checkpoint D（不阻断 V1） | ⬜ 未就绪 |
 
 ## A. 已承接的冻结决策
@@ -327,16 +327,16 @@ plan_status: design_active
 
 ### 15. Checkpoint 治理落地
 
-- [ ] 15.1 在 PR 模板中增加必填字段：`Context-Checkpoint(A/B/C/D)`、`Decision IDs`、`Blocked by`、`Out-of-scope touched`
-- [ ] 15.2 在提交规范中增加 trailer：`Context-Checkpoint: A|B|C|D`
-- [ ] 15.3 新增 CI 强检脚本 `scripts/check-context-checkpoints.py`，缺字段或决策未冻结即 fail
+- [x] 15.1 在 PR 模板中增加必填字段：`Context-Checkpoint(A/B/C/D)`、`Decision IDs`、`Blocked by`、`Out-of-scope touched`
+- [x] 15.2 在提交规范中增加 trailer：`Context-Checkpoint: A|B|C|D`
+- [x] 15.3 新增 CI 强检脚本 `scripts/check-context-checkpoints.py`，缺字段或决策未冻结即 fail
 - [x] 15.4 Checkpoint A 已绑定：`plan_proposal_pending + command prefix` 保持显式 fail-close，A-6 继续留在本方案
-- [ ] 15.5 Checkpoint B 绑定：A-1~A-8 唯一映射与“表格填不平”清零
+- [x] 15.5 Checkpoint B 绑定：A-1~A-8 唯一映射与“表格填不平”清零
 - [x] 15.6 Checkpoint C 绑定：v1 file map/白名单冻结与超范围变更阻断
 - [ ] 15.7 Checkpoint D 绑定：vNext 价值/预算/安全/结构门槛冻结
-- [ ] 15.8 Checkpoint A 增加“表资产落地 + Schema 冻结 + 插值安全校验”通过条件
-- [ ] 15.9 Checkpoint A 增加“legacy quarantine + escape hatch + 审计事件”通过条件
-- [ ] 15.10 Checkpoint B 增加“在 4a guard-rails 基线上通过样本压测”通过条件
+- [x] 15.8 Checkpoint A 增加“表资产落地 + Schema 冻结 + 插值安全校验”通过条件
+- [x] 15.9 Checkpoint A 增加“legacy quarantine + escape hatch + 审计事件”通过条件
+- [x] 15.10 Checkpoint B 增加“在 4a guard-rails 基线上通过样本压测”通过条件
 - [x] 15.11 Checkpoint C 增加“仅在 B 通过后锁定白名单与越界阻断”通过条件
 
 验收标准：
