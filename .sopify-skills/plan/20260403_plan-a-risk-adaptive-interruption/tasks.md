@@ -17,10 +17,12 @@ plan_status: design_active
 
 ## 当前状态
 
-- 本 plan 的 A/B/C 治理闭环已收口，已达到 `Ready-for-V1-Execution`；后续允许按 v1 file map / allowlist 进入受控 implementation，不再继续停留在纯设计收敛。
+- 本 plan 的 A/B/C 治理闭环已收口，已达到 `Ready-for-V1-Execution`；后续允许按 v1 file map / allowlist 进入受控 implementation，不再把 V1 阻断项停留在纯设计收敛。
 - 当前 session-scope handoff 已恢复为 `review_or_execute_plan`，并给出 `run_stage=ready_for_execution`；这是 runtime 当前轮的 plan review / execution confirm 入口，不等同于本清单中的里程碑 `Ready-for-V1-Execution`。
+- front matter 中的 `plan_status: design_active` 继续表示该方案包尚未 finalize / archive，且仍承载 deferred 账本；它不否定 `Ready-for-V1-Execution` 已达成。
 - 全局 `current_run / current_handoff / current_decision` 仍保留旧的 `decision_pending / auth_boundary` carrier；该现象应视为 `6.4~6.6 / 19.x` 的 legacy/quarantine debt，而不是重新打开认证边界拍板。
 - P0 底座已扩展并已验证：`decision_tables + signal_priority_table + embedded failure_recovery_table + side_effect_mapping_table + host_message_templates + schema + A-1~A-8 case matrix + unittest/CI/preflight` 已资产化收口；A/B/C 对应的 PR 模板、commit trailer 与 CI/preflight 强检也已接通。
+- `12.x / 13.2~13.4 / 14.6 / 15.7` 继续归入 `Ready-for-V2-Trial`；`14.1 / 14.2 / 14.7` 保留为分支治理账本项，不再阻断本次 v1 patch release 口径。
 - 后续文档更新以实施期账本维护为主，不再阻断 v1 implementation 启动。
 - `feature/context-boundary-core` 的历史 spike 身份仍保留为 `tracked spike / non-checkpoint-credit / no runtime wiring`；但其资产已通过 A/B/C 治理门并并入当前单一账本。
 
