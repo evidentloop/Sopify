@@ -6,6 +6,22 @@ This changelog is maintained manually (not auto-generated).
 
 ## [Unreleased]
 
+## [2026-04-13.144221] - 2026-04-13
+
+### Tests
+
+- Updated automated coverage:
+  - `tests/test_installer_status_doctor.py`
+
+### Changed
+
+- Updated project files:
+  - `installer/distribution.py`
+  - `installer/hosts/claude.py`
+  - `installer/hosts/codex.py`
+  - `installer/inspection.py`
+  - `installer/outcome_contract.py`
+
 ## [2026-04-12.230144] - 2026-04-12
 
 ### Docs

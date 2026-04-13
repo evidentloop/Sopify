@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
 from typing import Any, Mapping
@@ -51,11 +52,18 @@ REASON_GLOBAL_BUNDLE_MISSING = "GLOBAL_BUNDLE_MISSING"
 REASON_GLOBAL_BUNDLE_INCOMPATIBLE = "GLOBAL_BUNDLE_INCOMPATIBLE"
 REASON_GLOBAL_INDEX_CORRUPTED = "GLOBAL_INDEX_CORRUPTED"
 REASON_LEGACY_FALLBACK_SELECTED = "LEGACY_FALLBACK_SELECTED"
+REASON_INGRESS_PROOF_GATE_ENTER_OBSERVED = "INGRESS_PROOF_GATE_ENTER_OBSERVED"
+REASON_INGRESS_PROOF_DIRECT_ENTRY_BLOCK_OBSERVED = "INGRESS_PROOF_DIRECT_ENTRY_BLOCK_OBSERVED"
+REASON_INGRESS_PROOF_MISSING = "INGRESS_PROOF_MISSING"
+REASON_INGRESS_PROOF_STALE = "INGRESS_PROOF_STALE"
+REASON_INGRESS_PROOF_UNREADABLE = "INGRESS_PROOF_UNREADABLE"
 SOURCE_KIND_GLOBAL_ACTIVE = "global_active"
 SOURCE_KIND_LEGACY_LAYOUT = "legacy_layout"
 SOURCE_KIND_UNRESOLVED = "unresolved"
 STATUS_READY_STATES = {"READY", "NEWER_THAN_GLOBAL"}
 STATUS_WARN_STATES = {"MISSING", "OUTDATED_COMPATIBLE"}
+CURRENT_GATE_RECEIPT_FILENAME = "current_gate_receipt.json"
+INGRESS_PROOF_STALE_AFTER = timedelta(hours=24)
 _STATE_CONFLICT_EXPLANATIONS = {
     "multiple_pending_checkpoints": "Multiple review checkpoints are simultaneously active and need manual cleanup.",
     "pending_checkpoint_handoff_mismatch": "The active handoff points to one pending checkpoint type, but the persisted state contains another.",
@@ -150,6 +158,7 @@ class HostInspection:
     payload: InspectionCheck
     payload_bundle: PayloadBundleResolution
     workspace_bundle: InspectionCheck
+    ingress_proof: InspectionCheck
     handoff_first: InspectionCheck
     preferences_preload: InspectionCheck
     smoke: InspectionCheck
@@ -164,20 +173,19 @@ class HostInspection:
 
     def to_status_dict(self) -> dict[str, object]:
         configured = self.payload.status == CHECK_PASS
-        workspace_bundle_healthy = STATUS_NO
-        if self.workspace_bundle.reason_code == REASON_WORKSPACE_NOT_REQUESTED:
-            workspace_bundle_healthy = STATUS_NOT_REQUESTED
-        elif self.workspace_bundle.status == CHECK_PASS:
-            workspace_bundle_healthy = STATUS_YES
+        workspace_bundle_healthy = _check_state_value(self.workspace_bundle)
+        workspace_ingress_proof = _check_state_value(self.ingress_proof)
         return {
             **self.capability.to_dict(),
             "state": {
                 "installed": STATUS_YES if self.host_prompt.status == CHECK_PASS else STATUS_NO,
                 "configured": STATUS_YES if configured else STATUS_NO,
                 "workspace_bundle_healthy": workspace_bundle_healthy,
+                "workspace_ingress_proof": workspace_ingress_proof,
             },
             "payload_bundle": self.payload_bundle.to_status_dict(),
             "workspace_bundle": self.workspace_bundle.to_dict(),
+            "workspace_ingress_proof": self.ingress_proof.to_dict(),
         }
 
     def doctor_checks(self) -> tuple[InspectionCheck, ...]:
@@ -186,6 +194,7 @@ class HostInspection:
             self.payload,
             self.payload_bundle.to_check(host_id=self.capability.host_id),
             self.workspace_bundle,
+            self.ingress_proof,
             self.handoff_first,
             self.preferences_preload,
             self.smoke,
@@ -253,6 +262,13 @@ def inspect_host(
                 reason_code=REASON_OK,
                 recommendation=f"Install Sopify for {capability.host_id} before checking workspace bundle health.",
             ),
+            ingress_proof=InspectionCheck(
+                host_id=capability.host_id,
+                check_id="workspace_ingress_proof",
+                status=CHECK_SKIP,
+                reason_code=REASON_OK,
+                recommendation=f"Install Sopify for {capability.host_id} before checking workspace ingress proof health.",
+            ),
             handoff_first=InspectionCheck(
                 host_id=capability.host_id,
                 check_id="workspace_handoff_first",
@@ -290,6 +306,13 @@ def inspect_host(
             reason_code=REASON_WORKSPACE_NOT_REQUESTED,
             recommendation="Trigger Sopify in a project workspace to bootstrap on demand.",
         )
+        ingress_proof = InspectionCheck(
+            host_id=capability.host_id,
+            check_id="workspace_ingress_proof",
+            status=CHECK_SKIP,
+            reason_code=REASON_WORKSPACE_NOT_REQUESTED,
+            recommendation="Trigger Sopify in a project workspace to record workspace ingress proof.",
+        )
         preferences_preload = InspectionCheck(
             host_id=capability.host_id,
             check_id="workspace_preferences_preload",
@@ -309,6 +332,7 @@ def inspect_host(
             payload=payload,
             payload_bundle=payload_bundle,
             workspace_bundle=workspace_bundle,
+            ingress_proof=ingress_proof,
             handoff_first=handoff_first,
             preferences_preload=preferences_preload,
             smoke=smoke,
@@ -317,6 +341,10 @@ def inspect_host(
         adapter=adapter,
         capability=capability,
         home_root=home_root,
+        workspace_root=workspace_root,
+    )
+    ingress_proof = _inspect_workspace_ingress_proof(
+        capability=capability,
         workspace_root=workspace_root,
     )
     capability_manifest = _resolve_workspace_capability_manifest(
@@ -353,6 +381,7 @@ def inspect_host(
         payload=payload,
         payload_bundle=payload_bundle,
         workspace_bundle=workspace_bundle,
+        ingress_proof=ingress_proof,
         handoff_first=handoff_first,
         preferences_preload=preferences_preload,
         smoke=smoke,
@@ -427,13 +456,15 @@ def render_status_text(payload: dict[str, object]) -> str:
         state = host["state"]
         payload_bundle = host.get("payload_bundle") or {}
         workspace_bundle = host.get("workspace_bundle") or {}
+        ingress_proof = host.get("workspace_ingress_proof") or {}
         lines.append(
-            "  - {host_id}: tier={support_tier}, installed={installed}, configured={configured}, workspace_bundle_healthy={workspace_bundle_healthy}, payload_bundle={payload_source_kind} ({payload_reason_code})".format(
+            "  - {host_id}: tier={support_tier}, installed={installed}, configured={configured}, workspace_bundle_healthy={workspace_bundle_healthy}, workspace_ingress_proof={workspace_ingress_proof}, payload_bundle={payload_source_kind} ({payload_reason_code})".format(
                 host_id=host["host_id"],
                 support_tier=host["support_tier"],
                 installed=state["installed"],
                 configured=state["configured"],
                 workspace_bundle_healthy=state["workspace_bundle_healthy"],
+                workspace_ingress_proof=state.get("workspace_ingress_proof", STATUS_NO),
                 payload_source_kind=payload_bundle.get("source_kind", SOURCE_KIND_UNRESOLVED),
                 payload_reason_code=payload_bundle.get("reason_code", REASON_GLOBAL_INDEX_CORRUPTED),
             )
@@ -441,12 +472,20 @@ def render_status_text(payload: dict[str, object]) -> str:
         workspace_summary = render_outcome_summary(workspace_bundle)
         if workspace_summary:
             lines.append(f"    workspace_outcome: {workspace_summary}")
+        ingress_summary = render_outcome_summary(ingress_proof)
+        if ingress_summary:
+            lines.append(f"    ingress_outcome: {ingress_summary}")
         payload_summary = render_outcome_summary(payload_bundle)
         if payload_summary:
             lines.append(f"    payload_outcome: {payload_summary}")
         warning_identifiers = diagnostic_identifiers_from_evidence(workspace_bundle.get("evidence") or ())
         if warning_identifiers:
             lines.append(f"    workspace_warning: {', '.join(warning_identifiers)}")
+        ingress_evidence = _displayable_evidence(ingress_proof.get("evidence") or ())
+        if ingress_evidence:
+            lines.append(f"    ingress_evidence: {', '.join(ingress_evidence)}")
+        if ingress_proof.get("recommendation"):
+            lines.append(f"    ingress_hint: {ingress_proof['recommendation']}")
         if payload_bundle.get("recommendation"):
             lines.append(f"    payload_hint: {payload_bundle['recommendation']}")
     workspace_state = payload["workspace_state"]
@@ -1127,6 +1166,14 @@ def _displayable_evidence(evidence: object) -> tuple[str, ...]:
     return tuple(values[:3])
 
 
+def _check_state_value(check: InspectionCheck) -> str:
+    if check.reason_code == REASON_WORKSPACE_NOT_REQUESTED:
+        return STATUS_NOT_REQUESTED
+    if check.status == CHECK_PASS:
+        return STATUS_YES
+    return STATUS_NO
+
+
 def _reason_code_from_install_error(exc: InstallError, *, default: str = "MISSING_REQUIRED_FILE") -> str:
     message = str(exc)
     if "schema" in message.lower():
@@ -1136,6 +1183,102 @@ def _reason_code_from_install_error(exc: InstallError, *, default: str = "MISSIN
     if "missing" in message.lower() or "verification failed" in message.lower():
         return "MISSING_REQUIRED_FILE"
     return default
+
+
+def _inspect_workspace_ingress_proof(
+    *,
+    capability: HostCapability,
+    workspace_root: Path,
+) -> InspectionCheck:
+    receipt_path = workspace_root / ".sopify-skills" / "state" / CURRENT_GATE_RECEIPT_FILENAME
+    receipt_payload, read_error = _read_json_object(receipt_path)
+    if read_error == "missing":
+        return InspectionCheck(
+            host_id=capability.host_id,
+            check_id="workspace_ingress_proof",
+            status=CHECK_WARN,
+            reason_code=REASON_INGRESS_PROOF_MISSING,
+            evidence=(str(receipt_path),),
+            recommendation="Trigger Sopify through `scripts/runtime_gate.py enter ...` so the workspace records a fresh ingress proof.",
+        )
+    if read_error or receipt_payload is None:
+        return InspectionCheck(
+            host_id=capability.host_id,
+            check_id="workspace_ingress_proof",
+            status=CHECK_WARN,
+            reason_code=REASON_INGRESS_PROOF_UNREADABLE,
+            evidence=(str(receipt_path),),
+            recommendation="Refresh `.sopify-skills/state/current_gate_receipt.json` by entering Sopify through `scripts/runtime_gate.py enter ...` again.",
+        )
+
+    observability = receipt_payload.get("observability")
+    if not isinstance(observability, Mapping):
+        return InspectionCheck(
+            host_id=capability.host_id,
+            check_id="workspace_ingress_proof",
+            status=CHECK_WARN,
+            reason_code=REASON_INGRESS_PROOF_UNREADABLE,
+            evidence=(str(receipt_path),),
+            recommendation="Refresh `.sopify-skills/state/current_gate_receipt.json` by entering Sopify through `scripts/runtime_gate.py enter ...` again.",
+        )
+
+    ingress_mode = str(observability.get("ingress_mode") or "").strip()
+    written_at = str(observability.get("written_at") or "").strip()
+    written_at_dt = _parse_iso_datetime(written_at)
+    evidence = tuple(
+        item
+        for item in (
+            str(receipt_path),
+            f"ingress_mode={ingress_mode}" if ingress_mode else "",
+            f"written_at={written_at}" if written_at else "",
+        )
+        if item
+    )
+    if not ingress_mode or written_at_dt is None:
+        return InspectionCheck(
+            host_id=capability.host_id,
+            check_id="workspace_ingress_proof",
+            status=CHECK_WARN,
+            reason_code=REASON_INGRESS_PROOF_UNREADABLE,
+            evidence=evidence or (str(receipt_path),),
+            recommendation="Refresh `.sopify-skills/state/current_gate_receipt.json` by entering Sopify through `scripts/runtime_gate.py enter ...` again.",
+        )
+
+    if _utc_now() - written_at_dt > INGRESS_PROOF_STALE_AFTER:
+        return InspectionCheck(
+            host_id=capability.host_id,
+            check_id="workspace_ingress_proof",
+            status=CHECK_WARN,
+            reason_code=REASON_INGRESS_PROOF_STALE,
+            evidence=evidence,
+            recommendation="Trigger Sopify through `scripts/runtime_gate.py enter ...` again before relying on this workspace runtime state.",
+        )
+
+    if ingress_mode == "runtime_gate_enter":
+        return InspectionCheck(
+            host_id=capability.host_id,
+            check_id="workspace_ingress_proof",
+            status=CHECK_PASS,
+            reason_code=REASON_INGRESS_PROOF_GATE_ENTER_OBSERVED,
+            evidence=evidence,
+        )
+    if ingress_mode == "default_runtime_entry_blocked":
+        return InspectionCheck(
+            host_id=capability.host_id,
+            check_id="workspace_ingress_proof",
+            status=CHECK_WARN,
+            reason_code=REASON_INGRESS_PROOF_DIRECT_ENTRY_BLOCK_OBSERVED,
+            evidence=evidence,
+            recommendation="The last ingress proof recorded a blocked direct runtime entry. Re-enter Sopify through `scripts/runtime_gate.py enter ...` before continuing.",
+        )
+    return InspectionCheck(
+        host_id=capability.host_id,
+        check_id="workspace_ingress_proof",
+        status=CHECK_WARN,
+        reason_code=REASON_INGRESS_PROOF_UNREADABLE,
+        evidence=evidence,
+        recommendation="Refresh `.sopify-skills/state/current_gate_receipt.json` by entering Sopify through `scripts/runtime_gate.py enter ...` again.",
+    )
 
 
 def _payload_bundle_recommendation(host_id: str, reason_code: str) -> str | None:
@@ -1175,6 +1318,35 @@ def _read_json(path: Path) -> dict[str, Any]:
     if not isinstance(payload, dict):
         return {}
     return payload
+
+
+def _read_json_object(path: Path) -> tuple[dict[str, Any] | None, str | None]:
+    if not path.is_file():
+        return None, "missing"
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None, "unreadable"
+    if not isinstance(payload, dict):
+        return None, "unreadable"
+    return payload, None
+
+
+def _parse_iso_datetime(raw: str) -> datetime | None:
+    normalized = str(raw or "").strip()
+    if not normalized:
+        return None
+    try:
+        parsed = datetime.fromisoformat(normalized.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 def _payload_evidence_paths(payload_root: Path) -> tuple[Path, ...]:

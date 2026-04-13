@@ -41,6 +41,7 @@ CODEX_CAPABILITY = HostCapability(
         "host_prompt_present",
         "payload_present",
         "workspace_bundle_manifest",
+        "workspace_ingress_proof",
         "workspace_handoff_first",
         "workspace_preferences_preload",
         "bundle_smoke",

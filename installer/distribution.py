@@ -22,6 +22,7 @@ _CHECK_LABELS = {
     "payload_present": "payload",
     "payload_bundle_resolution": "payload bundle",
     "workspace_bundle_manifest": "workspace bundle",
+    "workspace_ingress_proof": "workspace ingress proof",
     "workspace_handoff_first": "handoff-first runtime",
     "workspace_preferences_preload": "preferences preload",
     "bundle_smoke": "smoke",
