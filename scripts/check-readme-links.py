@@ -21,6 +21,8 @@ VERSION_HEADERS = (
     ROOT / "Codex/Skills/EN/AGENTS.md",
     ROOT / "Claude/Skills/CN/CLAUDE.md",
     ROOT / "Claude/Skills/EN/CLAUDE.md",
+    ROOT / "TraeCn/Skills/CN/user_rules/sopify.md",
+    ROOT / "TraeCn/Skills/EN/user_rules/sopify.md",
 )
 LINK_PATTERN = re.compile(r"(?<!\!)\[[^\]]+\]\(([^)]+)\)")
 HEADING_PATTERN = re.compile(r"^(#{1,6})\s+(.*)$")
@@ -33,6 +35,7 @@ MARKDOWN_SUFFIXES = {".md", ".markdown"}
 EXPECTED_LEVEL2_SECTIONS = {
     README_FILES[0]: (
         "Why Sopify?",
+        "What You Get After Install",
         "Quick Start",
         "Configuration",
         "Command Reference",
@@ -46,6 +49,7 @@ EXPECTED_LEVEL2_SECTIONS = {
     ),
     README_FILES[1]: (
         "为什么选择 Sopify？",
+        "安装后你会得到什么",
         "快速开始",
         "配置说明",
         "命令参考",
