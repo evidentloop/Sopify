@@ -96,7 +96,7 @@ archive_ready: false
 
 - [ ] 1.10 明确 runtime config v1 策略
   - 不修改 `runtime/config.py`
-  - Trae CN 宿主桥接统一显式传入 `--global-config ~/.trae-cn/sopify.config.yaml`
+  - Trae CN 宿主桥接统一显式传入 `--global-config-path ~/.trae-cn/sopify.config.yaml`
   - 方案文档和实现口径保持一致
 
 - [ ] 1.11 固化作用域边界
@@ -181,38 +181,139 @@ archive_ready: false
 
 ## Phase 3 — 真实 Trae CN IDE Smoke + Tier 升级
 
-- [ ] 3.1 补充 Trae CN 宿主的 bundle smoke 验证
-  - 复用 `run_bundle_smoke_check` 现有逻辑
-  - 验证通过后在 `verified_features` 中添加 `SMOKE_VERIFIED`
+### 3A. 安装到真实环境
 
-- [ ] 3.2 在真实 Trae CN IDE 中验证全局用户规则自动注入
-  - 验证安装后的 `~/.trae-cn/user_rules/sopify.md` 通过 `alwaysApply: true` 自动生效
-  - 确认本轮验证使用的是安装产物，而不是项目 `<project>/.trae/rules/*`
+- [ ] 3.1 安装到 `~/.trae-cn/`
+  ```bash
+  python3 scripts/install_sopify.py --target trae-cn:zh-CN
+  ```
+  验收：
+  - [ ] `~/.trae-cn/user_rules/sopify.md` 存在，以 `---\nalwaysApply: true\n---` 开头
+  - [ ] `~/.trae-cn/skills/sopify/` 完整（analyze / design / develop / kb / templates / model-compare / workflow-learning）
+  - [ ] `~/.trae-cn/sopify/payload-manifest.json` 存在
+  - [ ] `~/.trae-cn/sopify/bundles/<version>/manifest.json` 存在
+  - [ ] `~/.trae-cn/sopify/helpers/bootstrap_workspace.py` 存在
 
-- [ ] 3.3 在真实 Trae CN IDE 中验证全局 skills 可发现与加载
-  - 至少验证一个 Sopify skill 被发现并按需加载
-  - 确认使用的是 `~/.trae-cn/skills/sopify/*`
+### 3B. IDE Smoke 验证（人工操作）
 
-- [ ] 3.4 在真实 Trae CN IDE 中验证端到端 runtime gate 流程
-  - 验证 `python3 scripts/runtime_gate.py enter ...` 可执行
-  - 验证通过后升级 `verified_features: RUNTIME_GATE, HANDOFF_FIRST, PREFERENCES_PRELOAD`
+- [ ] 3.2 全局 user_rules 注入验证
+  - 打开空项目（无 `.trae/rules/sopify.md`），新建 Builder 对话
+  - 发送任意消息，观察 Sopify 系统提示是否自动注入
+  验收（可复查证据，非经验性 probe）：
+  - [ ] `alwaysApply: true` 使全局 user_rules 在无触发词时自动生效
+  - [ ] Sopify 版本头、A1-A4 提示段均出现在对话上下文中
+  - [ ] 确认使用的是 `~/.trae-cn/user_rules/sopify.md` 而非项目级 `.trae/rules/*`
+  - [ ] 证据留存：IDE 对话截图（含版本头 + 提示段），或导出的 IDE 日志片段
+  > 注意：此前 tasks.md 中使用的 `sopify-rule-check -> [RULE_LOADED]` 不是仓库代码定义的稳定观测点，
+  > 而是手工验证时的经验性回显标记，不适合用作正式验收 contract。验收以上述可复查证据为准。
 
-- [ ] 3.5 验证 Trae CN 的显式 global config 接入策略
-  - 确认宿主桥接显式传入 `--global-config ~/.trae-cn/sopify.config.yaml`
+- [ ] 3.3 全局 skills 发现与加载验证
+  - 在 Builder 对话中请求 "分析当前代码复杂度"（触发 analyze skill）
+  验收（可复查证据，非经验性 probe）：
+  - [ ] 至少一个 skill 被 IDE 发现并加载
+  - [ ] skill 内容来自 `~/.trae-cn/skills/sopify/` 而非项目级 `.trae/skills/`
+  - [ ] 证据留存：IDE 对话截图（显示 skill 被调用），或 Builder 对话中实际注入的 prompt 片段
+  > 注意：此前使用的 `[SKILL_LOADED:sopify-test-skill]` 同样不是仓库内定义的观测点。
+
+- [ ] 3.4 Runtime gate 端到端验证
+  ```bash
+  python3 ~/.trae-cn/sopify/bundles/<version>/scripts/runtime_gate.py enter \
+    --workspace-root . \
+    --request "测试 runtime gate" \
+    --global-config-path ~/.trae-cn/sopify.config.yaml \
+    --host-id trae-cn \
+    --format json
+  ```
+  > 参数契约已对齐 `scripts/runtime_gate.py` build_parser()（L24-85）：
+  > `--global-config-path`(L35), `--host-id`(L62), `--format json|text`(L82) 均为稳定 CLI 参数。
+  验收：
+  - [ ] 返回 `"status": "ready"` 且 `"gate_passed": true`
+  - [ ] `.sopify-skills/state/current_gate_receipt.json` 被正确写入
+  - [ ] handoff contract 包含 `entry_guard` 字段
+
+- [ ] 3.5 显式 global config 接入策略验证
+  - 确认宿主桥接显式传入 `--global-config-path ~/.trae-cn/sopify.config.yaml`
   - 明确本轮不修改 `runtime/config.py`
 
-- [ ] 3.6 验证项目 `.trae/*` 未被 installer 接管
-  - 若工作区内已有 `.trae/rules/*` 或 `.trae/skills/*`，安装流程不覆盖、不修复、不诊断
+- [ ] 3.6 项目 `.trae/*` 隔离验证
+  - 在已有 `.trae/rules/sopify.md` 的项目中执行安装
+  验收：
+  - [ ] 安装前后项目 `.trae/` 目录内容不变
+  - [ ] `sopify doctor` 不报告项目级 `.trae/` 的问题
 
-- [ ] 3.7 support_tier 升级评审
-  - `EXPERIMENTAL → BASELINE_SUPPORTED`：需要 smoke 通过 + 真实 IDE 验证
-  - `BASELINE_SUPPORTED → DEEP_VERIFIED`：需要完整 runtime gate + handoff + preferences 验证
-  - 若注入可观测性证据不完整，则保持 `EXPERIMENTAL`
+### 3C. Bundle Smoke + Doctor 独立验证
 
-- [ ] 3.8 根据 Trae CN IDE smoke 结果确认 Builder 工具映射
-  - 明确 Builder 实际可用的文件读取 / 搜索 / 编辑工具名
+- [ ] 3.7a Bundle 安装（含 workspace）
+  ```bash
+  python3 scripts/install_sopify.py --target trae-cn:zh-CN --workspace /path/to/workspace
+  ```
+  验收：
+  - [ ] 安装命令成功完成，摘要中无 FAIL 状态
+  - [ ] 复用 `run_bundle_smoke_check` 现有逻辑
+
+- [ ] 3.7b Doctor 独立核对（安装后单独运行）
+  ```bash
+  python3 scripts/sopify_doctor.py --workspace-root /path/to/workspace --format json
+  ```
+  > 入口为 `scripts/sopify_doctor.py`（L18-23），底层调用 `build_doctor_payload(home_root=..., workspace_root=...)`。
+  > `--home-root` 缺省时取 `Path.home()`，对本机环境通常无需显式传入。
+  验收（以 doctor JSON 结构化输出为准，逐项核对）：
+  - [ ] `host_prompt_present`: status = `pass`
+  - [ ] `payload_present`: status = `pass`
+  - [ ] `workspace_bundle_manifest`: status = `pass`
+  - [ ] `workspace_ingress_proof`: status = `pass`
+  - [ ] `workspace_handoff_first`: status = `pass`
+  - [ ] `workspace_preferences_preload`: status = `pass`
+  - [ ] `bundle_smoke`: status = `pass`
+  > 注意：`install_sopify.py` 的安装摘要（`distribution.py:142 render_distribution_result`）是人类可读文本，
+  > 不是 machine contract。doctor 核对必须以独立调用的结构化输出为准，不能以"安装时顺带看摘要"替代。
+
+### 3D. 工具映射确认
+
+- [ ] 3.8 确认 Builder 工具映射
+  - 在 Trae CN Builder 对话中确认实际可用的工具名（文件读取 / 搜索 / 编辑 / Terminal）
+  - 评估 `user_rules/sopify.md` 的 `A2 | 工具映射` 段是否需要 TraeCn 专属映射
+  - 若需要，补充 `Codex -> TraeCn` 的 host-specific transform 规则，避免后续 sync 覆盖
+
+### 3E. Capability 元数据收口（代码变更，依赖 3A-3D 全部通过）
+
+- [ ] 3.9 升级 `installer/hosts/trae_cn.py`
+  Tier 判定逻辑（收紧版）：
+  - 3.2-3.4 全通过 + 3.7b doctor 7 项全 pass → `BASELINE_SUPPORTED`
+  - 部分通过 → 保持 `EXPERIMENTAL`（记录未通过项）
+  - 3.2 未通过（全局注入失败）→ 保持 `EXPERIMENTAL`
+  代码变更（BASELINE_SUPPORTED 场景）：
+  - `support_tier=SupportTier.BASELINE_SUPPORTED`
+  - `verified_features` 补齐: `WORKSPACE_BOOTSTRAP, RUNTIME_GATE, PREFERENCES_PRELOAD, HANDOFF_FIRST, SMOKE_VERIFIED`
+  - 注意：`HOST_BRIDGE` 仍不加入（v1 scope 排除）
+  > DEEP_VERIFIED 升级条件（留给后续轮次）：
+  > Codex/Claude 的 DEEP_VERIFIED 包含 `HOST_BRIDGE` verified（8 项 verified_features），
+  > 代表长期稳定的宿主桥接验证经验。TraeCn v1 不含 HOST_BRIDGE，首轮 IDE smoke 不足以
+  > 等价声称"与 Codex/Claude 齐平"。DEEP_VERIFIED 需要第二轮更完整的宿主使用验证，
+  > 或团队内部明确定义"不含 HOST_BRIDGE 的 DEEP_VERIFIED"为可接受语义。
+
+- [ ] 3.10 更新测试断言
+  - `tests/test_installer_status_doctor.py:120`: `"experimental"` → `"baseline_supported"`
+  - `tests/test_installer_status_doctor.py:159`: `"experimental"` → `"baseline_supported"`
+
+- [ ] 3.11 更新 README host matrix
+  - `README.md` L91: Experimental → Baseline supported, Notes → "Install + smoke verified; HOST_BRIDGE pending"
+  - `README.zh-CN.md` L91: Experimental → Baseline supported, 说明 → "安装与 smoke 已验证；HOST_BRIDGE 待验证"
+
+- [ ] 3.12 工具映射代码更新（如 3.8 发现需要）
   - 更新 `TraeCn/Skills/{CN,EN}/user_rules/sopify.md` 的 `A2 | 工具映射` 段
-  - 若需要 TraeCn 专属映射，补充 `Codex -> TraeCn` 的 host-specific transform 规则，避免后续 sync 覆盖或漂移
+  - 如需 TraeCn 专属映射，在 `sync-skills.sh` 中添加 host-specific transform
+
+- [ ] 3.13 提交 + 验证
+  ```bash
+  git checkout -b feature/trae-cn-phase3-tier-upgrade feature/trae-cn-host-adapter-slice2
+  # 修改 3.9-3.12 的文件
+  python3 -m unittest tests.test_installer_status_doctor -v
+  bash scripts/check-version-consistency.sh
+  python3 scripts/check-readme-links.py
+  ```
+
+- [ ] 3.14 更新 tasks.md 标记 Phase 3 完成
 
 ## Phase 后续 — 可选增强
 
