@@ -11,7 +11,7 @@
    blueprint 增强器是可选模块，开关关闭时零影响。架构支持后续接入其他增强器，不需改核心流程。
 
 2. **极简用户面**
-   用户只需设置 `blueprint_enhancers.graphify.enabled: true`。每个增强器最多暴露一个 `enabled` 开关，全部收敛在 `blueprint_enhancers` 父键下。
+   用户只需设置 `blueprint_enhancers.graphify.enabled: true` 即可启用。公共层保底 `enabled` 开关，增强器可按需暴露少量私有配置键（由各增强器白名单校验）。全部收敛在 `blueprint_enhancers` 父键下。
 
 3. **auto-section 命名空间隔离**
    每个增强器拥有自己的 auto-section 前缀（`{name}:auto:*`），互不干扰。同一增强器可在同一文件中写入多个 auto-section。
@@ -19,8 +19,10 @@
 4. **graphify 本体不改**
    所有适配逻辑在 sopify 侧。通过 graphify 的公开 API 做契约面。
 
-5. **降级优于崩溃**
-   增强器依赖未安装时跳过，字段缺失时 fallback。
+5. **降级优于崩溃（运行时），快速失败（配置错误）**
+   增强器依赖未安装时 warning + 跳过，字段缺失时 fallback（fail-open）。
+   但配置错误（未注册的 enhancer 名、私有键类型不合法）直接 raise（fail-closed），
+   不让拼写错误静默通过。
 
 ## 配置形态
 
@@ -44,27 +46,49 @@ blueprint_enhancers:
 ```python
 # runtime/config.py
 
+# DEFAULT_CONFIG 新增稳定父键（与 workflow/plan/multi_model/advanced 同级）
+DEFAULT_CONFIG: dict[str, Any] = {
+    ...
+    "blueprint_enhancers": {},  # 空 dict 作为合法 baseline
+}
+
 _ALLOWED_TOP_LEVEL = {
     "brand", "language", "output_style", "title_color",
     "workflow", "plan", "multi_model", "advanced",
     "blueprint_enhancers",  # 新增
 }
 
-_ALLOWED_ENHANCER_KEYS = {"enabled"}
+def _validate_blueprint_enhancers(enhancers: Any) -> None:
+    """验证 blueprint_enhancers 子配置。
 
-def _validate_blueprint_enhancers(enhancers: dict) -> None:
-    """验证 blueprint_enhancers 子配置。不限制增强器名（可插拔）。"""
+    公共层职责：
+    - 确保整体是 mapping
+    - 确保每个增强器配置是 mapping
+    - 确保 `enabled` 若存在则是 bool
+    - 不限制增强器名（可插拔）
+    - 不限制除 `enabled` 外的子键（由各增强器通过 `validate_enhancer_config()` 自行白名单校验；
+      新增私有键须同步扩展增强器校验方法）
+
+    未注册的增强器名在此不报错；但若 enabled: true 且不在 ENHANCER_REGISTRY，
+    由 get_enabled_enhancers() raise EnhancerConfigError。
+    """
     if not isinstance(enhancers, dict):
         raise ConfigError("blueprint_enhancers must be a mapping")
     for name, cfg in enhancers.items():
         if not isinstance(cfg, dict):
             raise ConfigError(f"blueprint_enhancers.{name} must be a mapping")
-        unknown = set(cfg.keys()) - _ALLOWED_ENHANCER_KEYS
-        if unknown:
-            raise ConfigError(f"Unknown key(s) in blueprint_enhancers.{name}: {unknown}")
+        if "enabled" in cfg and not isinstance(cfg["enabled"], bool):
+            raise ConfigError(f"blueprint_enhancers.{name}.enabled must be boolean")
 ```
 
-增强器名不做白名单限制。未注册的名字被忽略（不报错）。
+> **设计变更记录**（vs 初版）：
+>
+> 1. `blueprint_enhancers: {}` 加入 `DEFAULT_CONFIG`，`_deep_merge` 后此键必然存在，
+>    `_validate_config()` 中**无条件调用** `_validate_blueprint_enhancers()`，
+>    与 `workflow`/`plan` 等现有父键处理模式一致。不再需要 `if "blueprint_enhancers" in config` 分支。
+> 2. 去掉 `_ALLOWED_ENHANCER_KEYS` 白名单。公共层只校验 `enabled` 类型，
+>    其余子键由增强器通过 `validate_enhancer_config()` 自行校验（见增强器架构节）。
+>    避免"过严阻碍扩展"与"过松放过拼写错误"的两极。
 
 ### RuntimeConfig 取值链路
 
@@ -75,9 +99,12 @@ def _validate_blueprint_enhancers(enhancers: dict) -> None:
 
 ```python
 # runtime/_models/core.py — RuntimeConfig 新增字段
+# 追加在 cache_project 之后（最末尾），使用 default_factory 避免
+# 已有测试/手工实例化因位置参数错位而报错
 @dataclass(frozen=True)
 class RuntimeConfig:
     ...
+    cache_project: bool
     blueprint_enhancers: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
 
 # runtime/config.py — load_runtime_config() 构造时传入
@@ -189,24 +216,43 @@ _DETECT_STRATEGIES = [
 
 from pathlib import Path
 from abc import ABC, abstractmethod
+from typing import Any, ClassVar, Mapping
 
 class BlueprintEnhancer(ABC):
-    """可插拔的 blueprint 增强器基类。"""
+    """可插拔的 blueprint 增强器基类。
 
-    @property
+    设计约束：
+    - name 是类级元数据（ClassVar），注册时零实例化
+    - is_available() 和 validate_enhancer_config() 是类方法，
+      只有在 enabled + config 合法 + available 全部通过后才实例化
+    - 实例化时接收已验证的 enhancer config
+    """
+
+    name: ClassVar[str]
+    """增强器标识符。
+    用于：config key (`blueprint_enhancers.{name}.enabled`)
+          auto-section 前缀 (`<!-- {name}:auto:{section_id}:start/end -->`)
+          产物子目录 (`blueprint/{name}/`)
+    """
+
+    @classmethod
     @abstractmethod
-    def name(self) -> str:
-        """增强器标识符。
-        用于：config key (`blueprint_enhancers.{name}.enabled`)
-              auto-section 前缀 (`<!-- {name}:auto:{section_id}:start/end -->`)
-              产物子目录 (`blueprint/{name}/`)
+    def is_available(cls) -> bool:
+        """检查依赖是否已安装且版本兼容。类级检查，不实例化。"""
+        ...
+
+    @classmethod
+    def validate_enhancer_config(cls, cfg: Mapping[str, Any]) -> None:
+        """校验增强器私有配置键。
+
+        公共层已保证 `enabled` 是 bool，此方法只需校验增强器自定义的键。
+        默认实现为 no-op；增强器有自定义配置时 override。
         """
-        ...
+        pass
 
-    @abstractmethod
-    def is_available(self) -> bool:
-        """检查依赖是否已安装且版本兼容。"""
-        ...
+    def __init__(self, config: Mapping[str, Any] | None = None):
+        """实例化时接收已验证的 enhancer config。"""
+        self._config = config or {}
 
     @abstractmethod
     def generate(self, repo_root: Path, output_dir: Path) -> dict:
@@ -248,29 +294,73 @@ class BlueprintEnhancer(ABC):
         pass
 ```
 
+> **设计变更记录**（vs 初版）：
+>
+> - `name` 从 `@property @abstractmethod` 改为 `ClassVar[str]`，注册时零实例化
+> - `is_available()` 从实例方法改为 `@classmethod`，依赖检测不需要实例
+> - 新增 `validate_enhancer_config()` 类方法，承接从公共层下放的私有键校验
+> - `__init__` 接收已验证的 `config`，实例化延迟到一切检查通过之后
+
 ### 增强器注册表
 
 ```python
+class EnhancerConfigError(ValueError):
+    """增强器配置校验失败。
+
+    独立于 runtime.config.ConfigError，避免 installer → runtime 反向依赖。
+    """
+
 ENHANCER_REGISTRY: dict[str, type[BlueprintEnhancer]] = {}
 
 def register_enhancer(cls: type[BlueprintEnhancer]):
-    instance = cls()
-    ENHANCER_REGISTRY[instance.name] = cls
+    """纯类注册，零实例化。name 是 ClassVar，直接从类上读取。"""
+    ENHANCER_REGISTRY[cls.name] = cls
     return cls
 
 def get_enabled_enhancers(config: RuntimeConfig) -> list[BlueprintEnhancer]:
+    """返回已启用、配置合法、依赖可用的增强器实例列表。
+
+    三级过滤：enabled → validate_enhancer_config → is_available。
+    只有全部通过后才实例化。
+
+    Raises:
+        EnhancerConfigError: 未知 enhancer enabled: true / 私有键校验失败
+    """
     enhancers_cfg = config.blueprint_enhancers
     result = []
+
+    # 未知 enhancer + enabled: true → 配置错误，直接 raise
+    for cfg_name, cfg in enhancers_cfg.items():
+        if cfg.get("enabled", False) and cfg_name not in ENHANCER_REGISTRY:
+            raise EnhancerConfigError(
+                f"Enhancer '{cfg_name}' is enabled in config but not registered. "
+                f"Check for typos in blueprint_enhancers.{cfg_name}"
+            )
+
     for name, cls in ENHANCER_REGISTRY.items():
-        if enhancers_cfg.get(name, {}).get("enabled", False):
-            instance = cls()
-            if instance.is_available():
-                result.append(instance)
-            else:
-                import warnings
-                warnings.warn(f"Enhancer '{name}' enabled but dependencies not available")
+        cfg = enhancers_cfg.get(name, {})
+        if not cfg.get("enabled", False):
+            continue
+        # 类级校验：增强器私有配置键（校验失败 raise EnhancerConfigError）
+        cls.validate_enhancer_config(cfg)
+        # 类级检测：依赖可用性
+        if cls.is_available():
+            result.append(cls(config=cfg))  # 此时才实例化
+        else:
+            import warnings
+            warnings.warn(f"Enhancer '{name}' enabled but dependencies not available")
     return result
 ```
+
+> **设计变更记录**（vs 初版）：
+>
+> 1. 新增 `EnhancerConfigError(ValueError)`，独立于 `runtime.config.ConfigError`，
+>    避免 `installer` → `runtime` 反向依赖
+> 2. `register_enhancer` 不再实例化（`cls.name` 直接从 ClassVar 读取）
+> 3. `get_enabled_enhancers` 改为三级过滤：enabled → validate → is_available
+> 4. 未知 enhancer + `enabled: true` → **raise EnhancerConfigError**（统一为单一 contract，
+>    不再同时说 warning 和报错两种行为）
+> 5. 实例化延迟到所有类级检查通过之后，传入已验证的 config
 
 ### auto-section 注入引擎
 
@@ -298,11 +388,22 @@ def inject_auto_sections(
         changed = False
         for section_id, content in section_map.items():
             escaped_id = re.escape(section_id)
+            # 兼容 \n 和 \r\n 换行
             pattern = re.compile(
-                rf"(<!-- {prefix}:auto:{escaped_id}:start -->)\n.*?\n(<!-- {prefix}:auto:{escaped_id}:end -->)",
+                rf"(<!-- {prefix}:auto:{escaped_id}:start -->)\r?\n.*?\r?\n(<!-- {prefix}:auto:{escaped_id}:end -->)",
                 re.DOTALL,
             )
-            new_text = pattern.sub(rf"\1\n{content}\n\2", text)
+            # 使用 replacement function 避免 content 中的反斜杠被 re.sub 解释
+            trimmed = content.strip("\n")
+
+            def _make_replacer(c: str):
+                def _replacer(match: re.Match) -> str:
+                    # 保留原始换行风格，避免行尾漂移
+                    nl = "\r\n" if "\r\n" in match.group(0) else "\n"
+                    return f"{match.group(1)}{nl}{c}{nl}{match.group(2)}"
+                return _replacer
+
+            new_text = pattern.sub(_make_replacer(trimmed), text)
             if new_text != text:
                 text = new_text
                 changed = True
@@ -312,7 +413,15 @@ def inject_auto_sections(
     return modified
 ```
 
-> **与上版差异**：
+> **设计变更记录**（vs 初版）：
+>
+> 1. 正则兼容 `\r\n` 换行（`\r?\n`），避免 Windows 文件失配
+> 2. 改用 replacement function（`_make_replacer`），避免 `content` 中的
+>    `\1`、`\g<0>` 等序列被 `re.sub` 按替换语义解释
+> 3. replacement function 保留原始换行风格（`\r\n` 或 `\n`），
+>    匹配时兼容、替换时也保持一致，避免行尾漂移
+> 4. 内容边界处理用 `content.strip("\n")`（仅裁换行），
+>    不用 `content.strip()`（会吃掉 markdown 有意缩进）
 > - `sections` 从 `dict[str, str]` 改为 `dict[str, dict[str, str]]`
 > - 按 `(filename, section_id)` 精确匹配，同一文件可有多个 auto-section
 > - section_id 也做 `re.escape()` 确保特殊字符安全
@@ -352,33 +461,82 @@ plan/ 和 history/ 的 Markdown 方案文件不会被收集。适配层额外扫
 ### _collect_plan_docs — 文档节点补充扫描
 
 ```python
-def _collect_plan_docs(self, repo_root: Path) -> list[dict]:
+# 默认 history 扫描深度（最近 N 个归档目录）
+_DEFAULT_HISTORY_SCAN_DEPTH = 5
+
+def _collect_plan_docs(self, repo_root: Path) -> tuple[list[dict], dict]:
     """扫描 plan/ 和 history/ 中的 .md 文件，生成文件级文档节点。
 
     source_location 按 sopify 知识层级映射：
-    - plan/  → L2 (active plan)
-    - history/ → L3 (archived plan)
+    - plan/  → L2 (active plan)，全量扫描
+    - history/ → L3 (archived plan)，策略性收敛：只扫最近 N 个归档目录
+
     不写死为 L1，避免与 blueprint stable 层混淆。
+
+    Returns:
+        (md_nodes, scan_meta) — 节点列表 + 扫描元数据（含截断信息）
     """
     LAYER_MAP = {
-        "plan": "L2",       # active plan
-        "history": "L3",    # archived plan
+        "plan": "L2",       # active plan — 全扫
+        "history": "L3",    # archived plan — 策略性收敛
     }
+    history_scan_depth = self._config.get(
+        "history_scan_depth", _DEFAULT_HISTORY_SCAN_DEPTH
+    )
     md_nodes = []
+    scan_meta = {"history_truncated": False, "history_scan_depth": history_scan_depth}
+
     for subdir, layer in LAYER_MAP.items():
         md_dir = repo_root / ".sopify-skills" / subdir
         if not md_dir.exists():
             continue
-        for md_file in md_dir.rglob("*.md"):
-            md_nodes.append({
-                "id": str(md_file.relative_to(repo_root)),
-                "label": md_file.stem,
-                "file_type": "markdown",
-                "source_file": str(md_file),
-                "source_location": layer,
-            })
-    return md_nodes
+
+        if subdir == "history":
+            # 策略性收敛：遍历 history/YYYY-MM/<plan_id>/，
+            # 按 plan 目录名倒序取最近 N 个具体归档 plan。
+            #
+            # 排序依据：plan 目录名遵循 sopify 命名规范 `YYYYMMDD_<slug>`，
+            # 字符串倒序等价于时间倒序。若目录名不符合此规范（无日期前缀），
+            # 仍按字符串排序，行为退化为字母序但不报错。
+            all_plan_dirs = sorted(
+                [d for month_dir in md_dir.iterdir() if month_dir.is_dir()
+                 for d in month_dir.iterdir() if d.is_dir()],
+                key=lambda d: d.name,
+                reverse=True,
+            )
+            if len(all_plan_dirs) > history_scan_depth:
+                scan_meta["history_truncated"] = True
+                scan_meta["history_total_plans"] = len(all_plan_dirs)
+                all_plan_dirs = all_plan_dirs[:history_scan_depth]
+            for plan_dir in all_plan_dirs:
+                for md_file in plan_dir.rglob("*.md"):
+                    md_nodes.append({
+                        "id": str(md_file.relative_to(repo_root)),
+                        "label": md_file.stem,
+                        "file_type": "markdown",
+                        "source_file": str(md_file),
+                        "source_location": layer,
+                    })
+        else:
+            # plan/ 全量扫描
+            for md_file in md_dir.rglob("*.md"):
+                md_nodes.append({
+                    "id": str(md_file.relative_to(repo_root)),
+                    "label": md_file.stem,
+                    "file_type": "markdown",
+                    "source_file": str(md_file),
+                    "source_location": layer,
+                })
+    return md_nodes, scan_meta
 ```
+
+> **设计变更记录**（vs 初版）：
+>
+> 1. history 改为策略性收敛：按目录名排序取最近 N 个归档，
+>    防止历史文档节点淹没代码图谱、影响聚类和报告可读性
+> 2. `history_scan_depth` 可通过增强器 config 覆盖（默认 5）
+> 3. 截断信息写入 `scan_meta`，最终落入 `.meta.json`，便于追溯
+> 4. 返回值从 `list[dict]` 改为 `tuple[list[dict], dict]`，携带扫描元数据
 
 ### 依赖可用性检测
 
@@ -386,6 +544,7 @@ def _collect_plan_docs(self, repo_root: Path) -> list[dict]:
 
 ```python
 class GraphifyEnhancer(BlueprintEnhancer):
+    name = "graphify"
     MIN_VERSION = "0.4.16"
 
     _DETECT_STRATEGIES = [
@@ -394,13 +553,38 @@ class GraphifyEnhancer(BlueprintEnhancer):
         ("import", "graphify"),
     ]
 
-    def is_available(self) -> bool:
-        for strategy, target in self._DETECT_STRATEGIES:
+    @classmethod
+    def validate_enhancer_config(cls, cfg):
+        """校验 graphify 增强器私有配置键。
+
+        当前 graphify 增强器仅定义以下私有键：
+        - history_scan_depth: int (>= 1) — history 归档扫描深度
+
+        新增私有键时必须同步更新此方法。未在此校验的键不应出现在配置中。
+        """
+        known_private_keys = {"history_scan_depth"}
+        private_keys = {k for k in cfg if k != "enabled"}
+        unknown = private_keys - known_private_keys
+        if unknown:
+            raise EnhancerConfigError(
+                f"Unknown key(s) in blueprint_enhancers.graphify: {unknown}"
+            )
+        depth = cfg.get("history_scan_depth")
+        if depth is not None:
+            if isinstance(depth, bool) or not isinstance(depth, int) or depth < 1:
+                raise EnhancerConfigError(
+                    f"blueprint_enhancers.graphify.history_scan_depth "
+                    f"must be a positive integer, got {depth!r}"
+                )
+
+    @classmethod
+    def is_available(cls) -> bool:
+        for strategy, target in cls._DETECT_STRATEGIES:
             if strategy == "pkg":
                 try:
                     from importlib.metadata import version
                     ver = version(target)
-                    if self._version_compat(ver):
+                    if cls._version_compat(ver):
                         return True
                 except Exception:
                     continue
@@ -409,7 +593,7 @@ class GraphifyEnhancer(BlueprintEnhancer):
                     import importlib
                     mod = importlib.import_module(target)
                     ver = getattr(mod, "__version__", None)
-                    if ver and self._version_compat(ver):
+                    if ver and cls._version_compat(ver):
                         return True
                 except Exception:
                     continue
@@ -452,11 +636,8 @@ def _label_communities(self, G: nx.Graph, communities: dict) -> dict[int, str]:
 ```python
 @register_enhancer
 class GraphifyEnhancer(BlueprintEnhancer):
+    name = "graphify"
     MIN_VERSION = "0.4.16"
-
-    @property
-    def name(self) -> str:
-        return "graphify"
 
     def generate(self, repo_root, output_dir):
         import graphify
@@ -473,8 +654,9 @@ class GraphifyEnhancer(BlueprintEnhancer):
         # 3. 构图
         G = graphify.build_from_json(extraction)
 
-        # 4. 补充 plan/history .md 文档节点（L2/L3 层级标记）
-        for node in self._collect_plan_docs(repo_root):
+        # 4. 补充 plan/history .md 文档节点（L2/L3 层级标记，含 history 截断）
+        md_nodes, scan_meta = self._collect_plan_docs(repo_root)
+        for node in md_nodes:
             G.add_node(node["id"], **node)
 
         # 5. 聚类 + 分析
@@ -496,7 +678,7 @@ class GraphifyEnhancer(BlueprintEnhancer):
         (output_dir / "report.md").write_text(report_md, encoding="utf-8")
         graphify.to_json(G, communities, str(output_dir / "graph.json"))
         graphify.to_html(G, communities, str(output_dir / "graph.html"))
-        self._write_meta(output_dir, G, communities)
+        self._write_meta(output_dir, G, communities, scan_meta=scan_meta)
 
         return {
             "gods": gods, "communities": communities,
@@ -505,6 +687,7 @@ class GraphifyEnhancer(BlueprintEnhancer):
             "node_count": G.number_of_nodes(),
             "edge_count": G.number_of_edges(),
             "community_count": len(communities),
+            "scan_meta": scan_meta,
         }
 
     def update(self, repo_root, output_dir):
@@ -658,6 +841,7 @@ python3 scripts/blueprint_enhance.py
 代码/文档变更
   → python3 scripts/blueprint_enhance.py
   → get_enabled_enhancers(config)
+      - EnhancerConfigError → 格式化用户可见错误，exit 1
   → 每个增强器 update()
       - graph.json 不存在 → fallback generate()
       - .meta.json 缺失/损坏/版本变化 → fallback generate()
@@ -667,6 +851,20 @@ python3 scripts/blueprint_enhance.py
   → inject_auto_sections() 精确匹配 (filename, section_id) 注入
   → 人工 review
 ```
+
+编排脚本**错误处理**：
+
+```python
+# scripts/blueprint_enhance.py — 异常捕获闭环
+try:
+    enhancers = get_enabled_enhancers(config)
+except EnhancerConfigError as exc:
+    print(f"[ERROR] {exc}", file=sys.stderr)
+    sys.exit(1)
+```
+
+> `EnhancerConfigError` 是内部类型契约；编排脚本负责统一渲染为用户可见的终端输出。
+> 不在 `get_enabled_enhancers()` 内部做 print/exit，保持 library-style 行为。
 
 编排脚本接口：
 ```bash

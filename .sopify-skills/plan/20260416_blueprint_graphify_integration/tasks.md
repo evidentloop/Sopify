@@ -38,24 +38,38 @@ archive_ready: false
   - `is_available()` 使用策略链检测，不硬绑分发名
 
 - [ ] 0.2 新增 `installer/blueprint_enhancer.py` — 可插拔增强器基类
-  - `BlueprintEnhancer` ABC：name / is_available / generate / update / render_auto_sections
+  - `BlueprintEnhancer` ABC：
+    - `name: ClassVar[str]`（类级元数据，注册时零实例化）
+    - `is_available()` classmethod（类级依赖检测）
+    - `validate_enhancer_config(cfg)` classmethod（增强器私有键校验，默认 no-op）
+    - `__init__(config)` 接收已验证的 enhancer config
+    - `generate / update / render_auto_sections` 实例方法
   - `ensure_output_excluded(repo_root, output_dir)` — 自产物排除通用约定（默认 no-op，子类 override）
   - `render_auto_sections()` 返回 `dict[str, dict[str, str]]`（filename → section_id → content）
     - 同一增强器可在同一文件中写入多个 auto-section
-  - `ENHANCER_REGISTRY` 注册表 + `register_enhancer` 装饰器
-  - `get_enabled_enhancers(config)` — 读取 `config.blueprint_enhancers`
+  - `ENHANCER_REGISTRY` 注册表 + `register_enhancer` 装饰器（纯类注册，零实例化）
+  - `EnhancerConfigError(ValueError)` — 独立于 `runtime.config.ConfigError`，避免反向依赖
+  - `get_enabled_enhancers(config)` — 三级过滤：enabled → validate → is_available
+    - 未知 enhancer + `enabled: true` → **raise EnhancerConfigError**（统一 contract）
+    - 实例化延迟到所有类级检查通过之后
   - `inject_auto_sections(blueprint_dir, enhancer, sections)` 注入引擎
     - 按 `(filename, section_id)` 精确匹配
     - section_id 做 `re.escape()` 确保安全
     - 支持含连字符的 section-id
-  - 验收：空注册表不崩溃 + 同文件多 section 正确注入
+    - 正则兼容 `\r\n` 换行
+    - 使用 replacement function 避免 content 中反斜杠被 re.sub 解释
+    - 保留原始换行风格（`\r\n` 或 `\n`），避免行尾漂移
+    - 内容边界用 `content.strip("\n")`（仅裁换行，保留有意缩进）
+  - 验收：空注册表不崩溃 + 同文件多 section 正确注入 + 未知 enhancer raise
 
 - [ ] 0.3 修改 `runtime/config.py` + `runtime/_models/core.py` — 配置链路闭环
+  - `DEFAULT_CONFIG` 新增 `"blueprint_enhancers": {}`（稳定默认键）
   - `_ALLOWED_TOP_LEVEL` 加 `"blueprint_enhancers"`
-  - `_validate_blueprint_enhancers()` — 不限制增强器名，只校验子键结构
-  - `RuntimeConfig` 新增 `blueprint_enhancers: Mapping[str, Mapping[str, Any]]` 字段
+  - `_validate_blueprint_enhancers()` — 公共层只校验 `enabled` 是 bool，不限制增强器名和其他子键
+  - `_validate_config()` 中**无条件调用**（因 DEFAULT_CONFIG 保证此键必然存在）
+  - `RuntimeConfig` 新增 `blueprint_enhancers: Mapping[str, Mapping[str, Any]]` 字段（末尾，default_factory=dict）
   - `load_runtime_config()` 构造时传入 `merged.get("blueprint_enhancers", {})`
-  - 验收：`config.blueprint_enhancers["graphify"]["enabled"]` 可读取
+  - 验收：`config.blueprint_enhancers["graphify"]["enabled"]` 可读取；空配不崩溃；非法值报错
 
   > **为什么改 RuntimeConfig**：编排脚本和 finalize 提示都需要读取此配置。
   > 如果绕过 RuntimeConfig 直接读 raw YAML，会和主配置链路分叉。
@@ -79,24 +93,34 @@ archive_ready: false
 
 - [ ] 1.1 新增 `installer/enhancers/graphify_enhancer.py`
   - `GraphifyEnhancer(BlueprintEnhancer)`
-  - `is_available()`: 策略链检测（pkg:graphifyy → pkg:graphify → import:graphify）
+  - `name = "graphify"`（ClassVar，类级元数据）
+  - `validate_enhancer_config()` classmethod：
+    - 校验 `history_scan_depth`（正整数）
+    - 校验未知私有键（当前仅定义 `history_scan_depth`，新增键须同步更新）
+    - 校验失败 raise `EnhancerConfigError`
+  - `is_available()` classmethod：策略链检测（pkg:graphifyy → pkg:graphify → import:graphify）
     - 不硬绑 PyPI 分发名，兼容 editable install / sys.path / PyPI
   - `generate()`:
     - `collect_files(repo_root)` → `list[Path]`
     - `extract(code_files)` → `dict{nodes, edges}`（批量 `list[Path]`）
     - `build_from_json(extraction)` → `nx.Graph`
-    - 补充 plan/history .md 文档节点 → `_collect_plan_docs()`
+    - 补充 plan/history .md 文档节点 → `_collect_plan_docs()` 返回 `(nodes, scan_meta)`
     - `cluster()` → `god_nodes()` → `surprising_connections()` → `suggest_questions()`
     - `_label_communities()` 生成社区可读标签
-    - 持久化到 `blueprint/graphify/`
+    - 持久化到 `blueprint/graphify/`，`scan_meta` 写入 `.meta.json`
   - `update()`:
     - `detect_incremental()` → `new_files` + `deleted_files`
     - .meta.json 缺失/损坏/版本变化 / graph.json 异常 → fallback generate()
   - `render_auto_sections()` → `{filename: {section_id: content}}`
 
 - [ ] 1.2 实现 `_collect_plan_docs()` — Markdown 文档节点
-  - 扫描 `plan/**/*.md` → `source_location: "L2"`（active plan）
-  - 扫描 `history/**/*.md` → `source_location: "L3"`（archived plan）
+  - 扫描 `plan/**/*.md` → `source_location: "L2"`（active plan）— 全量扫描
+  - 扫描 `history/YYYY-MM/<plan_id>/` → `source_location: "L3"`（archived plan）— **策略性收敛**：
+    - 收敛粒度为**具体归档 plan 目录**（非月份目录），按 plan 目录名倒序取最近 N 个
+    - 排序依据：plan 目录名遵循 `YYYYMMDD_<slug>` 命名规范，字符串倒序 ≈ 时间倒序
+    - 默认 `history_scan_depth=5`，可通过 enhancer config 覆盖
+    - 截断信息写入 `scan_meta`（`history_truncated`, `history_total_plans`），落入 `.meta.json`
+  - 返回 `tuple[list[dict], dict]`（节点列表 + 扫描元数据）
   - 不写死 "L1"，避免与 blueprint stable 层混淆
   - 本期只保证"入图可见"，不承诺文档间依赖推断
 
@@ -109,6 +133,7 @@ archive_ready: false
   - `--only <name>` / `--list` / 默认全部
   - `--strict`：CI 模式，Leiden 不满足 → exit 1（自动检测 `CI` 环境变量作为 fallback）
   - 检查 scaffold 存在性
+  - 捕获 `EnhancerConfigError` → 格式化用户可见错误 + exit 1（UX 闭环）
   - 协调 update → render_auto_sections → inject_auto_sections
   - **输出必须包含 `cluster_backend=leiden|louvain` 标识**
   - normal 模式下 Louvain fallback 输出警告，提示勿提交
