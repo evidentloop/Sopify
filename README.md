@@ -272,7 +272,7 @@ Additional notes:
 - `workflow-learning`: replay, retrospective, and step-by-step explanation
   Docs: [CN](./Codex/Skills/CN/skills/sopify/workflow-learning/SKILL.md) / [EN](./Codex/Skills/EN/skills/sopify/workflow-learning/SKILL.md)
 
-Claude hosts use the mirrored `Claude/Skills/{CN,EN}/...` layout; the links above use the Codex tree as the canonical doc entry.
+Claude and Trae CN hosts use the mirrored `Claude/Skills/{CN,EN}/...` and `TraeCn/Skills/{CN,EN}/...` layouts; the links above use the Codex tree as the canonical doc entry.
 
 ## Directory Structure
 
@@ -287,7 +287,8 @@ sopify/
 │   ├── plan/              # active plans
 │   └── history/           # archived plans
 ├── Codex/                 # Codex host prompt layer
-└── Claude/                # Claude host prompt layer
+├── Claude/                # Claude host prompt layer
+└── TraeCn/                # Trae CN host prompt layer
 ```
 
 This is a simplified view of the core layout. See [docs/how-sopify-works.en.md](./docs/how-sopify-works.en.md) for the full workflow, checkpoints, and knowledge layout.
