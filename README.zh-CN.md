@@ -272,7 +272,7 @@ export DASHSCOPE_API_KEY="your_qwen_key"
 - `workflow-learning`：回放、复盘与逐步讲解
   文档：[中文](./Codex/Skills/CN/skills/sopify/workflow-learning/SKILL.md) / [English](./Codex/Skills/EN/skills/sopify/workflow-learning/SKILL.md)
 
-Claude 宿主使用镜像结构的 `Claude/Skills/{CN,EN}/...` 路径；上述链接以 Codex 目录作为统一文档入口。
+Claude 与 Trae CN 宿主分别使用镜像结构的 `Claude/Skills/{CN,EN}/...` 和 `TraeCn/Skills/{CN,EN}/...` 路径；上述链接以 Codex 目录作为统一文档入口。
 
 ## 目录结构
 
@@ -287,7 +287,8 @@ sopify/
 │   ├── plan/              # 活跃方案
 │   └── history/           # 已归档方案
 ├── Codex/                 # Codex 宿主提示层
-└── Claude/                # Claude 宿主提示层
+├── Claude/                # Claude 宿主提示层
+└── TraeCn/                # Trae CN 宿主提示层
 ```
 
 上面是核心目录的精简视图；完整工作流、checkpoint 和知识库层级说明见 [docs/how-sopify-works.md](./docs/how-sopify-works.md)。
