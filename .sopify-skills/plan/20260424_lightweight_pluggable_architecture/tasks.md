@@ -1,0 +1,286 @@
+# Tasks: Sopify 总纲
+
+## 子任务包索引
+
+| 子任务包 | Phase 归属 | 状态 | 方案包路径 |
+|---------|-----------|------|----------|
+| `20260417_risk_engine_upgrade` | Phase 0.1 | 事件触发 P0；启动前按 ADR-017 重审 | `plan/20260417_risk_engine_upgrade/` |
+| `20260417_ux_perception_tuning` | Phase 0.2 | 活跃 (B/C) | `plan/20260417_ux_perception_tuning/` |
+| `20260418_cross_review_engine` | Phase 4 前置 | 已确认 | `plan/20260418_cross_review_engine/` |
+| `20260416_blueprint_graphify_integration` | Phase 5 基础 | 基础集成活跃；Plugin 封装延后 | `plan/20260416_blueprint_graphify_integration/` |
+| `20260413_trae_host_adapter` | 多宿主扩展 | Sunset (ADR-018) | `plan/20260413_trae_host_adapter/` |
+
+## 旧总纲吸收记录
+
+| 旧子 plan | 状态 | 吸收到 | 说明 |
+|----------|------|-------|------|
+| Plan H / B1 / A | ✅ 已归档 | — | contract 稳定性继续有效 |
+| Plan D (文档) | 未启动 | Phase 6 | |
+| Plan B2 (Ghost State) | ✅ 终结 | ADR-005 | Phase 1+2 自然解决 |
+| Plan C (Side task) | ✅ 终结 | ADR-005 | Phase 2 自然解决 |
+| Plan B3 (Ghost Knowledge) | 延后 | Phase 2 扩展 | |
+
+---
+
+## 执行路线
+
+> **核心原则**：先验证价值，再决定建多少基础设施。
+> **战略方向 (2026-04-26)**：Protocol-first / Runtime-optional。Protocol 提取不与任何 Phase 冲突，可并行但不抢 P0。详见 design.md §1.2。
+
+### 三阶段总览
+
+| 阶段 | 内容 | 时间窗口 |
+|------|------|---------|
+| **阶段 1 — 验证就绪** | Sopify 0.2-B/C + CR v0 → release gate → PyPI | 当前 |
+| **阶段 2 — 价值验证** | Phase 4a advisory + 3 项目 dogfood | CR gate 通过后 |
+| **阶段 3 — 数据驱动** | advisory 够用 → 继续；不够用 → Phase 1-3 | dogfood 数据后 |
+
+---
+
+### 当前活跃
+
+**Phase 0.2-B: Router 精度修正**
+- [ ] 修正 `_is_consultation()` 问句+动作词判断
+- [ ] 修正 `_estimate_complexity()` 短请求降级
+- 改动 `router.py` (~15行)，不改 engine.py
+- 验证：全量测试通过，路由行为变更逐条确认
+
+**Phase 0.2-C: 输出瘦身**
+- [ ] 精简 consult/quick_fix 调试信息为面向用户的提示
+- 改动 `output.py`，不改机器契约
+- 验证：全量测试通过
+
+> 详细设计见子任务包 `20260417_ux_perception_tuning/design.md`
+
+---
+
+### 待触发
+
+**Phase 0.1: Action/Risk Boundary v1** `🔶 事件触发型 P0`
+- 触发条件：出现高风险误放行 (force_push / credential_exposure / production_deploy 等)
+- 内容：Action/Risk Boundary v1；RiskRule dataclass + scan_scope + cacheable 只保留为 hard-risk detector，不扩用户话术白名单
+- 约束：启动前必须按 ADR-017 重审 `20260417_risk_engine_upgrade/`，风险判断对象优先为 action / side_effect / tool input / diff / plan task
+- 若事件早于 Protocol Step 3，最小审核标准为：① 不以扩用户话术白名单为主方案；② 必须评估 action/side_effect/tool input/diff/plan task 至少一类机器事实；③ 缺机器事实、缺 side_effect 或状态不匹配时 fail-close
+- 详见子任务包 `20260417_risk_engine_upgrade/`
+
+**Phase 4a: CrossReview Advisory Plugin** `可先草拟；E2E 待 CR release gate 通过`
+- [ ] T4a.1 创建 `.agents/skills/cross-review/` 目录 (SKILL.md + skill.yaml)
+- [ ] T4a.2 编写 SKILL.md：触发时机 (develop 完成后) + CLI 调用步骤 (默认 `verify --diff --format human`) + 4 种 verdict 处理
+- [ ] T4a.3 编写 skill.yaml：advisory mode, triggers=["review","cross-review"], host_support=["*"]
+- [ ] T4a.4 端到端验证 + 3 项目 dogfood
+- 草拟门槛：CR v0 CLI 可用即可起草 SKILL.md / skill.yaml
+- E2E/dogfood 门槛：CR v0 release gate 通过 + PyPI 可安装 + `verify --diff` + `--format human` 可用
+- 验证：LLM 读 SKILL.md 后自主调用 CLI；至少 3 个真实项目、至少 2 个 valid issue；误报不阻塞主流程
+
+**Protocol Step 2: Protocol validator CLI** `待需求信号确认`
+- check / doctor / archive，只读优先
+- 触发条件（全部满足）：
+  1. Protocol Step 1 完成
+  2. 至少 2 次实际 plan/state 校验需求出现（手动修正 / 状态损坏 / 迁移校验）
+  3. 不影响 Phase 0.2-B/C 和 CrossReview v0 的 P0 工作
+- 体量 ~2K 行新代码。分发形态待 Step 1 稳定后定。
+
+**Protocol Step 3: Action Schema Boundary / SKILL.md 表单式增强** `P1 架构约束，不抢当前 P0`
+- [ ] 定义有限 action schema：`inspect_checkpoint` / `confirm_plan_package` / `revise_plan_proposal` / `submit_decision` / `answer_clarification` / `confirm_execute` / `cancel_checkpoint` / `ask_question` / `no_write_consult`
+- [ ] 为每个 action 标注 `side_effect`、必填 id、允许 stage、允许 `required_host_action`
+- [ ] 更新 SKILL.md 表单式编排，使用 `[ACTION: ...]` 输出结构化 action proposal
+- [ ] 明确 fail-close 策略：缺字段、低置信度、歧义或机器事实不匹配时降级 inspect/ask 或拒绝写入
+- [ ] 定义 `action_schema_version` / `supported_actions` capability，供未来 bridge.py 或宿主查询 Core 支持面
+- [ ] 定义最小 `action_audit` 事件字段；暂不展开完整 `action_audit.jsonl` schema
+- [ ] 复核 Phase 0.1 风险检测、checkpoint 恢复、plugin verdict 映射是否只评估 action/payload/side_effect，不评估用户话术白名单
+- 优先级：P1 / Protocol Step 3。它约束未来实现，但不阻塞 CR release gate、Phase 0.2-B/C 或 Phase 4a 草拟。
+
+---
+
+### 可并行 (不抢 P0)
+
+**Protocol Step 1: 提取 Protocol 文档**
+- 提取 plan schema、state schema、lifecycle 约定、SKILL.md 编排规范
+- 纯文档，0 行代码变更。不与任何 Phase 冲突。
+
+---
+
+### 延后 (数据驱动后决策)
+
+> 以下 Phase 当前延后。激活时展开为独立子任务包或在已有子任务包中扩展。不在本文档展开实现步骤。
+
+| Phase | 内容摘要 | 激活条件 |
+|-------|---------|---------|
+| 0.2-A | Blueprint 可见化 (handoff 注入 blueprint 摘要) | Phase 2 启动时 |
+| 0.3 | State Write Classification (标注 engine.py 59 次 StateStore 调用) | Phase 1 启动前 |
+| 1 | Engine 拆分 (engine.py → checkpoint_engine + plan_engine + state_ops) | 阶段 2 数据证明 advisory 不够用 |
+| 2 | Skill 自包含 (SKILL.md 编排指令增强) — 与 Protocol Step 3 / ADR-017 合并 | Phase 1 完成后 |
+| 3 | Runtime hook/bridge 接口 (skill.yaml v2 + bridge.py 标准 + pipeline hooks) | Phase 1 完成后，可与 Phase 2 并行 |
+| 5 | Graphify Advisory Skill（Sopify 侧插件封装；区别于 GraphifyEnhancer 知识资产生成，后者属知识工程 P2） | Phase 3 完成后；当前仅基础集成活跃 |
+| 6 | 文档与示例 (plugin 开发指南) — 吸收旧 Plan D | 跟随各 Phase |
+
+### 冻结
+
+**Phase 4b: CR Runtime 模式** `🧊 冻结，不进入 0-6 个月承诺`
+- 升级 advisory → runtime (bridge.py + pipeline_hooks.after_develop)
+- 启动条件：Phase 3 就绪 + Phase 4a 价值验证 + 3 个 dogfood 数据证明 advisory 不够用
+
+---
+
+## 依赖关系
+
+```
+当前活跃                    可并行
+  Phase 0.2-B/C ──┐        Protocol Step 1 (纯文档)
+                   │
+待触发              │
+  Phase 0.1 (事件) │
+                   │
+  CR v0 release ───┼──→ Phase 4a (advisory) ──→ 3 项目 dogfood
+   gate 通过        │                              │
+                   │                     数据驱动决策 ↓
+  Protocol Step 2 ─┤ (Step 1 完成 + 2 次校验需求)
+  Protocol Step 3 ─┤ (ADR-017；P1 架构约束，不抢 P0)
+                   │
+延后                │              ┌── advisory 够用 → 继续
+  Phase 0.3 ───→ Phase 1 ──→ Phase 2+3 ──→ Phase 4b (冻结中)
+                                    │            └── Phase 5
+                                    │
+                              Phase 6 (跟随)
+```
+
+**CrossReview 交叉依赖：**
+CR v0 release gate 通过 → Sopify Phase 4a → dogfood 数据 → 决定 Phase 1-3 / Phase 4b
+
+---
+
+## 多宿主扩展
+
+不阻塞 Phase 0-6 主线。Phase 3 完成后需在 ≥2 宿主上验证 `host_support`。
+
+| 宿主 | 状态 | 子任务包 |
+|------|------|---------|
+| Claude Code | ✅ 深度验证 | — |
+| Codex | ✅ 深度验证 | — |
+| Trae CN | 🔴 Sunset (ADR-018) | `20260413_trae_host_adapter` → history/ 归档 |
+| QCoder | 📋 待调研 | 调研后独立立项 |
+| GitHub Copilot | 📋 待调研 | 调研后独立立项 |
+
+新宿主适配参考三层抽象 (HostAdapter + HostCapability + HostRegistration)，见 design.md §5。Trae 适配经验保留在 history/ 归档中供参考。
+
+---
+
+## P1/P2 Host Research（不阻塞主线）
+
+### T-host-research-1：QCoder CLI Host Capability Research
+
+- **行动：** 调研 QCoder CLI 的全局配置目录、规则注入方式、技能发现路径、命令触发方式和文件协议读写能力
+- **产出：** host capability matrix；是否值得独立立项的建议
+- **依赖：** 无
+- **验证：** 不进入 release gate；只要求调研结论可复核
+
+### T-host-research-2：GitHub Copilot CLI Host Capability Research
+
+- **行动：** 调研 Copilot CLI 的配置入口、规则注入能力、命令触发方式、隔离上下文能力和 `.sopify-skills/` 文件协议适配成本
+- **产出：** host capability matrix；是否值得独立立项的建议
+- **依赖：** 无
+- **验证：** 不进入 release gate；只要求调研结论可复核
+
+---
+
+## P1 Legacy Cleanup (ADR-018)
+
+> 不阻塞 Phase 0.2-B/C 或 CR P0。随 runtime/host 改造同步推进。
+
+### T-cleanup-1：Runtime Entrypoint Inventory
+
+- **行动：** 输出 entrypoint ownership table（canonical / debug / old-host / no-callsite）
+- **产出：** 本文件"多宿主扩展"章节更新，或独立 entrypoint-inventory.md
+- **依赖：** 无
+- **估计：** 0.5 天
+
+### T-cleanup-2：Trae Surface Sunset
+
+- **行动（顺序遵循 ADR-018 §8 删除顺序）：**
+  1. 从 `installer/hosts/__init__.py` 注册表中移除 trae_cn（CI dry-run）
+  2. 移除 `tests/test_installer.py` / `test_installer_status_doctor.py` / `test_release_hooks.py` 中 trae_cn 测试用例
+  3. 更新 `scripts/check-readme-links.py` / `check-skills-sync.sh` / `check-version-consistency.sh` / `sync-skills.sh` / `.githooks/pre-commit` 跳过 trae
+  4. 移除 `installer/hosts/trae_cn.py`
+  5. 移除 `TraeCn/` 整个目录
+  6. 归档 `.sopify-skills/plan/20260413_trae_host_adapter/` → `.sopify-skills/history/2026-04/`
+  7. 编辑 README.md / README.zh-CN.md / CONTRIBUTING.md / CONTRIBUTING_CN.md 移除 Trae 引用
+  8. CHANGELOG.md 保留历史记录，只在最新版本添加 sunset 说明
+- **依赖：** T-cleanup-1
+- **验证：** CI 全量通过；grep -ri "trae" 仅返回 CHANGELOG 和 history/ 中的归档记录
+- **估计：** 1 天
+
+### T-cleanup-3：总纲与文档同步
+
+- **行动：**
+  1. 更新总纲 design.md / tasks.md / background.md 中的宿主列表（确认 sunset 口径一致）
+  2. 确认 CI 全量通过，grep -ri "trae" 仅返回 CHANGELOG 和 history/
+- **依赖：** T-cleanup-2
+- **验证：** CI 全量通过，grep -ri "trae" 仅返回 CHANGELOG 和 history/ 中的归档记录
+- **估计：** 0.5 天
+
+### T-cleanup-4：install-sopify.sh 评估
+
+- **行动：** 评估 `scripts/install-sopify.sh` 是否被 `scripts/install_sopify.py` 完全替代；如果是则 sunset → removed
+- **依赖：** T-cleanup-1
+- **估计：** 0.5 天
+
+---
+
+## 优先级约束
+
+P0 任务必须增强至少一项核心能力：adaptive route/workflow、state protocol、handoff/checkpoint contract、quality gate、plugin permission、plan-blueprint-history-review 资产链，或解除关键 UX 阻塞。纯 prompt/output 优化最高 P1。
+
+**Complexity Budget Guard**（见 design.md §9）：新增 protocol 字段、状态文件、runtime helper、host action、系统提示规则或 ADR，必须同时说明替代了什么、能否删旧、是否增加 complexity debt。不能说明的默认不进入 P0/P1 主线。
+
+**外部思想吸收门禁**（见 design.md §1.3）：
+- 新 Phase / 子任务包 / schema 字段 / checkpoint 子类型 / state 文件 / runtime helper / plugin 能力，必须先标注 `Core Protocol` / `Curated Plugin` / `Inspiration Only`
+- 进入 Core 时必须说明强化哪项核心能力，并说明替换哪个旧概念；不能只新增概念
+- 能独立为 plugin 的能力默认留在 plugin；Sopify 只定义接入点、产物归档和 checkpoint 映射
+- 未完成归类和准入说明的新增项，默认不进入执行队列
+
+---
+
+## 验证标准
+
+| 范围 | 标准 |
+|------|------|
+| Phase 0.2-B/C | 全量测试通过，路由行为变更逐条确认 |
+| Phase 0.1 | 按 ADR-017 重审后 execution_gate / action-risk policy 全量通过，现有 hard-risk 行为不变 |
+| Phase 4a | E2E 跑通 + 3 项目 dogfood + ≥2 valid issue + 误报不阻塞 |
+| Phase 1 | pytest 全量通过，engine.py ≤600 行，行为等价 |
+| Phase 2 | 3 种复杂度工作流手动验证 |
+| Phase 3 | v2 解析无报错，v1 兼容，host_support 多宿主验证（Claude + Codex baseline） |
+| Phase 4b | 冻结，仅在启动条件满足后评审 |
+| ADR-018 cleanup | Trae sunset 完成（grep -ri "trae" 仅返回 CHANGELOG + history/）|
+| 多宿主 | QCoder/Copilot 完成调研 |
+
+---
+
+## 待确认与讨论
+
+### Open
+
+| # | 讨论项 | 何时 | 依赖 |
+|---|--------|------|------|
+| 1 | Phase 0.2-B router 修正是否触及 V2 classifier | 编码前 | 如需更深改造则单独立项 |
+| 2 | CR fixture provenance 复核 | CR release gate 前 | 以 CR 总纲事实为准 |
+| 3 | Phase 4b 启动时机 | Phase 3 临近 + 4a 有价值 | Phase 3 + 4a + CR gate 三条件 |
+| 4 | Plan B3 是否被 Phase 2 覆盖 | Phase 2 完成后 | Phase 2 实际效果 |
+| 5 | QCoder / Copilot 调研 | 按需 | 无硬性阻塞 |
+
+### 已收口
+
+| 决策 | 内容 | 记录 |
+|------|------|------|
+| D1 | 策展集成模型 | ADR-008 |
+| D2 | pipeline_hooks 默认关闭 | ADR-009 |
+| D3 | Ghost 路线终结 | ADR-005 |
+| D4 | 只用内置 4 种 checkpoint | ADR-010 |
+| D5 | verdict→checkpoint 映射 + 2 轮限制 | ADR-011 |
+| D6 | Phase 4 分阶段 (advisory → runtime) | design.md §3.2 |
+| D7 | Protocol-first 战略 | ADR-016 |
+| D8 | 三份总纲 Source of Truth 划分 | Sopify→Sopify 总纲, CR→CR 总纲, 生态→跨项目排序+依赖图 |
+| D9 | 知识工程优先级 | 降为 P2/P3，不作为 CR/Sopify 任何阶段前置；blueprint/knowledge/ 随 P2 启动再定 |
+| D10 | Phase 4a scope | 确认既有共识：advisory only，无 bridge.py/pipeline_hooks |
+| D11 | GraphifyEnhancer vs Graphify Advisory Skill | 两个独立概念：前者知识资产生成（知识工程 P2），后者 Sopify Phase 5 用户插件 |
+| D12 | Action Schema Boundary | ADR-017：不维护用户话术白名单；LLM 只提议结构化 action，Core/Validator 基于机器事实、side_effect 和风险策略授权 |
