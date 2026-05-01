@@ -12,7 +12,7 @@ Architecture Decision Records for Sopify.
 
 ## Absorbed (无独立实体)
 
-以下 ADR 编号曾在旧总纲 (`plan/20260424_lightweight_pluggable_architecture`) 中引用，其核心内容已并入 blueprint 削减目标和约束。当前不设独立实体文件。
+以下 ADR 编号曾在旧总纲中引用（旧总纲已删除，证据留 git history），其核心内容已并入 blueprint 削减目标和约束。当前不设独立实体文件。
 
 | ADR | 原始含义 | 归并去向 |
 |-----|---------|---------|
@@ -21,7 +21,7 @@ Architecture Decision Records for Sopify.
 
 ## Deferred (待实体化)
 
-以下 ADR 编号对应后续实现分支，实体文件随各自分支创建。
+以下 ADR 编号对应后续实现分支，实体文件随各自分支创建。旧总纲中的相关讨论可通过 git history 追溯。
 
 | ADR | 对应实现分支 | 预期时机 |
 |-----|-------------|---------|
@@ -31,5 +31,5 @@ Architecture Decision Records for Sopify.
 
 ---
 
-> 本索引维护在 `docs/adr/README.md`，是 ADR 编号的唯一 canonical 索引。
+> 本索引维护在 `.sopify-skills/blueprint/adr/README.md`，是 ADR 编号的唯一 canonical 索引。
 > Blueprint `design.md` 底部的 ADR 索引表只列 canonical entities。

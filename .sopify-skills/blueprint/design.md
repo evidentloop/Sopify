@@ -295,7 +295,7 @@ knowledge_sync:
 | ADR-016 | Protocol-first / Runtime-optional | 已确认 |
 | ADR-017 | Action/Effect Boundary | P0 完成，持续扩展 |
 
-详见 `docs/adr/`。
+详见 `adr/`。
 
 ## KB 职责矩阵
 
