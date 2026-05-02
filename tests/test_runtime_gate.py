@@ -112,7 +112,7 @@ def _make_runtime_handoff(
     *,
     run_id: str = "run-test",
     route_name: str = "workflow",
-    required_host_action: str = "continue_host_workflow",
+    required_host_action: str = "continue_host_develop",
     strict_runtime_entry: bool = True,
 ) -> RuntimeHandoff:
     entry_guard = build_entry_guard_contract(required_host_action=required_host_action)
@@ -1798,7 +1798,7 @@ class RuntimeGateTests(unittest.TestCase):
             self.assertTrue(result["gate_passed"])
             self.assertEqual(result["runtime"]["route_name"], "archive_lifecycle")
             self.assertEqual(result["allowed_response_mode"], NORMAL_RUNTIME_FOLLOWUP)
-            self.assertEqual(result["handoff"]["required_host_action"], "archive_completed")
+            self.assertEqual(result["handoff"]["required_host_action"], "continue_host_consult")
             self.assertTrue(result["evidence"]["handoff_found"])
             self.assertEqual(result["evidence"]["handoff_source_kind"], "current_request_persisted")
             self.assertTrue(result["evidence"]["persisted_handoff_matches_current_request"])
@@ -1809,8 +1809,9 @@ class RuntimeGateTests(unittest.TestCase):
             self.assertIsNone(store.get_current_run())
             persisted_handoff = store.get_current_handoff()
             self.assertIsNotNone(persisted_handoff)
-            self.assertEqual(persisted_handoff.required_host_action, "archive_completed")
-            self.assertEqual(persisted_handoff.artifacts["action_projection"]["archive_status"], "completed")
+            self.assertEqual(persisted_handoff.required_host_action, "continue_host_consult")
+            self.assertEqual(persisted_handoff.artifacts["archive_lifecycle"]["archive_status"], "completed")
+            self.assertEqual(persisted_handoff.artifacts["archive_receipt_status"], "completed")
             self.assertTrue(persisted_handoff.artifacts["archived_plan_path"].endswith(f"/{active_plan.plan_id}"))
             self.assertEqual(persisted_handoff.artifacts["history_index_path"], ".sopify-skills/history/index.md")
             self.assertTrue(persisted_handoff.artifacts["state_cleared"])
@@ -1851,10 +1852,11 @@ class RuntimeGateTests(unittest.TestCase):
             self.assertEqual(result["status"], "ready")
             self.assertTrue(result["gate_passed"])
             self.assertEqual(result["runtime"]["route_name"], "archive_lifecycle")
-            self.assertEqual(result["handoff"]["required_host_action"], "archive_review")
+            self.assertEqual(result["handoff"]["required_host_action"], "continue_host_consult")
             self.assertEqual(result["handoff"]["route_name"], "archive_lifecycle")
             self.assertEqual(result["handoff"]["handoff_kind"], "archive_lifecycle")
             self.assertEqual(result["handoff"]["archive_lifecycle"]["archive_status"], "blocked")
+            self.assertEqual(result["handoff"]["archive_receipt_status"], "review_required")
             config = load_runtime_config(workspace)
             review_store = StateStore(config, session_id=session_id)
             store = StateStore(config)
@@ -1865,7 +1867,7 @@ class RuntimeGateTests(unittest.TestCase):
             self.assertIsNone(store.get_current_plan())
             persisted_handoff = store.get_current_handoff()
             self.assertIsNotNone(persisted_handoff)
-            self.assertEqual(persisted_handoff.required_host_action, "archive_review")
+            self.assertEqual(persisted_handoff.required_host_action, "continue_host_consult")
             self.assertEqual(persisted_handoff.artifacts["archive_lifecycle"]["archive_status"], "blocked")
             self.assertEqual(persisted_handoff.artifacts["active_plan_path"], review_store.get_current_plan().path)
             self.assertFalse(persisted_handoff.artifacts["state_cleared"])
@@ -1911,13 +1913,14 @@ class RuntimeGateTests(unittest.TestCase):
             self.assertEqual(result["status"], "ready")
             self.assertTrue(result["gate_passed"])
             self.assertEqual(result["runtime"]["route_name"], "archive_lifecycle")
-            self.assertEqual(result["handoff"]["required_host_action"], "archive_completed")
+            self.assertEqual(result["handoff"]["required_host_action"], "continue_host_consult")
             self.assertEqual(result["evidence"]["handoff_source_kind"], "current_request_persisted")
             self.assertTrue(result["evidence"]["persisted_handoff_matches_current_request"])
             self.assertTrue(result["evidence"]["current_request_produced_handoff"])
             self.assertEqual(result["handoff"]["route_name"], "archive_lifecycle")
             self.assertEqual(result["handoff"]["handoff_kind"], "archive_lifecycle")
             self.assertEqual(result["handoff"]["archive_lifecycle"]["archive_status"], "completed")
+            self.assertEqual(result["handoff"]["archive_receipt_status"], "completed")
             self.assertTrue(result["handoff"]["archived_plan_path"].endswith(f"/{other_plan.plan_id}"))
             self.assertFalse(result["handoff"]["state_cleared"])
             self.assertNotIn("run_stage", result["handoff"])
@@ -1925,7 +1928,7 @@ class RuntimeGateTests(unittest.TestCase):
             self.assertEqual(store.get_current_plan().plan_id, active_plan.plan_id)
             self.assertEqual(store.get_current_run().plan_id, active_plan.plan_id)
             self.assertEqual(store.get_current_handoff().required_host_action, "continue_host_develop")
-            self.assertEqual(store.get_current_archive_receipt().required_host_action, "archive_completed")
+            self.assertEqual(store.get_current_archive_receipt().required_host_action, "continue_host_consult")
 
             resumed = enter_runtime_gate("继续", workspace_root=workspace, user_home=workspace / "home")
             self.assertEqual(resumed["status"], "ready")
@@ -2168,7 +2171,7 @@ class RuntimeGateTests(unittest.TestCase):
                 _make_runtime_handoff(
                     run_id="run-current",
                     route_name="workflow",
-                    required_host_action="continue_host_workflow",
+                    required_host_action="continue_host_develop",
                 )
             )
             runtime_handoff = RuntimeHandoff(
@@ -2258,7 +2261,7 @@ class RuntimeGateTests(unittest.TestCase):
             self.assertEqual(result["evidence"]["handoff_source_kind"], "current_request_persisted")
             self.assertTrue(result["evidence"]["persisted_handoff_matches_current_request"])
             self.assertEqual(result["state"]["scope"], "global")
-            self.assertEqual(result["handoff"]["required_host_action"], "continue_host_workflow")
+            self.assertEqual(result["handoff"]["required_host_action"], "continue_host_develop")
 
     def test_gate_persists_abort_conflict_handoff_without_current_run_in_same_session(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -2321,7 +2324,7 @@ class RuntimeGateTests(unittest.TestCase):
             self.assertTrue(cancel_result["gate_passed"])
             self.assertEqual(cancel_result["allowed_response_mode"], NORMAL_RUNTIME_FOLLOWUP)
             self.assertEqual(cancel_result["runtime"]["route_name"], "state_conflict")
-            self.assertEqual(cancel_result["handoff"]["required_host_action"], "continue_host_workflow")
+            self.assertEqual(cancel_result["handoff"]["required_host_action"], "continue_host_develop")
             self.assertEqual(cancel_result["evidence"]["handoff_source_kind"], "current_request_persisted")
             self.assertTrue(cancel_result["evidence"]["persisted_handoff_matches_current_request"])
             self.assertEqual(cancel_result["state"]["scope"], "session")
@@ -2365,7 +2368,7 @@ class RuntimeGateTests(unittest.TestCase):
             malformed_handoff = SimpleNamespace(
                 run_id="run-current",
                 route_name="workflow",
-                required_host_action="continue_host_workflow",
+                required_host_action="continue_host_develop",
             )
 
             with patch(

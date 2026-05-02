@@ -1,5 +1,5 @@
 <!-- bootstrap: lang=zh-CN; encoding=UTF-8 -->
-<!-- SOPIFY_VERSION: 2026-05-01.141049 -->
+<!-- SOPIFY_VERSION: 2026-05-02.134449 -->
 <!-- ARCHITECTURE: Adaptive Workflow + Layered Rules -->
 
 # Sopify - 自适应 AI 编程助手

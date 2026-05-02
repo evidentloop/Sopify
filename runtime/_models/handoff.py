@@ -59,7 +59,7 @@ class RuntimeHandoff:
     plan_id: Optional[str] = None
     plan_path: Optional[str] = None
     handoff_kind: str = "default"
-    required_host_action: str = "continue_host_workflow"
+    required_host_action: str = "continue_host_develop"
     recommended_skill_ids: tuple[str, ...] = ()
     artifacts: Mapping[str, Any] = field(default_factory=dict)
     notes: tuple[str, ...] = ()
@@ -92,7 +92,7 @@ class RuntimeHandoff:
             plan_id=data.get("plan_id") or None,
             plan_path=data.get("plan_path") or None,
             handoff_kind=str(data.get("handoff_kind") or "default"),
-            required_host_action=str(data.get("required_host_action") or "continue_host_workflow"),
+            required_host_action=str(data.get("required_host_action") or "continue_host_develop"),
             recommended_skill_ids=tuple(data.get("recommended_skill_ids") or ()),
             artifacts=dict(artifacts) if isinstance(artifacts, Mapping) else {},
             notes=tuple(data.get("notes") or ()),

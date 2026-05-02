@@ -900,7 +900,7 @@ class EngineIntegrationTests(unittest.TestCase):
 
             self.assertEqual(cleared.route.route_name, "state_conflict")
             self.assertEqual(cleared.route.active_run_action, "abort_conflict")
-            self.assertEqual(cleared.handoff.required_host_action, "continue_host_workflow")
+            self.assertEqual(cleared.handoff.required_host_action, "continue_host_develop")
             self.assertFalse(cleared.recovered_context.state_conflict)
             self.assertIsNone(after_store.get_current_plan_proposal())
             self.assertIsNone(after_store.get_current_decision())
@@ -2111,12 +2111,16 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertFalse((workspace / ".sopify-skills" / "state" / "current_run.json").exists())
             self.assertTrue((workspace / ".sopify-skills" / "state" / "current_handoff.json").exists())
             self.assertIsNotNone(result.handoff)
-            self.assertEqual(result.handoff.required_host_action, "archive_completed")
+            self.assertEqual(result.handoff.required_host_action, "continue_host_consult")
             self.assertEqual(result.handoff.handoff_kind, "archive_lifecycle")
             self.assertEqual(result.handoff.artifacts["archived_plan_path"], result.plan_artifact.path)
             self.assertEqual(result.handoff.artifacts["history_index_path"], ".sopify-skills/history/index.md")
             self.assertTrue(result.handoff.artifacts["state_cleared"])
-            self.assertEqual(result.handoff.artifacts["action_projection"]["archive_status"], "completed")
+            self.assertEqual(result.handoff.artifacts["archive_lifecycle"]["archive_status"], "completed")
+            self.assertEqual(result.handoff.artifacts["archive_receipt_status"], "completed")
+            # Archive is a terminal receipt surface — must not carry consult guard/projection.
+            self.assertNotIn("deterministic_guard", result.handoff.artifacts)
+            self.assertNotIn("action_projection", result.handoff.artifacts)
 
             history_index = (workspace / ".sopify-skills" / "history" / "index.md").read_text(encoding="utf-8")
             self.assertIn(first.plan_artifact.plan_id, history_index)
@@ -2214,7 +2218,7 @@ class EngineIntegrationTests(unittest.TestCase):
 
             self.assertIsNotNone(handoff)
             assert handoff is not None
-            self.assertEqual(handoff.required_host_action, "archive_review")
+            self.assertEqual(handoff.required_host_action, "continue_host_consult")
             self.assertNotIn("archive_lifecycle", handoff.artifacts)
             self.assertNotIn("archived_plan_path", handoff.artifacts)
             self.assertNotIn("state_cleared", handoff.artifacts)
@@ -2249,7 +2253,7 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertEqual(archived_metadata["plan_status"], "completed")
             self.assertNotIn("blueprint_obligation", archived_metadata)
 
-    def test_archive_review_projection_prefers_archive_subject_over_active_plan(self) -> None:
+    def test_archive_lifecycle_prefers_archive_subject_over_active_plan(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
             config = load_runtime_config(workspace)
@@ -2272,17 +2276,10 @@ class EngineIntegrationTests(unittest.TestCase):
 
             self.assertEqual(result.route.route_name, "archive_lifecycle")
             self.assertIsNotNone(result.handoff)
-            self.assertEqual(result.handoff.required_host_action, "archive_review")
+            self.assertEqual(result.handoff.required_host_action, "continue_host_consult")
             self.assertEqual(result.handoff.artifacts["archive_lifecycle"]["archive_subject_plan_id"], "legacy_plan")
             self.assertEqual(result.handoff.artifacts["archive_lifecycle"]["archive_subject_path"], ".sopify-skills/plan/legacy_plan")
-            self.assertEqual(
-                result.handoff.artifacts["action_projection"]["plan_id"],
-                "legacy_plan",
-            )
-            self.assertEqual(
-                result.handoff.artifacts["action_projection"]["plan_path"],
-                ".sopify-skills/plan/legacy_plan",
-            )
+            self.assertEqual(result.handoff.artifacts["archive_receipt_status"], "review_required")
             self.assertEqual(store.get_current_plan().plan_id, active_plan.plan_id)
 
     def test_archive_blocks_full_plan_without_deep_blueprint_update(self) -> None:
@@ -2304,11 +2301,14 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertTrue((workspace / ".sopify-skills" / "state" / "current_plan.json").exists())
             self.assertTrue((workspace / ".sopify-skills" / "state" / "current_handoff.json").exists())
             self.assertIsNotNone(result.handoff)
-            self.assertEqual(result.handoff.required_host_action, "archive_review")
+            self.assertEqual(result.handoff.required_host_action, "continue_host_consult")
             self.assertEqual(result.handoff.handoff_kind, "archive_lifecycle")
             self.assertEqual(result.handoff.artifacts["archive_lifecycle"]["archive_status"], "blocked")
+            self.assertEqual(result.handoff.artifacts["archive_receipt_status"], "review_required")
             self.assertEqual(result.handoff.artifacts["active_plan_path"], first.plan_artifact.path)
             self.assertFalse(result.handoff.artifacts["state_cleared"])
+            self.assertNotIn("deterministic_guard", result.handoff.artifacts)
+            self.assertNotIn("action_projection", result.handoff.artifacts)
 
     def test_archive_allows_review_and_blocks_required_by_knowledge_sync(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -2383,8 +2383,9 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertTrue(legacy_dir.exists())
             self.assertEqual(legacy_tasks.read_text(encoding="utf-8"), "# legacy plan\n")
             self.assertIsNotNone(result.handoff)
-            self.assertEqual(result.handoff.required_host_action, "archive_review")
+            self.assertEqual(result.handoff.required_host_action, "continue_host_consult")
             self.assertEqual(result.handoff.artifacts["archive_lifecycle"]["archive_status"], "migration_required")
+            self.assertEqual(result.handoff.artifacts["archive_receipt_status"], "review_required")
             self.assertEqual(result.handoff.artifacts["archive_lifecycle"]["archive_changed_files"], [])
             self.assertTrue((workspace / ".sopify-skills" / "state" / "current_plan.json").exists())
 
@@ -2411,7 +2412,7 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertIsNone(second.plan_artifact)
             self.assertTrue(legacy_dir.exists())
             self.assertEqual(second.route.artifacts["archive_lifecycle"]["archive_status"], "migration_required")
-            self.assertEqual(second.handoff.required_host_action, "archive_review")
+            self.assertEqual(second.handoff.required_host_action, "continue_host_consult")
             self.assertFalse(second.handoff.artifacts["state_cleared"])
             self.assertFalse((workspace / ".sopify-skills" / "history" / "index.md").exists())
 
@@ -2448,12 +2449,12 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertFalse((workspace / other_plan.path).exists())
             self.assertEqual(store.get_current_plan().plan_id, current_plan.plan_id)
             self.assertEqual(store.get_current_run().plan_id, current_plan.plan_id)
-            self.assertEqual(result.handoff.required_host_action, "archive_completed")
+            self.assertEqual(result.handoff.required_host_action, "continue_host_consult")
             self.assertFalse(result.handoff.artifacts["state_cleared"])
             self.assertNotIn("run_stage", result.handoff.artifacts)
             self.assertNotIn("execution_gate", result.handoff.artifacts)
             self.assertIsNotNone(store.get_current_archive_receipt())
-            self.assertEqual(store.get_current_archive_receipt().required_host_action, "archive_completed")
+            self.assertEqual(store.get_current_archive_receipt().required_host_action, "continue_host_consult")
             self.assertNotIn("run_stage", store.get_current_archive_receipt().artifacts)
 
             resumed = run_runtime("继续", workspace_root=workspace, user_home=workspace / "home")
@@ -2525,10 +2526,10 @@ class EngineIntegrationTests(unittest.TestCase):
 
             self.assertEqual(result.route.route_name, "archive_lifecycle")
             self.assertIsNone(result.plan_artifact)
-            self.assertEqual(result.handoff.required_host_action, "archive_review")
+            self.assertEqual(result.handoff.required_host_action, "continue_host_consult")
             archive_lifecycle = result.handoff.artifacts["archive_lifecycle"]
             self.assertEqual(archive_lifecycle["archive_status"], "plan_not_found")
-            self.assertEqual(result.handoff.artifacts["action_projection"]["archive_status"], "plan_not_found")
+            self.assertEqual(result.handoff.artifacts["archive_receipt_status"], "review_required")
 
     def test_archive_plan_action_proposal_does_not_bypass_pending_decision(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -2932,7 +2933,7 @@ class EngineIntegrationTests(unittest.TestCase):
             replay = run_runtime("回放最近一次实现", workspace_root=workspace, user_home=workspace / "home")
             self.assertIsNotNone(replay.handoff)
             self.assertEqual(replay.handoff.handoff_kind, "replay")
-            self.assertEqual(replay.handoff.required_host_action, "host_replay_bridge_required")
+            self.assertEqual(replay.handoff.required_host_action, "continue_host_develop")
 
     def test_rendered_plan_output_and_repo_local_helper(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

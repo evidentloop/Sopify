@@ -369,7 +369,7 @@ def _normalize_handoff(handoff: Any) -> dict[str, Any]:
     archive_lifecycle = artifacts.get("archive_lifecycle")
     if isinstance(archive_lifecycle, Mapping):
         payload["archive_lifecycle"] = dict(archive_lifecycle)
-    for key in ("archived_plan_path", "active_plan_path", "history_index_path", "state_cleared"):
+    for key in ("archived_plan_path", "active_plan_path", "history_index_path", "state_cleared", "archive_receipt_status"):
         if key in artifacts:
             payload[key] = artifacts.get(key)
     trigger_evidence: dict[str, Any] = {}
@@ -700,7 +700,7 @@ def _store_for_route(
 
     if route_name == "state_conflict":
         required_host_action = str(getattr(runtime_handoff, "required_host_action", "") or "").strip()
-        if required_host_action == "continue_host_workflow" and (
+        if required_host_action == "continue_host_develop" and (
             global_store.get_current_handoff() is not None or global_store.get_current_run() is not None
         ):
             return global_store

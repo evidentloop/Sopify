@@ -108,12 +108,10 @@ def build_runtime_handoff(
     normalized_notes = tuple(note.strip() for note in notes if note and note.strip())
     if not normalized_notes and decision.reason:
         normalized_notes = (decision.reason,)
-    archive_completed = _is_archive_completed(decision)
     required_host_action = _required_host_action(
         decision,
         current_run=current_run,
         skill_result_present=bool(skill_result),
-        archive_completed=archive_completed,
     )
     artifacts = _collect_handoff_artifacts(
         config=config,
@@ -210,7 +208,6 @@ def _required_host_action(
     *,
     current_run: RunState | None,
     skill_result_present: bool,
-    archive_completed: bool = False,
 ) -> str:
     route_name = decision.route_name
     if route_name == "plan_only":
@@ -220,9 +217,9 @@ def _required_host_action(
     if route_name == "plan_proposal_pending":
         return "confirm_plan_package"
     if route_name in {"workflow", "light_iterate"}:
-        return "continue_host_workflow"
+        return "continue_host_develop"
     if route_name == "archive_lifecycle":
-        return "archive_completed" if archive_completed else "archive_review"
+        return "continue_host_consult"
     if route_name in {"clarification_pending", "clarification_resume"}:
         return "answer_questions"
     if route_name == "execution_confirm_pending":
@@ -232,7 +229,7 @@ def _required_host_action(
     if route_name in {"resume_active", "exec_plan"}:
         return "continue_host_develop"
     if route_name == "quick_fix":
-        return "continue_host_quick_fix"
+        return "continue_host_develop"
     if route_name in {"decision_pending", "decision_resume"}:
         return "confirm_decision"
     if route_name == "state_conflict":
@@ -242,12 +239,12 @@ def _required_host_action(
             resume_action = _STATE_CONFLICT_ABORT_RESUME_ACTIONS.get(str(current_run.stage or "").strip())
             if resume_action:
                 return resume_action
-        return "continue_host_workflow"
+        return "continue_host_develop"
     if route_name == "replay":
-        return "host_replay_bridge_required"
+        return "continue_host_develop"
     if route_name == "consult":
         return "continue_host_consult"
-    return "continue_host_workflow"
+    return "continue_host_develop"
 
 
 def _should_use_execution_confirm_handoff(current_run: RunState | None) -> bool:
@@ -335,6 +332,10 @@ def _collect_handoff_artifacts(
             artifacts["archive_lifecycle"] = dict(archive_lifecycle)
             archive_status = str(archive_lifecycle.get("archive_status") or "").strip()
             subject_path = str(archive_lifecycle.get("archive_subject_path") or "").strip()
+            # Canonical two-value receipt status for host consumption.
+            artifacts["archive_receipt_status"] = (
+                "completed" if archive_status in {"completed", "already_archived"} else "review_required"
+            )
             if archive_status in {"completed", "already_archived"}:
                 if current_plan is not None:
                     artifacts["archived_plan_path"] = current_plan.path
@@ -435,12 +436,16 @@ def _collect_handoff_artifacts(
         ).to_dict()
     if decision.route_name == "execution_confirm_pending" and decision.active_run_action == "revise_execution":
         artifacts["execution_feedback"] = decision.request_text.strip()
-    _attach_v1_guardrail_artifacts(
-        artifacts,
-        required_host_action=required_host_action,
-        current_run=current_run,
-        current_plan=current_plan,
-    )
+    # Archive lifecycle is a terminal receipt surface — it expresses results
+    # via archive_lifecycle artifact + archive_receipt_status, not via the
+    # consult guard/projection surface it borrows as transport label.
+    if decision.route_name != "archive_lifecycle":
+        _attach_v1_guardrail_artifacts(
+            artifacts,
+            required_host_action=required_host_action,
+            current_run=current_run,
+            current_plan=current_plan,
+        )
     return artifacts
 
 
@@ -613,13 +618,4 @@ def _should_emit_handoff(*, decision: RouteDecision, current_run: RunState | Non
         return True
     # ~go exec is an advanced recovery/debug entry; when it does not converge
     # back into the standard checkpoints, avoid emitting a misleading develop handoff.
-    return False
-
-
-def _is_archive_completed(decision: RouteDecision) -> bool:
-    if decision.route_name != "archive_lifecycle":
-        return False
-    archive_lifecycle = decision.artifacts.get("archive_lifecycle")
-    if isinstance(archive_lifecycle, Mapping):
-        return str(archive_lifecycle.get("archive_status") or "").strip() in {"completed", "already_archived"}
     return False

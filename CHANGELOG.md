@@ -6,6 +6,26 @@ This changelog is maintained manually (not auto-generated).
 
 ## [Unreleased]
 
+## [2026-05-02.134449] - 2026-05-02
+
+### Runtime
+
+- Updated runtime internals:
+  - `runtime/_models/handoff.py`
+  - `runtime/action_projection.py`
+  - `runtime/deterministic_guard.py`
+  - `runtime/gate.py`
+  - `runtime/handoff.py`
+  - `runtime/output.py`
+
+### Tests
+
+- Updated automated coverage:
+  - `tests/test_context_v1_scope.py`
+  - `tests/test_contract_consistency.py`
+  - `tests/test_runtime_engine.py`
+  - `tests/test_runtime_gate.py`
+
 ## [2026-05-01.141049] - 2026-05-01
 
 ### Docs

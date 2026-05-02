@@ -1,0 +1,39 @@
+# Blueprint Truth Cutover — 任务清单
+
+## 验收标准
+
+1. **Runtime 表面符合预算** — checkpoint ≤2, host action ≤5 (canonical), route family ≤6, core state ≤6。超出部分必须标为 `legacy/compat` 且带 sunset 条件，不得在新链路中使用
+2. **最小新链路可跑** — `consult` route 完整走通 Protocol → Validator → Receipt（proof command: `python3 scripts/runtime_gate.py enter` + consult 请求；预期产物: `current_handoff.json` 含 canonical `continue_host_consult` action + `current_run.json` + `current_gate_receipt.json`）；proof 前置断言：consult 不经过 plan_proposal / execution_confirm 路径
+3. **旧复杂面被显著移除** — runtime 行数或模块数有可观察的下降（方向可证明即可）
+4. **Blueprint 是唯一 forward baseline** — 新代码修改以 design.md 预算和契约为前提，不以 runtime 现状为前提
+5. **旧面冻结** — 不在 legacy route / legacy host action / legacy state file 上新增功能或扩展
+6. **Prompt-layer 同步** — `Codex/Skills/{CN,EN}/AGENTS.md` 中不再规范已删除的 legacy action / state file；宿主消费的契约面与 runtime canonical 面一致
+7. **Smoke/bundle 合同同步** — `scripts/check-prompt-runtime-gate-smoke.py` 和 `scripts/sync-runtime-assets.sh` 不再断言或依赖已删除的 legacy action / state file；删旧面后 smoke 仍 pass
+8. **测试层同步** — 每波删旧面后，涉及的 test 文件和 fixture YAML 同步更新；现有测试套件 pass（允许删除只验证旧概念的断言，但不允许静默跳过或注释掉）
+
+## 任务
+
+| # | 任务 | 说明 | 同步面 | 状态 |
+|---|------|------|--------|------|
+| 1 | 盘点 legacy 面 | 列出 runtime 中超出 canonical 预算的所有 route / host action / checkpoint / state，标注引用范围、耦合深度、按层归类 | — | pending |
+| 2 | 冻结旧面扩展 | 在 contributing/review 流程中明确：不在 legacy 面上新增功能 | — | pending |
+| 3 | Wave 1（低耦合） | 删除 `continue_host_quick_fix`→`continue_host_develop`、`host_replay_bridge_required`→`continue_host_workflow`、`archive_completed`→`archive_review`（降为结果状态，Next 提示按 archive_status 区分）。233 测试全通过 | prompt-layer/smoke/contracts 无引用 | done |
+| 4a | Wave 2a（低风险） | `continue_host_workflow`(17 refs) → `continue_host_develop(mode=standard)` 合并。runtime/tests 零残留，`_handoff_next_hint` 按 route_name 智能分发，233 测试全通过 | deterministic_guard 合并后 inspect 泄漏到全场景（Wave 2d 统一处理） | done |
+| 4b | Wave 2b | `archive_review`(30 refs) 从 host action 退出，archive 变成 terminal receipt surface。host-facing action 复用 `continue_host_consult`，结果由 `archive_lifecycle` artifact + `archive_receipt_status`(completed\|review_required) + `current_archive_receipt.json` 表达。deterministic_guard / action_projection / output 专用分支已删除。冻结约束写入 `test_contract_consistency.py`。663→662 tests (3 旧 projection tests 合并为 2 新 tests)，全通过 | 涉及断言 + action_projection + deterministic_guard + gate normalize + 冻结约束 | done |
+| 4c | Wave 2c | `develop_checkpoint`(12 refs + AGENTS.md 4) 保留 helper 能力，但退出 checkpoint/route 概念。重命名为 develop callback source，不再作为 checkpoint type 暴露 | AGENTS.md + 涉及断言 | pending |
+| 4d | Wave 2d（route family 真收敛） | 精确审计 route_name literal 后，对 router + engine + handoff + output + guard 做真收敛：内部主链路使用 6 canonical family，旧 alias 只在入口解析边界存在。2d 独占 engine.py，完成后才开 3a/3b。不删 plan_proposal/execution_confirm 语义，只挂到 canonical family 下 | 2d 前做精确审计 + test_runtime_router + test_runtime_engine 部分 | pending |
+| 4e | Wave 2 consult proof | 绑定 Wave 2d 完成态。Proof: `python3 scripts/runtime_gate.py enter` + consult → handoff 含 `continue_host_consult` + `route_family=consult` + receipt 完整。前置断言：consult 不经过 plan_proposal/execution_confirm | — | pending |
+| 5 | Wave 3a（plan_proposal） | 单拆 `plan_proposal`(162 refs/16 files)。一并折叠 `current_plan_proposal.json`、`confirm_plan_package`、`plan_proposal_pending`。涉及状态解析层 + 控制平面 + 呈现层 | prompt-layer + smoke + `test_context_v1_scope`(47) + `test_runtime_engine`(大量) + `test_runtime_sample_invariant_gate`(37) + contract YAML(30+) | pending |
+| 6 | Wave 3b（execution_confirm） | 在 3a 稳定后拆 `execution_confirm`(87 refs/13 files)。一并折叠 `confirm_execute`、`execution_confirm_pending`。涉及状态解析层 + 控制平面 + 呈现层 | prompt-layer + smoke + `test_runtime_engine` + `test_runtime_decision`(52) + `test_runtime_state`(17) + contract YAML | pending |
+| 7 | 验收与收口 | 确认 8 条验收标准达成，归档本方案 | — | pending |
+
+## 与 blueprint P1–P4 的关系
+
+本方案高于 P1–P4，但不替代它们，而是重定义它们的语境：
+
+| 原任务 | Cutover 后的新定位 |
+|--------|-------------------|
+| P1 existing_plan_subject_binding | 在新骨架上做主体绑定，不在旧 route 上做 |
+| P2 checkpoint_local_actions | 只收敛 2 canonical checkpoint 的动作，不维护旧 5 种 |
+| P3 runtime_surface_cleanup | 从"长期清理"变成 cutover 的结果动作 |
+| P4 host_prompt_governance | 前提不变，但 prompt 消费的是新骨架的 contract |

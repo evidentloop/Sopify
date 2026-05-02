@@ -120,15 +120,11 @@ _LABELS = {
         "next_consult": "在宿主会话中继续问答，或改成明确变更请求",
         "next_decision": "回复 1/2（或 ~decide choose <option_id>）确认方案，或输入 取消 终止本轮设计",
         "handoff_review_or_execute_plan": "已写入 plan handoff，宿主可继续评审方案或执行",
-        "handoff_archive_review": "已写入 archive handoff，宿主应先检查归档结果再决定下一步",
-        "handoff_continue_host_workflow": "已写入 workflow handoff，后续阶段需宿主继续",
         "handoff_answer_questions": "已写入 clarification handoff，宿主应先补齐缺失事实信息",
         "handoff_confirm_plan_package": "已写入 plan-proposal handoff，宿主应先确认是否生成方案包",
         "handoff_confirm_execute": "已写入 execution-confirm handoff，宿主应先征求用户执行确认",
         "handoff_continue_host_develop": "已写入 develop handoff，后续开发需宿主继续",
-        "handoff_continue_host_quick_fix": "已准备进入快速修复，请在宿主会话中继续完成代码修改",
         "handoff_confirm_decision": "已写入 decision handoff，宿主应先确认当前设计分叉",
-        "handoff_host_replay_bridge_required": "已写入 replay handoff，当前仍需 workflow-learning 专用链路",
         "handoff_continue_host_consult": "已进入咨询问答，请在宿主会话中继续回答",
         "handoff_resolve_state_conflict": "已检测到运行态冲突，当前需先放弃当前协商再继续",
         "state_conflict_detected": "检测到运行态冲突",
@@ -198,15 +194,11 @@ _LABELS = {
         "next_consult": "Continue the discussion in the host session, or restate it as a change request",
         "next_decision": "Reply with 1/2 (or `~decide choose <option_id>`) to confirm, or type cancel to abort this design round",
         "handoff_review_or_execute_plan": "plan handoff written; the host can review the plan or execute it",
-        "handoff_archive_review": "archive handoff written; the host should inspect the archive result before continuing",
-        "handoff_continue_host_workflow": "workflow handoff written; downstream stages still need the host flow",
         "handoff_answer_questions": "clarification handoff written; the host should gather the missing factual details first",
         "handoff_confirm_plan_package": "plan-proposal handoff written; the host should confirm package materialization first",
         "handoff_confirm_execute": "execution-confirm handoff written; the host should ask for user confirmation first",
         "handoff_continue_host_develop": "develop handoff written; downstream implementation still needs the host flow",
-        "handoff_continue_host_quick_fix": "Ready for quick fix; continue the code change in the host session",
         "handoff_confirm_decision": "decision handoff written; the host should confirm the current design split first",
-        "handoff_host_replay_bridge_required": "replay handoff written; workflow-learning still needs its dedicated bridge",
         "handoff_continue_host_consult": "Consult mode is ready; continue the answer in the host session",
         "handoff_resolve_state_conflict": "A runtime state conflict was detected; abandon the current negotiation before continuing",
         "state_conflict_detected": "A runtime state conflict was detected",
@@ -582,12 +574,13 @@ def _handoff_next_hint(result: RuntimeResult, language: str) -> str:
     required_host_action = str(handoff.required_host_action or "").strip()
     if required_host_action == "review_or_execute_plan":
         return labels["next_plan"]
-    if required_host_action == "archive_review":
-        return labels["next_archive_retry"]
-    if required_host_action == "archive_completed":
-        return labels["next_archive_success"]
-    if required_host_action == "continue_host_workflow":
-        return labels["next_workflow"]
+    if required_host_action == "continue_host_consult":
+        if handoff.handoff_kind == "archive_lifecycle":
+            receipt_status = str((handoff.artifacts or {}).get("archive_receipt_status", "")).strip()
+            if receipt_status == "completed":
+                return labels["next_archive_success"]
+            return labels["next_archive_retry"]
+        return labels["next_consult"]
     if required_host_action == "answer_questions":
         return labels["next_answer_questions"]
     if required_host_action == "resolve_state_conflict":
@@ -597,15 +590,15 @@ def _handoff_next_hint(result: RuntimeResult, language: str) -> str:
     if required_host_action == "confirm_execute":
         return labels["next_confirm_execute"]
     if required_host_action == "continue_host_develop":
-        return labels["next_resume"] if result.route.route_name == "resume_active" else labels["next_exec"]
-    if required_host_action == "continue_host_quick_fix":
-        return labels["next_quick_fix"]
+        if result.route.route_name == "resume_active":
+            return labels["next_resume"]
+        if result.route.route_name == "exec_plan":
+            return labels["next_exec"]
+        if handoff.handoff_kind == "quick_fix":
+            return labels["next_quick_fix"]
+        return labels["next_workflow"]
     if required_host_action == "confirm_decision":
         return labels["next_decision"]
-    if required_host_action == "host_replay_bridge_required":
-        return labels["next_replay"]
-    if required_host_action == "continue_host_consult":
-        return labels["next_consult"]
     if handoff.handoff_kind == "plan":
         return labels["next_plan"]
     if handoff.handoff_kind == "workflow":
