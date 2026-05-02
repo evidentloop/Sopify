@@ -92,7 +92,6 @@ _LABELS = {
         "light_handoff": "已生成 light 方案，后续改动仍需宿主继续",
         "quick_fix_handoff": "已准备进入快速修复，请在宿主会话中继续完成代码修改",
         "consult_handoff": "已进入咨询问答，请在宿主会话中继续回答",
-        "replay_handoff": "已识别 replay 路由，当前仍需 workflow-learning 专用链路",
         "resume_handoff": "已恢复当前流程，当前 repo-local runtime 未执行 develop bridge",
         "exec_handoff": "已进入 ~go exec 高级恢复入口，当前仅用于检查或恢复已有 plan，不作为普通开发主链路",
         "archive_success": "已完成方案归档",
@@ -108,14 +107,12 @@ _LABELS = {
         "next_confirm_execute": "回复 继续 / next / 开始 确认执行，或直接回复修改意见",
         "next_plan": "在宿主会话中继续评审或执行方案，或直接回复修改意见",
         "next_workflow": "在宿主会话中继续执行后续阶段，或显式使用 ~go plan 只规划",
-        "next_light_iterate": "在宿主会话中继续执行轻量迭代，或回复修改意见",
         "next_resume": "在宿主会话中继续 develop 阶段",
         "next_exec": "仅在已有活动 plan 或恢复态时使用 ~go exec；普通开发流继续按宿主会话推进",
         "next_cancel": "如需继续，重新发起 ~go plan 或 ~go",
         "next_archive_success": "请验证 blueprint 索引与 history 归档结果",
         "next_archive_retry": "补齐 blueprint 更新或切换到 metadata-managed plan 后重试",
         "next_summary": "可再次运行 ~summary 刷新，或继续当前开发流",
-        "next_replay": "继续使用 workflow-learning 回放链路",
         "next_quick_fix": "在宿主会话中继续执行快速修复",
         "next_consult": "在宿主会话中继续问答，或改成明确变更请求",
         "next_decision": "回复 1/2（或 ~decide choose <option_id>）确认方案，或输入 取消 终止本轮设计",
@@ -166,7 +163,6 @@ _LABELS = {
         "light_handoff": "Light plan generated; downstream changes still need the host flow",
         "quick_fix_handoff": "Ready for quick fix; continue the code change in the host session",
         "consult_handoff": "Consult mode is ready; continue the answer in the host session",
-        "replay_handoff": "replay route recognized; workflow-learning still needs its dedicated bridge",
         "resume_handoff": "Active flow restored; the repo-local runtime has not executed the develop bridge",
         "exec_handoff": "~go exec entered the advanced recovery entry; it is only used to inspect or recover an existing plan, not as the default implementation path",
         "archive_success": "The plan has been archived",
@@ -182,14 +178,12 @@ _LABELS = {
         "next_confirm_execute": "Reply with continue / next / start to confirm execution, or send feedback to revise the plan",
         "next_plan": "Continue plan review or execution in the host session, or reply with feedback",
         "next_workflow": "Continue the downstream stages in the host session, or use ~go plan for planning only",
-        "next_light_iterate": "Continue the light iteration in the host session, or reply with feedback",
         "next_resume": "Continue the develop stage in the host session",
         "next_exec": "Use ~go exec only when an active plan or recovery state already exists; otherwise continue through the host flow",
         "next_cancel": "Start a new ~go plan or ~go flow when ready",
         "next_archive_success": "Review the blueprint index refresh and the history archive",
         "next_archive_retry": "Update the blueprint or switch to a metadata-managed plan and retry",
         "next_summary": "Run ~summary again to refresh, or continue the active development flow",
-        "next_replay": "Use the workflow-learning replay flow",
         "next_quick_fix": "Continue the quick-fix flow in the host session",
         "next_consult": "Continue the discussion in the host session, or restate it as a change request",
         "next_decision": "Reply with 1/2 (or `~decide choose <option_id>`) to confirm, or type cancel to abort this design round",
@@ -543,12 +537,10 @@ def _status_message(result: RuntimeResult, language: str) -> str:
         return labels["execution_confirm_handoff"]
     if route_name == "quick_fix":
         return labels["quick_fix_handoff"]
-    if route_name == "consult":
+    if route_name in {"consult", "replay"}:
         return labels["consult_handoff"]
     if route_name == "summary":
         return labels["next_summary"]
-    if route_name == "replay":
-        return labels["replay_handoff"]
     if route_name == "decision_pending":
         return labels["decision_pending_handoff"]
     if route_name == "resume_active":
@@ -575,7 +567,7 @@ def _handoff_next_hint(result: RuntimeResult, language: str) -> str:
     if required_host_action == "review_or_execute_plan":
         return labels["next_plan"]
     if required_host_action == "continue_host_consult":
-        if handoff.handoff_kind == "archive_lifecycle":
+        if handoff.handoff_kind == "archive":
             receipt_status = str((handoff.artifacts or {}).get("archive_receipt_status", "")).strip()
             if receipt_status == "completed":
                 return labels["next_archive_success"]
@@ -594,29 +586,24 @@ def _handoff_next_hint(result: RuntimeResult, language: str) -> str:
             return labels["next_resume"]
         if result.route.route_name == "exec_plan":
             return labels["next_exec"]
-        if handoff.handoff_kind == "quick_fix":
+        if result.route.route_name == "quick_fix":
             return labels["next_quick_fix"]
         return labels["next_workflow"]
     if required_host_action == "confirm_decision":
         return labels["next_decision"]
+    # Fallback: match by canonical handoff_kind (family)
     if handoff.handoff_kind == "plan":
         return labels["next_plan"]
-    if handoff.handoff_kind == "workflow":
-        return labels["next_workflow"]
-    if handoff.handoff_kind == "light_iterate":
-        return labels["next_light_iterate"]
     if handoff.handoff_kind == "clarification":
         return labels["next_answer_questions"]
     if handoff.handoff_kind == "execution_confirm":
         return labels["next_confirm_execute"]
     if handoff.handoff_kind == "develop":
+        if result.route.route_name == "quick_fix":
+            return labels["next_quick_fix"]
         return labels["next_resume"] if result.route.route_name == "resume_active" else labels["next_exec"]
-    if handoff.handoff_kind == "quick_fix":
-        return labels["next_quick_fix"]
     if handoff.handoff_kind == "decision":
         return labels["next_decision"]
-    if handoff.handoff_kind == "replay":
-        return labels["next_replay"]
     if handoff.handoff_kind == "consult":
         return labels["next_consult"]
     return labels["next_retry"]

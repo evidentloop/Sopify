@@ -6,6 +6,65 @@ This changelog is maintained manually (not auto-generated).
 
 ## [Unreleased]
 
+## [2026-05-02.205827] - 2026-05-02
+
+### Docs
+
+- Refined public documentation:
+  - `README.md`
+  - `README.zh-CN.md`
+
+### Runtime
+
+- Updated runtime internals:
+  - `runtime/builtin_catalog.generated.json`
+  - `runtime/builtin_catalog.py`
+  - `runtime/builtin_skill_packages/workflow-learning/skill.yaml`
+  - `runtime/engine.py`
+  - `runtime/handoff.py`
+  - `runtime/output.py`
+
+### Skills
+
+- Synced prompt-layer skills:
+  - `Claude/Skills/CN/CLAUDE.md`
+  - `Claude/Skills/EN/CLAUDE.md`
+  - `Codex/Skills/CN/AGENTS.md`
+  - `Codex/Skills/EN/AGENTS.md`
+
+### Tests
+
+- Updated automated coverage:
+  - `tests/test_runtime_engine.py`
+  - `tests/test_runtime_gate.py`
+  - `tests/test_runtime_router.py`
+  - `tests/test_runtime_state.py`
+
+### Changed
+
+- Updated project files:
+  - `CHANGELOG.md`
+
+## [2026-05-02.205419] - 2026-05-02
+
+### Runtime
+
+- Updated runtime internals:
+  - `runtime/builtin_catalog.generated.json`
+  - `runtime/builtin_catalog.py`
+  - `runtime/builtin_skill_packages/workflow-learning/skill.yaml`
+  - `runtime/engine.py`
+  - `runtime/handoff.py`
+  - `runtime/output.py`
+
+### Tests
+
+- Updated automated coverage:
+  - `tests/test_runtime_engine.py`
+  - `tests/test_runtime_gate.py`
+  - `tests/test_runtime_router.py`
+  - `tests/test_runtime_state.py`
+
 ## [2026-05-02.150730] - 2026-05-02
 
 ### Docs

@@ -99,6 +99,19 @@ _HOST_FACING_TRUTH_KIND_ENGINE_RUNTIME_HANDOFF = "engine_runtime_handoff"
 _HOST_FACING_TRUTH_KIND_PROMOTION_GLOBAL_EXECUTION = "promotion_global_execution"
 _ABORTABLE_CLARIFICATION_STATUSES = frozenset({"pending", "collecting"})
 _ABORTABLE_DECISION_STATUSES = frozenset({"pending", "collecting", "cancelled", "timed_out"})
+
+# Canonical route families (blueprint design.md §Route Families).
+# Internal consumers should reference families, not enumerate individual route names.
+_CANONICAL_ROUTE_FAMILIES: dict[str, str] = {
+    "plan_only": "plan", "workflow": "plan", "light_iterate": "plan",
+    "quick_fix": "develop", "resume_active": "develop", "exec_plan": "develop",
+    "consult": "consult", "replay": "consult",
+    "archive_lifecycle": "archive",
+    "clarification_pending": "clarification", "clarification_resume": "clarification",
+    "decision_pending": "decision", "decision_resume": "decision",
+}
+_NON_FAMILY_SURFACES = frozenset({"state_conflict", "cancel_active", "summary"})
+
 _ABORTABLE_HANDOFF_ACTIONS = frozenset(
     {
         "answer_questions",

@@ -51,23 +51,33 @@ HANDOFF_SCHEMA_VERSION = "1"
 CURRENT_HANDOFF_FILENAME = "current_handoff.json"
 CURRENT_HANDOFF_RELATIVE_PATH = f".sopify-skills/state/{CURRENT_HANDOFF_FILENAME}"
 
+# Canonical route → family mapping (blueprint design.md §Route Families).
+# 6 canonical families + non-family surfaces. Wave 3a/3b entries kept as-is.
 _ROUTE_HANDOFF_KIND = {
+    # plan family
     "plan_only": "plan",
-    "workflow": "workflow",
-    "light_iterate": "light_iterate",
-    "quick_fix": "quick_fix",
-    "archive_lifecycle": "archive_lifecycle",
-    "clarification_pending": "clarification",
-    "clarification_resume": "clarification",
-    "plan_proposal_pending": "plan_proposal",
-    "execution_confirm_pending": "execution_confirm",
+    "workflow": "plan",
+    "light_iterate": "plan",
+    # develop family
+    "quick_fix": "develop",
     "resume_active": "develop",
     "exec_plan": "develop",
+    # consult family
+    "consult": "consult",
+    "replay": "consult",
+    # archive family
+    "archive_lifecycle": "archive",
+    # clarification family
+    "clarification_pending": "clarification",
+    "clarification_resume": "clarification",
+    # decision family
     "decision_pending": "decision",
     "decision_resume": "decision",
+    # Wave 3a/3b — not converged in 2d
+    "plan_proposal_pending": "plan_proposal",
+    "execution_confirm_pending": "execution_confirm",
+    # non-family surface
     "state_conflict": "state_conflict",
-    "replay": "replay",
-    "consult": "consult",
 }
 
 _STATE_CONFLICT_ABORT_RESUME_ACTIONS = {
@@ -240,9 +250,7 @@ def _required_host_action(
             if resume_action:
                 return resume_action
         return "continue_host_develop"
-    if route_name == "replay":
-        return "continue_host_develop"
-    if route_name == "consult":
+    if route_name == "consult" or route_name == "replay":
         return "continue_host_consult"
     return "continue_host_develop"
 

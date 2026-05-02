@@ -182,7 +182,7 @@ class StateStoreInvariantTests(unittest.TestCase):
                 schema_version="1",
                 route_name="workflow",
                 run_id="run-1",
-                handoff_kind="workflow",
+                handoff_kind="plan",
                 required_host_action="review_or_execute_plan",
             )
 
@@ -216,7 +216,7 @@ class StateStoreInvariantTests(unittest.TestCase):
                 schema_version="1",
                 route_name="workflow",
                 run_id="run-1",
-                handoff_kind="workflow",
+                handoff_kind="plan",
                 required_host_action="review_or_execute_plan",
             )
 
@@ -331,7 +331,7 @@ class ContextSnapshotTests(unittest.TestCase):
                     schema_version="1",
                     route_name="workflow",
                     run_id="run-1",
-                    handoff_kind="workflow",
+                    handoff_kind="plan",
                     required_host_action="review_or_execute_plan",
                 ),
                 current_plan_proposal=None,
@@ -357,7 +357,7 @@ class ContextSnapshotTests(unittest.TestCase):
                     schema_version="1",
                     route_name="workflow",
                     run_id="run-1",
-                    handoff_kind="workflow",
+                    handoff_kind="plan",
                     required_host_action="confirm_decision",
                 ),
                 current_plan_proposal=None,
@@ -396,7 +396,7 @@ class ContextSnapshotTests(unittest.TestCase):
                     schema_version="1",
                     route_name="workflow",
                     run_id="run-1",
-                    handoff_kind="workflow",
+                    handoff_kind="plan",
                     required_host_action="confirm_plan_package",
                 ),
                 current_plan_proposal=None,
@@ -833,7 +833,7 @@ class ContextSnapshotTests(unittest.TestCase):
                     schema_version="1",
                     route_name="workflow",
                     run_id="run-1",
-                    handoff_kind="workflow",
+                    handoff_kind="plan",
                     required_host_action="review_or_execute_plan",
                     resolution_id="resolution-b",
                 )
@@ -872,7 +872,7 @@ class ContextSnapshotTests(unittest.TestCase):
                     schema_version="1",
                     route_name="workflow",
                     run_id="run-1",
-                    handoff_kind="workflow",
+                    handoff_kind="plan",
                     required_host_action="review_or_execute_plan",
                 )
             )
@@ -1148,7 +1148,7 @@ class ContextSnapshotTests(unittest.TestCase):
                     schema_version="1",
                     route_name="workflow",
                     run_id="run-1",
-                    handoff_kind="workflow",
+                    handoff_kind="plan",
                     required_host_action="confirm_plan_package",
                 )
             )

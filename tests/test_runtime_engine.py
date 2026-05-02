@@ -2112,7 +2112,7 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertTrue((workspace / ".sopify-skills" / "state" / "current_handoff.json").exists())
             self.assertIsNotNone(result.handoff)
             self.assertEqual(result.handoff.required_host_action, "continue_host_consult")
-            self.assertEqual(result.handoff.handoff_kind, "archive_lifecycle")
+            self.assertEqual(result.handoff.handoff_kind, "archive")
             self.assertEqual(result.handoff.artifacts["archived_plan_path"], result.plan_artifact.path)
             self.assertEqual(result.handoff.artifacts["history_index_path"], ".sopify-skills/history/index.md")
             self.assertTrue(result.handoff.artifacts["state_cleared"])
@@ -2302,7 +2302,7 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertTrue((workspace / ".sopify-skills" / "state" / "current_handoff.json").exists())
             self.assertIsNotNone(result.handoff)
             self.assertEqual(result.handoff.required_host_action, "continue_host_consult")
-            self.assertEqual(result.handoff.handoff_kind, "archive_lifecycle")
+            self.assertEqual(result.handoff.handoff_kind, "archive")
             self.assertEqual(result.handoff.artifacts["archive_lifecycle"]["archive_status"], "blocked")
             self.assertEqual(result.handoff.artifacts["archive_receipt_status"], "review_required")
             self.assertEqual(result.handoff.artifacts["active_plan_path"], first.plan_artifact.path)
@@ -2932,8 +2932,8 @@ class EngineIntegrationTests(unittest.TestCase):
 
             replay = run_runtime("回放最近一次实现", workspace_root=workspace, user_home=workspace / "home")
             self.assertIsNotNone(replay.handoff)
-            self.assertEqual(replay.handoff.handoff_kind, "replay")
-            self.assertEqual(replay.handoff.required_host_action, "continue_host_develop")
+            self.assertEqual(replay.handoff.handoff_kind, "consult")
+            self.assertEqual(replay.handoff.required_host_action, "continue_host_consult")
 
     def test_rendered_plan_output_and_repo_local_helper(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

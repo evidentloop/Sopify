@@ -156,3 +156,54 @@
 3. **`develop_quality.py:79` 的 `required_helper` 是机器 key** — 需审计消费链（engine.py `_should_attempt_develop_checkpoint` 附近）一并改名
 4. **冻结测试** — `develop_checkpoint` 不得出现在 CHECKPOINT_KINDS / route names；manifest 不再暴露 `develop_checkpoint_*` key
 5. **blueprint docs 中 "旧类型 develop_checkpoint → develop callback source" 的历史迁移说明保留** — 那是迁移记录，不是运行面残留
+
+### Wave 2d 精确审计结果
+
+审计对象：`SUPPORTED_ROUTE_NAMES`（18 个）× `_ROUTE_HANDOFF_KIND` 映射 × engine/output/guard 消费面。
+
+#### 2d 确定收敛映射
+
+| route_name | 当前 handoff_kind | 目标 canonical family | 改动性质 |
+|-----------|------------------|----------------------|---------|
+| `workflow` | `workflow` | `plan` | handoff 映射 + output 标签 + guard |
+| `light_iterate` | `light_iterate` | `plan` | handoff 映射 + output 标签 + guard |
+| `quick_fix` | `quick_fix` | `develop` | handoff 映射 + output 标签 + guard |
+| `archive_lifecycle` | `archive_lifecycle` | `archive` | handoff 映射 + output 标签 |
+
+#### 已经是 canonical（不改）
+
+| route_name | handoff_kind = family |
+|-----------|----------------------|
+| `plan_only` | `plan` |
+| `exec_plan` | `develop` |
+| `resume_active` | `develop` |
+| `consult` | `consult` |
+| `clarification_pending` / `clarification_resume` | `clarification` |
+| `decision_pending` / `decision_resume` | `decision` |
+
+#### 2d 不碰
+
+| route_name | 原因 |
+|-----------|------|
+| `plan_proposal_pending` | Wave 3a 范围 |
+| `execution_confirm_pending` | Wave 3b 范围 |
+| `state_conflict` | 横切面，blueprint 明确不计入 family |
+
+#### 2d 决策结果
+
+| route_name | 归宿 | 说明 |
+|-----------|------|------|
+| `cancel_active` | non-family control/teardown surface | 清空 active flow，不产出 handoff |
+| `summary` | non-family read-only utility surface | `~summary` 显式命令，不写 last_route |
+| `replay` | consult family | handoff_kind + required_host_action 均已收敛到 consult |
+
+#### 2d 模块实际变更
+
+| 模块 | 结果 |
+|------|------|
+| `router.py` | 不改（如预期） |
+| `engine.py` | 新增 `_CANONICAL_ROUTE_FAMILIES` + `_NON_FAMILY_SURFACES` |
+| `handoff.py` | 5 个映射收敛 + replay required_host_action → continue_host_consult |
+| `output.py` | 消除旧 handoff_kind 分支 + replay label 收敛到 consult |
+| `deterministic_guard.py` | 无需改（不分支 route_name / handoff_kind） |
+| `gate.py` | 审计结论：无需改（用 route_name 不用 handoff_kind） |

@@ -123,7 +123,7 @@ def _make_runtime_handoff(
         schema_version="1",
         route_name=route_name,
         run_id=run_id,
-        handoff_kind="workflow",
+        handoff_kind="plan",
         required_host_action=required_host_action,
         artifacts={"entry_guard": entry_guard},
         observability={
@@ -1854,7 +1854,7 @@ class RuntimeGateTests(unittest.TestCase):
             self.assertEqual(result["runtime"]["route_name"], "archive_lifecycle")
             self.assertEqual(result["handoff"]["required_host_action"], "continue_host_consult")
             self.assertEqual(result["handoff"]["route_name"], "archive_lifecycle")
-            self.assertEqual(result["handoff"]["handoff_kind"], "archive_lifecycle")
+            self.assertEqual(result["handoff"]["handoff_kind"], "archive")
             self.assertEqual(result["handoff"]["archive_lifecycle"]["archive_status"], "blocked")
             self.assertEqual(result["handoff"]["archive_receipt_status"], "review_required")
             config = load_runtime_config(workspace)
@@ -1918,7 +1918,7 @@ class RuntimeGateTests(unittest.TestCase):
             self.assertTrue(result["evidence"]["persisted_handoff_matches_current_request"])
             self.assertTrue(result["evidence"]["current_request_produced_handoff"])
             self.assertEqual(result["handoff"]["route_name"], "archive_lifecycle")
-            self.assertEqual(result["handoff"]["handoff_kind"], "archive_lifecycle")
+            self.assertEqual(result["handoff"]["handoff_kind"], "archive")
             self.assertEqual(result["handoff"]["archive_lifecycle"]["archive_status"], "completed")
             self.assertEqual(result["handoff"]["archive_receipt_status"], "completed")
             self.assertTrue(result["handoff"]["archived_plan_path"].endswith(f"/{other_plan.plan_id}"))
