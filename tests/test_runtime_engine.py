@@ -1447,18 +1447,18 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertEqual(followup.route.route_name, "decision_pending")
             self.assertEqual(followup.handoff.required_host_action, "confirm_decision")
 
-    def test_develop_checkpoint_helper_writes_decision_checkpoint_and_handoff(self) -> None:
+    def test_develop_callback_helper_writes_decision_checkpoint_and_handoff(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
             _enter_active_develop_context(workspace)
             config = load_runtime_config(workspace)
 
-            inspected = inspect_develop_checkpoint_context(config=config)
+            inspected = inspect_develop_callback_context(config=config)
             self.assertEqual(inspected["status"], "ready")
             self.assertEqual(inspected["required_host_action"], "continue_host_develop")
             self.assertEqual(inspected["quality_contract"]["max_retry_count"], 1)
 
-            submission = submit_develop_checkpoint(
+            submission = submit_develop_callback(
                 {
                     "schema_version": "1",
                     "checkpoint_kind": "decision",
@@ -1526,7 +1526,7 @@ class EngineIntegrationTests(unittest.TestCase):
                 config=config,
             )
 
-            self.assertIsNone(submission.delegated_checkpoint)
+            self.assertIsNone(submission.delegated_callback)
             self.assertEqual(submission.handoff.required_host_action, "continue_host_develop")
             store = StateStore(config)
             handoff = store.get_current_handoff()
@@ -1547,7 +1547,7 @@ class EngineIntegrationTests(unittest.TestCase):
             _enter_active_develop_context(workspace)
             config = load_runtime_config(workspace)
 
-            with self.assertRaisesRegex(DevelopCheckpointError, "requires checkpoint_kind"):
+            with self.assertRaisesRegex(DevelopCallbackError, "requires checkpoint_kind"):
                 submit_develop_quality_report(
                     {
                         "schema_version": "1",
@@ -1611,7 +1611,7 @@ class EngineIntegrationTests(unittest.TestCase):
                 config=config,
             )
 
-            self.assertIsNotNone(submission.delegated_checkpoint)
+            self.assertIsNotNone(submission.delegated_callback)
             self.assertEqual(submission.handoff.required_host_action, "confirm_decision")
             store = StateStore(config)
             handoff = store.get_current_handoff()
@@ -1651,7 +1651,7 @@ class EngineIntegrationTests(unittest.TestCase):
                 },
                 config=config,
             )
-            submit_develop_checkpoint(
+            submit_develop_callback(
                 {
                     "schema_version": "1",
                     "checkpoint_kind": "decision",
@@ -1680,14 +1680,14 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertEqual(resumed.handoff.artifacts["result"], "passed")
             self.assertEqual(resumed.handoff.artifacts["task_refs"], ["2.2"])
 
-    def test_develop_checkpoint_missing_kind_with_tradeoff_payload_emits_reason_code(self) -> None:
+    def test_develop_callback_missing_kind_with_tradeoff_payload_emits_reason_code(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
             _enter_active_develop_context(workspace)
             config = load_runtime_config(workspace)
 
-            with self.assertRaisesRegex(DevelopCheckpointError, CHECKPOINT_REASON_MISSING_BUT_TRADEOFF_DETECTED):
-                submit_develop_checkpoint(
+            with self.assertRaisesRegex(DevelopCallbackError, CHECKPOINT_REASON_MISSING_BUT_TRADEOFF_DETECTED):
+                submit_develop_callback(
                     {
                         "schema_version": "1",
                         "question": "认证边界是否移动到 adapter 层？",
@@ -1700,7 +1700,7 @@ class EngineIntegrationTests(unittest.TestCase):
                             "active_run_stage": "executing",
                             "current_plan_path": ".sopify-skills/plan/20260319_feature",
                             "task_refs": ["2.1"],
-                            "changed_files": ["runtime/develop_checkpoint.py"],
+                            "changed_files": ["runtime/develop_callback.py"],
                             "working_summary": "发现开发中分叉但 payload 未声明 checkpoint_kind。",
                             "verification_todo": ["补 develop callback payload 校验"],
                             "resume_after": "continue_host_develop",
@@ -1715,7 +1715,7 @@ class EngineIntegrationTests(unittest.TestCase):
             _enter_active_develop_context(workspace)
             config = load_runtime_config(workspace)
 
-            submit_develop_checkpoint(
+            submit_develop_callback(
                 {
                     "schema_version": "1",
                     "checkpoint_kind": "decision",
@@ -1751,7 +1751,7 @@ class EngineIntegrationTests(unittest.TestCase):
             _enter_active_develop_context(workspace)
             config = load_runtime_config(workspace)
 
-            submit_develop_checkpoint(
+            submit_develop_callback(
                 {
                     "schema_version": "1",
                     "checkpoint_kind": "decision",
@@ -1787,7 +1787,7 @@ class EngineIntegrationTests(unittest.TestCase):
             _enter_active_develop_context(workspace)
             config = load_runtime_config(workspace)
 
-            submit_develop_checkpoint(
+            submit_develop_callback(
                 {
                     "schema_version": "1",
                     "checkpoint_kind": "clarification",
@@ -1798,7 +1798,7 @@ class EngineIntegrationTests(unittest.TestCase):
                         "active_run_stage": "executing",
                         "current_plan_path": ".sopify-skills/plan/20260319_feature",
                         "task_refs": ["4.2"],
-                        "changed_files": ["runtime/develop_checkpoint.py"],
+                        "changed_files": ["runtime/develop_callback.py"],
                         "working_summary": "缺少 adapter 兼容性口径。",
                         "verification_todo": ["补 compatibility case"],
                         "resume_after": "continue_host_develop",
@@ -1820,7 +1820,7 @@ class EngineIntegrationTests(unittest.TestCase):
             _enter_active_develop_context(workspace)
             config = load_runtime_config(workspace)
 
-            submit_develop_checkpoint(
+            submit_develop_callback(
                 {
                     "schema_version": "1",
                     "checkpoint_kind": "decision",
@@ -3408,14 +3408,14 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertTrue((bundle_root / "runtime" / "__init__.py").exists())
             self.assertTrue((bundle_root / "runtime" / "clarification_bridge.py").exists())
             self.assertTrue((bundle_root / "runtime" / "cli_interactive.py").exists())
-            self.assertTrue((bundle_root / "runtime" / "develop_checkpoint.py").exists())
+            self.assertTrue((bundle_root / "runtime" / "develop_callback.py").exists())
             self.assertTrue((bundle_root / "runtime" / "execution_confirm.py").exists())
             self.assertTrue((bundle_root / "runtime" / "decision_bridge.py").exists())
             self.assertTrue((bundle_root / "runtime" / "gate.py").exists())
             self.assertTrue((bundle_root / "runtime" / "workspace_preflight.py").exists())
             self.assertTrue((bundle_root / "scripts" / "check-runtime-smoke.sh").exists())
             self.assertTrue((bundle_root / "scripts" / "clarification_bridge_runtime.py").exists())
-            self.assertTrue((bundle_root / "scripts" / "develop_checkpoint_runtime.py").exists())
+            self.assertTrue((bundle_root / "scripts" / "develop_callback_runtime.py").exists())
             self.assertTrue((bundle_root / "scripts" / "decision_bridge_runtime.py").exists())
             self.assertTrue((bundle_root / "scripts" / "plan_registry_runtime.py").exists())
             self.assertTrue((bundle_root / "scripts" / "preferences_preload_runtime.py").exists())
@@ -3484,7 +3484,7 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertTrue(manifest["capabilities"]["writes_clarification_file"])
             self.assertTrue(manifest["capabilities"]["decision_checkpoint"])
             self.assertTrue(manifest["capabilities"]["decision_bridge"])
-            self.assertTrue(manifest["capabilities"]["develop_checkpoint_callback"])
+            self.assertTrue(manifest["capabilities"]["develop_callback"])
             self.assertTrue(manifest["capabilities"]["develop_quality_feedback"])
             self.assertTrue(manifest["capabilities"]["develop_resume_context"])
             self.assertTrue(manifest["capabilities"]["execution_gate"])
@@ -3534,9 +3534,9 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertEqual(manifest["limits"]["decision_bridge_entry"], "scripts/decision_bridge_runtime.py")
             self.assertEqual(manifest["limits"]["decision_bridge_hosts"]["cli"]["preferred_mode"], "interactive_form")
             self.assertEqual(manifest["limits"]["decision_bridge_hosts"]["cli"]["select"], "interactive_select")
-            self.assertEqual(manifest["limits"]["develop_checkpoint_entry"], "scripts/develop_checkpoint_runtime.py")
-            self.assertEqual(manifest["limits"]["develop_checkpoint_hosts"]["cli"]["preferred_mode"], "structured_callback")
-            self.assertEqual(manifest["limits"]["develop_checkpoint_hosts"]["cli"]["submit_quality"], "json_payload")
+            self.assertEqual(manifest["limits"]["develop_callback_entry"], "scripts/develop_callback_runtime.py")
+            self.assertEqual(manifest["limits"]["develop_callback_hosts"]["cli"]["preferred_mode"], "structured_callback")
+            self.assertEqual(manifest["limits"]["develop_callback_hosts"]["cli"]["submit_quality"], "json_payload")
             self.assertIn("working_summary", manifest["limits"]["develop_resume_context_required_fields"])
             self.assertIn("continue_host_develop", manifest["limits"]["develop_resume_after_actions"])
             self.assertEqual(manifest["limits"]["develop_quality_contract_version"], "1")
@@ -3777,7 +3777,7 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertFalse((workspace / ".sopify-skills" / "state" / "current_decision.json").exists())
             self.assertTrue((workspace / ".sopify-skills" / "state" / "current_plan.json").exists())
 
-    def test_synced_runtime_bundle_supports_develop_checkpoint_helper(self) -> None:
+    def test_synced_runtime_bundle_supports_develop_callback_helper(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
             target_root = temp_root / "target"
@@ -3795,7 +3795,7 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertEqual(sync_completed.returncode, 0, msg=sync_completed.stderr)
 
             runtime_script = target_root / ".sopify-runtime" / "scripts" / "sopify_runtime.py"
-            helper_script = target_root / ".sopify-runtime" / "scripts" / "develop_checkpoint_runtime.py"
+            helper_script = target_root / ".sopify-runtime" / "scripts" / "develop_callback_runtime.py"
 
             _prepare_ready_plan_state(workspace)
             exec_pending = subprocess.run(
@@ -3855,14 +3855,14 @@ class EngineIntegrationTests(unittest.TestCase):
                         {
                             "schema_version": "1",
                             "task_refs": ["5.1"],
-                            "changed_files": ["runtime/develop_checkpoint.py"],
+                            "changed_files": ["runtime/develop_callback.py"],
                             "working_summary": "已记录 develop 质量结果。",
                             "verification_todo": ["补 bundle helper 测试"],
                             "quality_result": {
                                 "schema_version": "1",
                                 "verification_source": "project_native",
                                 "command": "python -m unittest tests.test_runtime_engine -v",
-                                "scope": "runtime/develop_checkpoint.py",
+                                "scope": "runtime/develop_callback.py",
                                 "result": "passed",
                                 "retry_count": 0,
                                 "review_result": {
@@ -3904,7 +3904,7 @@ class EngineIntegrationTests(unittest.TestCase):
                                 "active_run_stage": "executing",
                                 "current_plan_path": ".sopify-skills/plan/20260319_feature",
                                 "task_refs": ["5.1"],
-                                "changed_files": ["runtime/develop_checkpoint.py"],
+                                "changed_files": ["runtime/develop_callback.py"],
                                 "working_summary": "需要确认认证边界。",
                                 "verification_todo": ["补 bundle helper 测试"],
                                 "resume_after": "continue_host_develop",

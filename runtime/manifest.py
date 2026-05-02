@@ -34,7 +34,7 @@ DEFAULT_ENTRY = ENTRY_GUARD_DEFAULT_ENTRY
 PLAN_ONLY_ENTRY = ENTRY_GUARD_PLAN_ONLY_HELPER_ENTRY
 DECISION_BRIDGE_ENTRY = "scripts/decision_bridge_runtime.py"
 CLARIFICATION_BRIDGE_ENTRY = "scripts/clarification_bridge_runtime.py"
-DEVELOP_CHECKPOINT_ENTRY = "scripts/develop_checkpoint_runtime.py"
+DEVELOP_CALLBACK_ENTRY = "scripts/develop_callback_runtime.py"
 PLAN_REGISTRY_ENTRY = "scripts/plan_registry_runtime.py"
 PREFERENCES_PRELOAD_ENTRY = "scripts/preferences_preload_runtime.py"
 RUNTIME_GATE_ENTRY = "scripts/runtime_gate.py"
@@ -152,7 +152,7 @@ def build_bundle_manifest(
             "decision_bridge": True,
             "clarification_checkpoint": True,
             "clarification_bridge": True,
-            "develop_checkpoint_callback": True,
+            "develop_callback": True,
             "develop_quality_feedback": True,
             "develop_resume_context": True,
             "execution_gate": True,
@@ -191,7 +191,7 @@ def build_bundle_manifest(
             ],
             "host_bridge_status": {
                 "develop": "required",
-                "develop_checkpoint": "required",
+                "develop_callback": "required",
                 "execution_confirm": "required",
                 "replay": "required",
             },
@@ -202,7 +202,7 @@ def build_bundle_manifest(
                 "pending_checkpoint_actions": list(ENTRY_GUARD_PENDING_ACTIONS),
                 "bypass_blocked_commands": list(ENTRY_GUARD_BYPASS_BLOCKED_COMMANDS),
                 "reason_codes": dict(ENTRY_GUARD_REASON_CODES),
-                "develop_checkpoint_callback_reason_code": ENTRY_GUARD_DEVELOP_CALLBACK_REASON_CODE,
+                "develop_callback_reason_code": ENTRY_GUARD_DEVELOP_CALLBACK_REASON_CODE,
             },
             "runtime_payload_required_skill_ids": [],
             "session_state": {
@@ -236,8 +236,8 @@ def build_bundle_manifest(
                     "textarea": "multiline_text",
                 },
             },
-            "develop_checkpoint_entry": DEVELOP_CHECKPOINT_ENTRY,
-            "develop_checkpoint_hosts": {
+            "develop_callback_entry": DEVELOP_CALLBACK_ENTRY,
+            "develop_callback_hosts": {
                 "cli": {
                     "preferred_mode": "structured_callback",
                     "inspect": "json_contract",

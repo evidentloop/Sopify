@@ -526,7 +526,7 @@ class DecisionContractTests(unittest.TestCase):
                     config=config,
                 )
 
-    def test_materialize_checkpoint_request_rejects_develop_checkpoint_without_resume_context(self) -> None:
+    def test_materialize_checkpoint_request_rejects_develop_callback_without_resume_context(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
             config = load_runtime_config(workspace)
@@ -593,7 +593,7 @@ class DecisionContractTests(unittest.TestCase):
                 requested_plan_level="standard",
                 capture_mode="summary",
                 candidate_skill_ids=("develop",),
-                policy_id="develop_checkpoint_callback",
+                policy_id="develop_callback",
                 trigger_reason="host_callback",
                 resume_context=resume_context,
                 created_at=iso_now(),
@@ -1191,7 +1191,7 @@ class DecisionContractTests(unittest.TestCase):
                 user_home=workspace / "home",
             )
 
-            submit_develop_checkpoint(
+            submit_develop_callback(
                 {
                     "schema_version": "1",
                     "checkpoint_kind": "decision",

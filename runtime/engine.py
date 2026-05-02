@@ -30,7 +30,7 @@ from .decision import (
     response_from_submission,
     stale_decision,
 )
-from .develop_checkpoint import develop_resume_after, is_develop_checkpoint_state
+from .develop_callback import develop_resume_after, is_develop_callback_state
 from .execution_confirm import parse_execution_confirm_response
 from .execution_gate import evaluate_execution_gate
 from .archive_lifecycle import (
@@ -1590,7 +1590,7 @@ def _handle_clarification_resume(
             return (_clarification_pending_route(decision, reason="Clarification still requires factual details"), None, notes, kb_artifact)
 
         resumed_request = merge_clarification_request(current_clarification, response.text)
-    if is_develop_checkpoint_state(current_clarification):
+    if is_develop_callback_state(current_clarification):
         return _resume_from_develop_clarification(
             state_store=state_store,
             current_clarification=current_clarification,
@@ -1714,7 +1714,7 @@ def _handle_decision_resume(
         notes.append("Decision checkpoint has not reached a confirmed state yet")
         return (_decision_pending_route(decision, reason="Decision checkpoint is still pending"), None, notes, kb_artifact, None)
 
-    if is_develop_checkpoint_state(current_decision):
+    if is_develop_callback_state(current_decision):
         return _resume_from_develop_decision(
             state_store=state_store,
             current_decision=current_decision,

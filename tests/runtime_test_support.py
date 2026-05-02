@@ -31,8 +31,8 @@ from runtime.clarification_bridge import (
     load_clarification_bridge_context,
     prompt_cli_clarification_submission,
 )
-from runtime.develop_checkpoint import DevelopCheckpointError, inspect_develop_checkpoint_context, submit_develop_checkpoint
-from runtime.develop_checkpoint import submit_develop_quality_report
+from runtime.develop_callback import DevelopCallbackError, inspect_develop_callback_context, submit_develop_callback
+from runtime.develop_callback import submit_develop_quality_report
 from runtime.develop_quality import build_develop_quality_contract
 from runtime.decision import build_decision_state, build_execution_gate_decision_state, confirm_decision, response_from_submission
 from runtime.decision_bridge import (

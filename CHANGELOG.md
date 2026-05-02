@@ -6,6 +6,105 @@ This changelog is maintained manually (not auto-generated).
 
 ## [Unreleased]
 
+## [2026-05-02.150730] - 2026-05-02
+
+### Docs
+
+- Refined public documentation:
+  - `README.md`
+  - `README.zh-CN.md`
+
+### Runtime
+
+- Updated runtime internals:
+  - `runtime/develop_callback.py`
+  - `runtime/develop_checkpoint.py`
+  - `runtime/develop_quality.py`
+  - `runtime/engine.py`
+  - `runtime/entry_guard.py`
+  - `runtime/manifest.py`
+  - `runtime/state_invariants.py`
+
+### Scripts
+
+- Adjusted maintenance scripts:
+  - `scripts/check-runtime-smoke.sh`
+  - `scripts/develop_callback_runtime.py`
+  - `scripts/develop_checkpoint_runtime.py`
+  - `scripts/sync-runtime-assets.sh`
+
+### Skills
+
+- Synced prompt-layer skills:
+  - `Claude/Skills/CN/CLAUDE.md`
+  - `Claude/Skills/EN/CLAUDE.md`
+  - `Codex/Skills/CN/AGENTS.md`
+  - `Codex/Skills/EN/AGENTS.md`
+
+### Tests
+
+- Updated automated coverage:
+  - `tests/runtime_test_support.py`
+  - `tests/test_installer.py`
+  - `tests/test_runtime_decision.py`
+  - `tests/test_runtime_engine.py`
+
+### Changed
+
+- Updated project files:
+  - `.githooks/pre-commit`
+  - `CHANGELOG.md`
+  - `installer/bootstrap_workspace.py`
+  - `installer/payload.py`
+  - `installer/runtime_bundle.py`
+  - `installer/validate.py`
+
+## [2026-05-02.150313] - 2026-05-02
+
+### Runtime
+
+- Updated runtime internals:
+  - `runtime/develop_callback.py`
+  - `runtime/develop_checkpoint.py`
+  - `runtime/develop_quality.py`
+  - `runtime/engine.py`
+  - `runtime/entry_guard.py`
+  - `runtime/manifest.py`
+  - `runtime/state_invariants.py`
+
+### Scripts
+
+- Adjusted maintenance scripts:
+  - `scripts/check-runtime-smoke.sh`
+  - `scripts/develop_callback_runtime.py`
+  - `scripts/develop_checkpoint_runtime.py`
+  - `scripts/sync-runtime-assets.sh`
+
+### Skills
+
+- Synced prompt-layer skills:
+  - `Claude/Skills/CN/CLAUDE.md`
+  - `Claude/Skills/EN/CLAUDE.md`
+  - `Codex/Skills/CN/AGENTS.md`
+  - `Codex/Skills/EN/AGENTS.md`
+
+### Tests
+
+- Updated automated coverage:
+  - `tests/runtime_test_support.py`
+  - `tests/test_installer.py`
+  - `tests/test_runtime_decision.py`
+  - `tests/test_runtime_engine.py`
+
+### Changed
+
+- Updated project files:
+  - `.githooks/pre-commit`
+  - `installer/bootstrap_workspace.py`
+  - `installer/payload.py`
+  - `installer/runtime_bundle.py`
+  - `installer/validate.py`
+
 ## [2026-05-02.134449] - 2026-05-02
 
 ### Runtime
