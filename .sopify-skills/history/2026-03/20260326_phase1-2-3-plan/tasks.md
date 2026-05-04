@@ -2,7 +2,7 @@
 plan_id: 20260326_phase1-2-3-plan
 feature_key: phase1-2-3-plan
 level: standard
-lifecycle_state: active
+lifecycle_state: archived
 knowledge_sync:
   project: review
   background: review

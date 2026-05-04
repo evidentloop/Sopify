@@ -13,9 +13,8 @@
 ## 当前焦点
 
 <!-- sopify:auto:focus:start -->
-- 当前活动 plan：[P1 Subject Identity Binding](../plan/20260504_subject_identity_binding/plan.md)（T1-T5 已完成）
-  - 语义债：DECISION_REJECT surface 仍落成 consult，待 P1.5 收口
-- history 归档：已可用；最近归档为 `../history/2026-04/20260429_standard-archive-finalize-archive-checkpoint`。
+- 当前活动 plan：暂无。
+- history 归档：已可用；最近归档为 `../history/2026-05/20260504_subject_identity_binding`。
 <!-- sopify:auto:focus:end -->
 
 ## 深入阅读入口
@@ -28,5 +27,5 @@
 - [Sopify 最小协议规范 (Protocol v0)](./protocol.md)
 - [Skill 标准对齐蓝图](./skill-standards-refactor.md)
 - [变更历史](../history/index.md)
-- 最近归档：`../history/2026-04/20260429_standard-archive-finalize-archive-checkpoint`
+- 最近归档：`../history/2026-05/20260504_subject_identity_binding`
 <!-- sopify:auto:read-next:end -->

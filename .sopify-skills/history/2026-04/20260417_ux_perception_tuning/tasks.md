@@ -2,7 +2,7 @@
 plan_id: 20260417_ux_perception_tuning
 feature_key: ux_perception_tuning
 level: standard
-lifecycle_state: active
+lifecycle_state: archived
 knowledge_sync:
   project: review
   background: review

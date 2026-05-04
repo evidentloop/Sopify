@@ -4,6 +4,12 @@
 
 ## 索引
 
+- `2026-05-04` [`20260504_subject_identity_binding`](2026-05/20260504_subject_identity_binding/) - standard - P1 Subject Identity & Existing Plan Binding: protocol §7 升格 + validator admission + engine reject + workspace root normalization
+- `2026-05-04` ~~`20260416_blueprint_graphify_integration`~~ - deleted - Blueprint 可插拔增强架构 + Graphify（未实现，方向与主线相反，直接删除，git history 留底）
+- `2026-05-04` [`20260326_phase1-2-3-plan`](2026-03/20260326_phase1-2-3-plan/) - archived - Phase 1-2-3 旧总纲（B1/B2/B3 语义，已被 P0→P4 蓝图取代）
+- `2026-05-04` [`20260417_ux_perception_tuning`](2026-04/20260417_ux_perception_tuning/) - archived - UX 感知层调优（B/C 已完成，A 放弃；不独立拆包）
+- `2026-05-04` [`20260429_host_prompt_governance`](2026-04/20260429_host_prompt_governance/) - archived(upstreamed) - Host Prompt Governance（核心观点已进蓝图 P3b/P4，设计推演保留供回看）
+
 - `2026-04-30` [`20260429_standard-archive-finalize-archive-checkpoint`](2026-04/20260429_standard-archive-finalize-archive-checkpoint/) - standard - 任务清单: 为“显式主体与生命周期收敛”主题写第一子切片方案文档：新建 standard 方案包，只覆...
 - `2026-05-01` [`20260501_convention_smoke`](2026-05/20260501_convention_smoke/) - smoke - Convention 模式跨宿主最小 roundtrip 验证（Host B: Claude Sonnet + Host C: Codex/GPT-5，5/5 pass）
 - `2026-05-01` [`20260429_legacy_feature_cleanup`](2026-05/20260429_legacy_feature_cleanup/) - standard - Legacy Feature Cleanup: consult override 删除 + model compare 功能面移除

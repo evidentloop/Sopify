@@ -2,7 +2,7 @@
 plan_id: 20260418_cross_review_engine
 feature_key: cross_review_engine
 level: standard
-lifecycle_state: draft
+lifecycle_state: deferred
 knowledge_sync:
   project: review
   background: review
