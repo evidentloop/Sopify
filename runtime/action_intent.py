@@ -9,7 +9,10 @@ evidence proof 授权但不接管路由；未知 action 回落现有 Router。
 
 from __future__ import annotations
 
+import hashlib
+import os
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Mapping, Optional
 
 # -- Action types recognized by P0 -------------------------------------------
@@ -55,6 +58,34 @@ DECISION_FALLBACK_ROUTER = "fallback_router"
 
 
 # -- Data contracts -----------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class PlanSubjectProposal:
+    """Action-specific subject payload for execute_existing_plan.
+
+    Minimal field block: workspace-relative plan directory path + content digest.
+    Follows the same pattern as ArchiveSubjectProposal — scene-specific, not generic.
+    """
+
+    subject_ref: str  # workspace-relative plan directory path
+    revision_digest: str  # SHA-256 hex of plan.md content
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "subject_ref": self.subject_ref,
+            "revision_digest": self.revision_digest,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "PlanSubjectProposal":
+        subject_ref = str(data.get("subject_ref") or "").strip()
+        revision_digest = str(data.get("revision_digest") or "").strip()
+        if not subject_ref:
+            raise ValueError("plan_subject.subject_ref is required")
+        if not revision_digest:
+            raise ValueError("plan_subject.revision_digest is required")
+        return cls(subject_ref=subject_ref, revision_digest=revision_digest)
 
 
 @dataclass(frozen=True)
@@ -119,6 +150,7 @@ class ActionProposal:
     confidence: str = "high"
     evidence: tuple[str, ...] = ()
     archive_subject: ArchiveSubjectProposal | None = None
+    plan_subject: PlanSubjectProposal | None = None
 
     def to_dict(self) -> dict[str, Any]:
         payload = {
@@ -129,6 +161,8 @@ class ActionProposal:
         }
         if self.archive_subject is not None:
             payload["archive_subject"] = self.archive_subject.to_dict()
+        if self.plan_subject is not None:
+            payload["plan_subject"] = self.plan_subject.to_dict()
         return payload
 
     @classmethod
@@ -170,12 +204,24 @@ class ActionProposal:
         elif raw_archive_subject is not None:
             raise ValueError("archive_subject is only valid for archive_plan")
 
+        # plan_subject: optional for execute_existing_plan, rejected at validator if missing.
+        # Parse-layer allows None — validator does the fail-closed check.
+        raw_plan_subject = data.get("plan_subject")
+        plan_subject: PlanSubjectProposal | None = None
+        if raw_plan_subject is not None:
+            if action_type != "execute_existing_plan":
+                raise ValueError("plan_subject is only valid for execute_existing_plan")
+            if not isinstance(raw_plan_subject, dict):
+                raise ValueError("plan_subject must be an object")
+            plan_subject = PlanSubjectProposal.from_dict(raw_plan_subject)
+
         return cls(
             action_type=action_type,
             side_effect=side_effect,
             confidence=confidence,
             evidence=evidence,
             archive_subject=archive_subject,
+            plan_subject=plan_subject,
         )
 
 
@@ -192,6 +238,7 @@ class ValidationContext:
     required_host_action: Optional[str] = None
     current_plan_path: Optional[str] = None
     state_conflict: bool = False
+    workspace_root: Optional[str] = None  # project root for file-level checks
 
 
 @dataclass(frozen=True)
@@ -321,6 +368,10 @@ class ActionValidator:
                         "archive_subject": archive_subject.to_dict(),
                     },
                 )
+            if proposal.action_type == "execute_existing_plan":
+                decision = _validate_plan_subject(proposal, context)
+                if decision is not None:
+                    return decision
             # Evidence sufficient → authorize, let Router decide route.
             return ValidationDecision(
                 decision=DECISION_AUTHORIZE,
@@ -352,6 +403,82 @@ def _evidence_proves_write_intent(proposal: ActionProposal) -> bool:
     if not proposal.evidence:
         return False
     return True
+
+
+def _validate_plan_subject(
+    proposal: ActionProposal,
+    context: ValidationContext,
+) -> ValidationDecision | None:
+    """P1 subject admission for execute_existing_plan.
+
+    Returns a DECISION_REJECT if plan_subject is missing/invalid, or None to
+    continue with normal authorization flow.
+    """
+    plan_subject = proposal.plan_subject
+    if plan_subject is None:
+        return ValidationDecision(
+            decision=DECISION_REJECT,
+            resolved_action="execute_existing_plan",
+            resolved_side_effect=proposal.side_effect,
+            route_override=None,
+            reason_code="validator.execute_existing_plan_missing_subject",
+        )
+    if not context.workspace_root:
+        return ValidationDecision(
+            decision=DECISION_REJECT,
+            resolved_action="execute_existing_plan",
+            resolved_side_effect=proposal.side_effect,
+            route_override=None,
+            reason_code="validator.execute_existing_plan_no_workspace",
+        )
+    # subject_ref boundary: reject absolute path, traversal, non-plan prefix.
+    ref = plan_subject.subject_ref
+    if os.path.isabs(ref):
+        return ValidationDecision(
+            decision=DECISION_REJECT,
+            resolved_action="execute_existing_plan",
+            resolved_side_effect=proposal.side_effect,
+            route_override=None,
+            reason_code="validator.execute_existing_plan_invalid_subject_ref",
+        )
+    if ".." in Path(ref).parts:
+        return ValidationDecision(
+            decision=DECISION_REJECT,
+            resolved_action="execute_existing_plan",
+            resolved_side_effect=proposal.side_effect,
+            route_override=None,
+            reason_code="validator.execute_existing_plan_invalid_subject_ref",
+        )
+    _PLAN_PREFIX = ".sopify-skills/plan/"
+    normalized = ref.replace("\\", "/")
+    if not normalized.startswith(_PLAN_PREFIX):
+        return ValidationDecision(
+            decision=DECISION_REJECT,
+            resolved_action="execute_existing_plan",
+            resolved_side_effect=proposal.side_effect,
+            route_override=None,
+            reason_code="validator.execute_existing_plan_invalid_subject_ref",
+        )
+    plan_dir = Path(context.workspace_root) / plan_subject.subject_ref
+    plan_file = plan_dir / "plan.md"
+    if not plan_file.is_file():
+        return ValidationDecision(
+            decision=DECISION_REJECT,
+            resolved_action="execute_existing_plan",
+            resolved_side_effect=proposal.side_effect,
+            route_override=None,
+            reason_code="validator.execute_existing_plan_subject_not_found",
+        )
+    actual_digest = hashlib.sha256(plan_file.read_bytes()).hexdigest()
+    if actual_digest != plan_subject.revision_digest:
+        return ValidationDecision(
+            decision=DECISION_REJECT,
+            resolved_action="execute_existing_plan",
+            resolved_side_effect=proposal.side_effect,
+            route_override=None,
+            reason_code="validator.execute_existing_plan_digest_mismatch",
+        )
+    return None
 
 
 # -- Deterministic fallback adapter -------------------------------------------

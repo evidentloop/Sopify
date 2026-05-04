@@ -6,6 +6,25 @@ Format: Summary → Plan Packages → File Details (collapsible).
 
 ## [Unreleased]
 
+## [2026-05-04.221930] - 2026-05-04
+
+### Summary
+
+- Changes across: Runtime, Tests.
+
+<details>
+<summary>File details</summary>
+
+**Runtime** — Updated runtime internals:
+  - `runtime/action_intent.py`
+  - `runtime/engine.py`
+  - `runtime/gate.py`
+
+**Tests** — Updated automated coverage:
+  - `tests/test_action_intent.py`
+
+</details>
+
 ## [2026-05-04.221601] - 2026-05-04
 
 ### Summary

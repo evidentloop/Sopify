@@ -62,6 +62,7 @@ from .action_intent import (
     ActionProposal,
     ActionValidator,
     ValidationContext,
+    DECISION_REJECT,
 )
 from .skill_registry import SkillRegistry
 from .skill_runner import SkillExecutionError, run_runtime_skill
@@ -644,9 +645,19 @@ def run_runtime(
             required_host_action=required_host_action,
             current_plan_path=getattr(active_plan_for_validator, "path", "") or "" if active_plan_for_validator else "",
             state_conflict=snapshot.is_conflict,
+            workspace_root=str(config.workspace_root) if config is not None else None,
         )
         validation_decision = validator.validate(action_proposal, ctx)
-        if validation_decision.route_override:
+        if validation_decision.decision == DECISION_REJECT:
+            # P1: validator explicitly rejected — block execution.
+            proposal_override_route = RouteDecision(
+                route_name="consult",
+                request_text=user_input,
+                reason=f"action_proposal_rejected: {validation_decision.reason_code}",
+                complexity="simple",
+                should_recover_context=False,
+            )
+        elif validation_decision.route_override:
             proposal_override_route = RouteDecision(
                 route_name=validation_decision.route_override,
                 request_text=user_input,

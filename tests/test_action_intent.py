@@ -1174,3 +1174,251 @@ class IntegrationRegressionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ---------------------------------------------------------------------------
+# P1: execute_existing_plan subject admission tests
+# ---------------------------------------------------------------------------
+
+
+class PlanSubjectAdmissionTests(unittest.TestCase):
+    """P1 — validator MUST reject execute_existing_plan when plan_subject is
+    missing, subject_ref points to a non-existent plan, or revision_digest
+    does not match."""
+
+    def setUp(self) -> None:
+        from runtime.action_intent import DECISION_REJECT, PlanSubjectProposal
+        self.validator = ActionValidator()
+        self.DECISION_REJECT = DECISION_REJECT
+        self.PlanSubjectProposal = PlanSubjectProposal
+        self._tmpdir = tempfile.mkdtemp()
+        self.workspace = Path(self._tmpdir)
+        # Create a valid plan directory with plan.md
+        plan_dir = self.workspace / ".sopify-skills" / "plan" / "20260504_test_plan"
+        plan_dir.mkdir(parents=True)
+        self.plan_md = plan_dir / "plan.md"
+        self.plan_md.write_text("# Test Plan\n\ntitle: test\n", encoding="utf-8")
+        import hashlib
+        self.valid_digest = hashlib.sha256(self.plan_md.read_bytes()).hexdigest()
+        self.valid_subject_ref = ".sopify-skills/plan/20260504_test_plan"
+
+    def tearDown(self) -> None:
+        import shutil
+        shutil.rmtree(self._tmpdir, ignore_errors=True)
+
+    def _make_proposal(self, plan_subject=None):
+        """Build an execute_existing_plan proposal with side_effect + evidence."""
+        return ActionProposal(
+            action_type="execute_existing_plan",
+            side_effect="write_files",
+            confidence="high",
+            evidence=("user confirmed execution",),
+            plan_subject=plan_subject,
+        )
+
+    def _ctx(self, workspace_root=None):
+        return ValidationContext(
+            workspace_root=workspace_root if workspace_root is not None else str(self.workspace),
+        )
+
+    def test_missing_plan_subject_rejected(self):
+        """execute_existing_plan without plan_subject → DECISION_REJECT."""
+        proposal = self._make_proposal(plan_subject=None)
+        decision = self.validator.validate(proposal, self._ctx())
+        self.assertEqual(decision.decision, self.DECISION_REJECT)
+        self.assertEqual(decision.reason_code, "validator.execute_existing_plan_missing_subject")
+
+    def test_subject_ref_not_found_rejected(self):
+        """plan_subject.subject_ref points to nonexistent plan → DECISION_REJECT."""
+        plan_subject = self.PlanSubjectProposal(
+            subject_ref=".sopify-skills/plan/nonexistent_plan",
+            revision_digest="0" * 64,
+        )
+        proposal = self._make_proposal(plan_subject=plan_subject)
+        decision = self.validator.validate(proposal, self._ctx())
+        self.assertEqual(decision.decision, self.DECISION_REJECT)
+        self.assertEqual(decision.reason_code, "validator.execute_existing_plan_subject_not_found")
+
+    def test_digest_mismatch_rejected(self):
+        """plan_subject.revision_digest doesn't match actual file → DECISION_REJECT."""
+        plan_subject = self.PlanSubjectProposal(
+            subject_ref=self.valid_subject_ref,
+            revision_digest="0" * 64,  # wrong digest
+        )
+        proposal = self._make_proposal(plan_subject=plan_subject)
+        decision = self.validator.validate(proposal, self._ctx())
+        self.assertEqual(decision.decision, self.DECISION_REJECT)
+        self.assertEqual(decision.reason_code, "validator.execute_existing_plan_digest_mismatch")
+
+    def test_valid_subject_authorized(self):
+        """Correct plan_subject → authorized (not rejected)."""
+        plan_subject = self.PlanSubjectProposal(
+            subject_ref=self.valid_subject_ref,
+            revision_digest=self.valid_digest,
+        )
+        proposal = self._make_proposal(plan_subject=plan_subject)
+        decision = self.validator.validate(proposal, self._ctx())
+        self.assertNotEqual(decision.decision, self.DECISION_REJECT)
+        self.assertEqual(decision.decision, DECISION_AUTHORIZE)
+
+    def test_no_workspace_root_rejected(self):
+        """Missing workspace_root in context → DECISION_REJECT."""
+        plan_subject = self.PlanSubjectProposal(
+            subject_ref=self.valid_subject_ref,
+            revision_digest=self.valid_digest,
+        )
+        proposal = self._make_proposal(plan_subject=plan_subject)
+        decision = self.validator.validate(proposal, self._ctx(workspace_root=""))
+        self.assertEqual(decision.decision, self.DECISION_REJECT)
+        self.assertEqual(decision.reason_code, "validator.execute_existing_plan_no_workspace")
+
+    def test_plan_subject_parse_only_for_execute_existing_plan(self):
+        """plan_subject on a non-execute_existing_plan action → parse error."""
+        with self.assertRaises(ValueError) as cm:
+            ActionProposal.from_dict({
+                "action_type": "consult_readonly",
+                "plan_subject": {
+                    "subject_ref": self.valid_subject_ref,
+                    "revision_digest": self.valid_digest,
+                },
+            })
+        self.assertIn("only valid for execute_existing_plan", str(cm.exception))
+
+    def test_plan_subject_serialization_roundtrip(self):
+        """PlanSubjectProposal survives to_dict/from_dict roundtrip."""
+        original = self.PlanSubjectProposal(
+            subject_ref=self.valid_subject_ref,
+            revision_digest=self.valid_digest,
+        )
+        d = original.to_dict()
+        restored = self.PlanSubjectProposal.from_dict(d)
+        self.assertEqual(restored.subject_ref, original.subject_ref)
+        self.assertEqual(restored.revision_digest, original.revision_digest)
+
+    # -- Finding 3: subject_ref boundary tests --
+
+    def test_absolute_path_subject_ref_rejected(self):
+        """Absolute subject_ref → DECISION_REJECT (path injection defense)."""
+        plan_subject = self.PlanSubjectProposal(
+            subject_ref="/etc/passwd",
+            revision_digest=self.valid_digest,
+        )
+        proposal = self._make_proposal(plan_subject=plan_subject)
+        decision = self.validator.validate(proposal, self._ctx())
+        self.assertEqual(decision.decision, self.DECISION_REJECT)
+        self.assertEqual(decision.reason_code, "validator.execute_existing_plan_invalid_subject_ref")
+
+    def test_traversal_subject_ref_rejected(self):
+        """subject_ref with '..' → DECISION_REJECT (path traversal defense)."""
+        plan_subject = self.PlanSubjectProposal(
+            subject_ref="../../etc/shadow",
+            revision_digest=self.valid_digest,
+        )
+        proposal = self._make_proposal(plan_subject=plan_subject)
+        decision = self.validator.validate(proposal, self._ctx())
+        self.assertEqual(decision.decision, self.DECISION_REJECT)
+        self.assertEqual(decision.reason_code, "validator.execute_existing_plan_invalid_subject_ref")
+
+    def test_non_plan_prefix_subject_ref_rejected(self):
+        """subject_ref outside .sopify-skills/plan/ → DECISION_REJECT."""
+        plan_subject = self.PlanSubjectProposal(
+            subject_ref="src/some_dir",
+            revision_digest=self.valid_digest,
+        )
+        proposal = self._make_proposal(plan_subject=plan_subject)
+        decision = self.validator.validate(proposal, self._ctx())
+        self.assertEqual(decision.decision, self.DECISION_REJECT)
+        self.assertEqual(decision.reason_code, "validator.execute_existing_plan_invalid_subject_ref")
+
+
+# ---------------------------------------------------------------------------
+# P1: Engine-level integration — reject blocks main route
+# ---------------------------------------------------------------------------
+
+
+class PlanSubjectEngineIntegrationTests(unittest.TestCase):
+    """P1 — engine MUST block execution when validator rejects plan_subject.
+
+    These tests prove the full path: ActionProposal → validator → engine routing.
+    """
+
+    # Execution-semantic routes that reject MUST NOT fall into.
+    _EXEC_ROUTES = frozenset({"develop", "exec_plan", "workflow", "light_iterate", "quick_fix", "go_plan"})
+
+    def test_reject_missing_subject_blocks_engine(self):
+        """execute_existing_plan without plan_subject → rejected, not routed to execution."""
+        with tempfile.TemporaryDirectory() as td:
+            workspace = Path(td)
+            proposal = ActionProposal(
+                "execute_existing_plan", "write_files", "high",
+                evidence=("user confirmed execution",),
+            )
+            result = run_runtime(
+                "继续执行计划",
+                workspace_root=workspace,
+                user_home=workspace / "home",
+                action_proposal=proposal,
+            )
+            self.assertIn("action_proposal_rejected", result.route.reason)
+            self.assertNotIn(result.route.route_name, self._EXEC_ROUTES)
+
+    def test_reject_invalid_digest_blocks_engine(self):
+        """execute_existing_plan with wrong digest → rejected, not routed to execution."""
+        with tempfile.TemporaryDirectory() as td:
+            workspace = Path(td)
+            plan_dir = workspace / ".sopify-skills" / "plan" / "20260504_test"
+            plan_dir.mkdir(parents=True)
+            (plan_dir / "plan.md").write_text("# test\n", encoding="utf-8")
+
+            from runtime.action_intent import PlanSubjectProposal
+            plan_subject = PlanSubjectProposal(
+                subject_ref=".sopify-skills/plan/20260504_test",
+                revision_digest="0" * 64,
+            )
+            proposal = ActionProposal(
+                "execute_existing_plan", "write_files", "high",
+                evidence=("user confirmed execution",),
+                plan_subject=plan_subject,
+            )
+            result = run_runtime(
+                "继续执行计划",
+                workspace_root=workspace,
+                user_home=workspace / "home",
+                action_proposal=proposal,
+            )
+            self.assertIn("action_proposal_rejected", result.route.reason)
+            self.assertNotIn(result.route.route_name, self._EXEC_ROUTES)
+
+    def test_valid_subject_not_blocked_by_engine(self):
+        """execute_existing_plan with valid plan_subject → NOT rejected (router runs)."""
+        import hashlib
+        with tempfile.TemporaryDirectory() as td:
+            workspace = Path(td)
+            plan_dir = workspace / ".sopify-skills" / "plan" / "20260504_test"
+            plan_dir.mkdir(parents=True)
+            plan_md = plan_dir / "plan.md"
+            plan_md.write_text("# test\n", encoding="utf-8")
+            digest = hashlib.sha256(plan_md.read_bytes()).hexdigest()
+
+            from runtime.action_intent import PlanSubjectProposal
+            plan_subject = PlanSubjectProposal(
+                subject_ref=".sopify-skills/plan/20260504_test",
+                revision_digest=digest,
+            )
+            proposal = ActionProposal(
+                "execute_existing_plan", "write_files", "high",
+                evidence=("user confirmed execution",),
+                plan_subject=plan_subject,
+            )
+            result = run_runtime(
+                "继续执行计划",
+                workspace_root=workspace,
+                user_home=workspace / "home",
+                action_proposal=proposal,
+            )
+            # Valid subject → authorized, NOT rejected — router handles routing
+            self.assertNotIn("action_proposal_rejected", result.route.reason)
+
+
+if __name__ == "__main__":
+    unittest.main()

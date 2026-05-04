@@ -850,6 +850,14 @@ def _build_action_proposal_schema() -> dict[str, Any]:
                 "allow_current_plan_fallback": {"type": "bool", "default": False},
             },
         },
+        "plan_subject": {
+            "type": "object",
+            "required_for": ["execute_existing_plan"],
+            "fields": {
+                "subject_ref": {"type": "string", "required": True, "description": "workspace-relative plan directory path"},
+                "revision_digest": {"type": "string", "required": True, "description": "SHA-256 hex of plan.md content"},
+            },
+        },
     }
 
 
