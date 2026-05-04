@@ -200,19 +200,55 @@ Sopify 把上述三类输入统一收敛为：
 | `history` | 归档事实：outcome + key_decisions + verification_evidence |
 | `blueprint` | 长期知识：只有稳定结论（via knowledge_sync） |
 
-## 7. Multi-host Review Wire Contract — *informative / draft*
+## 7. Subject Identity & Review Wire Contract — *升格候选 (normative target)*
 
-> 本节定义跨宿主协作审查的最小 machine contract（wire level）。收敛策略性规则（轮数上限、severity 判定、冲突解决）归 `design.md` Default Workflow 策略。
+> **升格状态**：本节中 Subject Identity 的通用字段与核心语义（subject_type / subject_ref / revision_digest / 取证优先级）从 informative/draft 升格为 normative target。execute_existing_plan 场景绑定仍为 draft（见下方 UNSTABLE 标注），不在本次升格范围内。`tasks.md` P1 定义完整升格路线。Review Wire Contract 部分仍为 informative/draft，待 P1 完成后联动升格。
+>
+> 本节定义跨宿主协作中"操作的是谁"的最小 machine contract（wire level）。适用于 review、execute_existing_plan、revise、archive 等所有需要绑定主体的场景。收敛策略性规则（轮数上限、severity 判定、冲突解决）归 `design.md` Default Workflow 策略。
 
-### Review Subject Identity
+### Subject Identity（跨场景通用）
 
-每次审查必须绑定被审查对象，以保证跨宿主可追溯：
+每个 side-effecting action 必须携带明确的主体身份，以保证跨宿主可追溯、可验证。Subject identity 是 protocol 层契约，validator 和 runtime 都是消费方。
 
 | 字段 | 说明 |
 |------|------|
-| `subject_type` | 被审查对象类型（`plan` / `code` / `architecture`） |
+| `subject_type` | 被操作对象类型（`plan` / `code` / `architecture`） |
 | `subject_ref` | 对象定位（如 `plan/20260501_dark_mode/plan.md`） |
-| `revision_digest` | 版本标识（git SHA 或内容 hash），保证审查绑定到确定性快照 |
+| `revision_digest` | 版本标识（git SHA 或内容 hash），保证操作绑定到确定性快照 |
+
+**主体取证优先级**（当 subject 未显式给出时的解析链路）：
+
+1. `explicit_reference` — 用户或 ActionProposal 显式指定
+2. `self_reference` — 当前上下文中可唯一推定的活跃主体
+3. `new_plan_intent` — 检测到新建意图，不绑定已有主体
+4. `stable_handoff_evidence` — 上轮 handoff 中稳定的主体引用
+5. `current_plan_anchor` — 全局 current_plan 作为兜底
+
+**Validator 消费边界**：validator 基于 subject identity 做 admission / authorization 判定。subject 不明确时 validator 应拒绝而非猜测。
+
+**Runtime 消费边界**：runtime 作为参考实现消费 protocol 定义的 subject identity contract，不自行定义主体解析语义。
+
+### execute_existing_plan 场景的 Subject Binding — *draft*
+
+> ⚠️ **UNSTABLE** — illustrative draft for P1 planning only; do not implement against these fields/rules until P1 acceptance.
+>
+> 本小节是 execute_existing_plan 场景的主体绑定草案。完整规范化依赖 `tasks.md` P1 + P1.5。
+
+execute_existing_plan 是 subject identity 最关键的消费场景。宿主必须在 ActionProposal 中携带：
+
+| 字段 | 说明 |
+|------|------|
+| `subject_ref` | 目标 plan 路径（如 `plan/20260501_dark_mode/plan.md`） |
+| `revision_digest` | plan 内容的确定性快照标识 |
+
+**可携带规则**：
+- 跨 session 接力时，新 session 必须通过 handoff 或 plan 文件重新建立 subject binding，不隐式继承前 session 的绑定
+- plan 内容变更（revision_digest 不匹配）后，已有 ExecutionAuthorizationReceipt 自动失效
+- validator 在 admission 阶段校验 subject_ref 存在性 + revision_digest 一致性
+
+### Review Subject Identity
+
+审查是 subject identity 的一个消费场景。每次审查必须绑定被审查对象，字段复用上述 Subject Identity 定义。
 
 ### Review Record Shape
 
