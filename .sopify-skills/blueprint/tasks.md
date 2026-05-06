@@ -1,6 +1,6 @@
 # 蓝图路线图与待办
 
-本文定位: 只记录未完成长期项与明确延后项。已完成项不保留。不替代当前 plan 的执行任务清单。
+本文定位: 路线图全景 + 未完成长期项与明确延后项。已完成里程碑仅保留一行摘要与归档指引。不替代当前 plan 的执行任务清单。
 
 ## 执行优先级（已确认）
 
@@ -24,87 +24,34 @@
 
 ### P0: Blueprint Rebaseline（已完成）
 
-- ✅ 重写 blueprint/{background,design,tasks}.md
-- ✅ 实体化 ADR-013/016/017 到 blueprint/architecture-decision-records/
-- ✅ 定义削减预算表和目标词汇表
-- ✅ 降级并删除 20260424_lightweight_pluggable_architecture（证据留 git history）
-- ✅ 迁移 ADR 到 blueprint/architecture-decision-records/
-- ✅ 竞品边界表已更新；最小协议文档已落地（`blueprint/protocol.md` v0）
+✅ 已完成。重写 blueprint 三件套、实体化 ADR、定义削减预算表、落地 protocol.md v0。细节见 git history。
 
 ### P1: Subject Identity & Existing Plan Binding（已完成）
 
-protocol / validator / runtime 三联动。不只是 runtime 内部统一主体解析，而是跨层定义"操作的是谁"的可携带 truth。
+✅ 已完成（归档：`history/2026-05/20260504_subject_identity_binding/`）。protocol §7 subject identity 升格 normative、Validator admission fail-closed、execute_existing_plan subject binding。P1 语义债（DECISION_REJECT consult 伪装）在 P1.5-A 收口。
 
-**范围界定**：P1 的核心交付是 execute_existing_plan 场景的 subject identity 规范化。protocol.md §7 已有 subject identity 草案覆盖所有 side-effecting action，P1 推进其升格路线但以 existing plan binding 为主战场，不把所有 action 的主体规范一次做完。
+### P1.5: Execution Authorization Spine（已完成）
 
-**当前进度**（方案包 `.sopify-skills/plan/20260504_subject_identity_binding/`）：
-- ✅ T1: execute_existing_plan subject binding 升格为 normative（RFC 2119 表述）
-- ✅ T2: Legacy mapping 文档规则（current_plan / ~go exec / review_or_execute_plan）
-- ✅ T3: Validator admission 实现（plan_subject 字段块 + fail-closed reject + subject_ref 边界防线）
-- ✅ T4: Validator + engine 集成测试（92 全绿）
-- ✅ T5: 蓝图回写
+✅ 全部完成（4 个方案包 + 3 个先行切片 + 1 个桥接切片）。
 
-**已知语义债**：DECISION_REJECT 当前通过 consult route 阻断执行，reject surface 语义在 P1.5 收口。
+| 序号 | 方案包 | 归档位置 |
+|------|--------|---------|
+| C | Plan Materialization Auth Boundary | `history/2026-05/20260505_p15_plan_materialization_auth/` |
+| A | DECISION_REJECT Surface 收口 | `history/2026-05/20260506_p15_reject_surface/` |
+| B | Authorization Contract Spec | `history/2026-05/20260506_p15_authorization_contract_spec/` |
+| D | Verifier Minimum Normative Slice | `history/2026-05/20260506_p15_verifier_normative_slice/` |
 
-- 推进 `protocol.md` §7 中已有的 subject identity 草案（subject_type / subject_ref / revision_digest）的升格路线，目标从 informative/draft → canonical/normative
-- 在 protocol 层定义 execute_existing_plan 场景下"我到底在操作哪个 existing plan"的可携带规则
-- 定义主体取证优先级：explicit reference → self-reference → new-plan intent → stable handoff evidence → current-plan anchor
-- 明确 validator 的消费边界：validator 基于 subject identity 做 admission / authorization 判定
-- 明确 runtime 的消费边界：runtime 作为参考实现消费 protocol 定义的 subject identity contract
-- 不定义局部动作 contract，不治理 prompt
+先行切片：Convention 入口兑现 ✅ + Protocol Compliance Suite Phase 1 ✅ + ~summary 全链路删除 ✅（归档：`history/2026-05/20260505_p15_advance_slices/`）
 
-### P1.5: Execution Authorization Spine
+**蓝图条目索引（已交付，保留供 P2+ 回溯）：**
 
-ADR-017 的直系后续。不要求落地完整 ExecutionAuthorizationReceipt 实现，但要把授权链路操作化为可实现 contract。
-
-**执行拆分（4 个方案包，串行依赖）：**
-
-```
- C: Plan Materialization     A: Reject Surface
-    Auth Boundary                收口
-    (修现存 bug,               (P1 语义债,
-     P2 硬前置)                 独立)
-        │                        │
-        │ C 建立授权模式           │
-        ▼                        │
- B: Authorization ◄──────────────┘
-    Contract Spec    A 的 reject surface
-    (P1.5 核心交付)    是 spec 消费场景之一
-        │
-        │ B 稳定后
-        ▼
- D: Verifier Normative
-    (P1.5→P2 桥接)
-```
-
-| 序号 | 方案包 | 蓝图条目 | 前置 | 性质 | 范围 |
-|------|--------|---------|------|------|------|
-| C | Plan Materialization Auth Boundary | #6 | 无 | 修现存 bug + P2 硬前置 | ✅ 已完成（PR #23, 2026-05-05）。`immediate` → `authorized_only`；Validator 授权结果传到 planning 流程；router `_ACTION_KEYWORDS` 单字止血。Known debt: resume path authorization provenance 留 P1.5-B/P2 |
-| A | DECISION_REJECT Surface 收口 | #1 | 无（独立） | P1 语义债清理 | ✅ 已完成（2026-05-06）。reject 从 consult 伪装剥离为独立 non-family surface `proposal_rejected`；handoff_kind="reject" + reject_reason_code 结构化 artifact；output 投影全链路对齐（_PHASE_LABELS / _status_message / _handoff_next_hint / _status_symbol）；required_host_action 保持 continue_host_consult（预算 5 不破）。测试债已清（plan/p15-final：stale receipt cross-run integration test 已交付） |
-| B | Authorization Contract Spec | #2 #3 #4 #5 #7 | C 先做更稳 | P1.5 核心交付 | ✅ 已完成（2026-05-06）。ExecutionAuthorizationReceipt 8-field spec normative（protocol §7 + ADR-017）；generate_proposal_id + host reject；engine receipt generation (deferred to post-gate)；RunState persistence + handoff exposure；stale detection fail-closed（integrity → binding → freshness）；authorization_source shape 严格匹配 `{kind: "request_hash", request_sha1}`。测试债已清（plan/p15-final：T5-C 端到端集成测试 7 条全部交付——正面链路 + 负面路径 + carry-forward + stale cross-run） |
-| D | Verifier Minimum Normative Slice | 桥接 | B 稳定 | P1.5→P2 桥接 | ✅ 已完成（2026-05-06）。protocol.md §6 Verifier 从 informative 升格为 normative（verdict/evidence/source MUST, scope SHOULD）；消费路径 contract 口径（verdict → Validator 风险因子, evidence → 证据链 + handoff SHOULD, receipt deferred）；§7 存储位置 deferred 边界收紧；design.md §7→§6 引用修正 |
-
-**蓝图条目索引：**
-
-1. **DECISION_REJECT surface 收口**（P1 语义债）→ 方案包 A：P1 的 validator reject 当前通过 consult route 阻断执行，但对宿主暴露的 surface 仍表现为 consult。P1.5 需扩展 handoff 白名单（`runtime/handoff.py`）和 gate 输出，使 reject 有独立的结构化 surface，而非借 consult 路由机制
-2. 将 ADR-017 中 ExecutionAuthorizationReceipt 字段规范（plan_id / plan_revision_digest / gate_status / action_proposal_id / authorization_source / fingerprint）从"后续扩展方向"提升为独立里程碑 → 方案包 B
-3. 规划 execute_existing_plan 的 authorization context：谁提交、基于哪个 plan revision、经过什么 gate、产生什么 receipt → 方案包 B
-4. 定义 plan revision binding 的失效规则：plan 变更后 receipt 自动失效的判定机制 → 方案包 B
-5. 定义 action identity 在 ActionProposal 管线中的唯一性保证 → 方案包 B
-6. **Plan materialization authorization boundary** → 方案包 C（优先执行）：plan 创建是 side-effecting action，必须走 ActionProposal → Validator 管线。当前 `plan_only → immediate` 硬默认绕过了 Validator 授权，违反核心不变量。P1.5 定义授权缺口、策略选项（`deferred` / `authorized_only` 物化策略）与验收边界。本里程碑不规定具体 runtime 实现位点；凡是使 P2 可落地所必需的最小实现，应在进入 P2 前完成。（此项是 P2 的硬前置——P2 只消费已完成的授权边界，不再背授权缺口）
-7. **字段命名对齐** → 方案包 B 附属：protocol.md 使用 `revision_digest`（通用 subject identity），ADR-017 使用 `plan_revision_digest`（plan 特化）。P1.5 需明确两者关系：`plan_revision_digest` 是 `revision_digest` 在 plan subject 场景的特化命名，实现时不得混用
-
-- 产出：可实现的 authorization contract spec（不一定是完整实现，但足够让后续 P2 的动作层基于此收敛）
-
-**可先行切片（presentation-only / protocol 下界验证，不改 machine contract）：**
-
-- ✅ **Convention 入口兑现（窄切片）**：README 增加 non-runtime quickstart 路径（基于 protocol.md §4 样例 A）；将 protocol.md §5 合规检查清单转化为面向外部宿主开发者的接入指南段落。不新增 CLI 面（不做 `sopify init --minimal`），用文档/模板/示例目录兑现。验收：外部宿主开发者只读 README + protocol.md 即可完成最小合规（≤3 步）
-- ✅ **Protocol Compliance Suite Phase 1**：在 `tests/protocol/` 建立最小合规断言套件，严格对齐 protocol.md §5（能读 blueprint、能写方案包、能归档 + receipt）。实现方式：文件结构存在性 + 必需字段断言（脚本级）。验收：16 项断言全部通过
-- ✅ **低风险辅助层预清理（~summary surface 全链路删除）**：删除 `~summary` 路由、`daily_summary` 模块、`_models/summary.py`、output/engine/router 中所有 summary 分支及相关测试。验收：全量测试通过（595 passed） + 6 组 grep 模式零残留 + 净删 2,207 行
-
-**P1.5→P2 桥接切片（涉及 protocol 层契约升格，需 P1.5 授权脊柱稳定后执行）：**
-
-- **Verifier minimum normative slice**：将 protocol.md §6 Verifier 子段从 informative/draft 升格为 normative。最小 normative 字段：`verdict`（MUST 提供可被 Validator 消费的判定标识，具体值域允许实现细化）+ `evidence` + `source`（RFC 2119 表述）；`scope` 保留 recommended。明确 Verifier 输出消费路径：verdict 作为 Validator 授权判定的风险因子，evidence 挂载在 handoff/receipt 中。不定义 evidence attachment 完整 schema，不扩 canonical 预算。外部启发：HelloAGENTS 交付证据链（contract.json / review.json），准入 T1 Adoption
+1. DECISION_REJECT surface 收口 → A
+2. ExecutionAuthorizationReceipt 字段升格 → B
+3. execute_existing_plan authorization context → B
+4. plan revision binding 失效规则 → B
+5. action identity 唯一性保证 → B
+6. Plan materialization authorization boundary → C
+7. 字段命名对齐（revision_digest / plan_revision_digest）→ B
 
 ### P2: Local Action Contracts on Bound Subjects
 
