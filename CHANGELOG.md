@@ -6,6 +6,81 @@ Format: Summary → Plan Packages → File Details (collapsible).
 
 ## [Unreleased]
 
+## [2026-05-07.220011] - 2026-05-07
+
+### Summary
+
+P3a Contract-Aligned Surface Cleanup 完整交付。Execution routing 收敛、cancel_scope 修复、knowledge_sync audit trail、dead path cleanup (-88 LOC)、blueprint 已完成里程碑压缩 + Px 独立里程碑。
+
+### Changed
+
+- **Execution routing convergence**: authorized ActionProposal → deterministic route derive (`_derive_route_from_authorized_proposal`); Router.classify 降为 bare-text legacy fallback
+- **cancel_scope fix**: cancel_flow 在 derive 路径内联处理，修复 artifacts 为空时默认全局清理的 bug
+- **knowledge_sync audit trail**: `knowledge_sync_result` 贯穿 archive 全管道（success / blocked / archive_target_conflict 三路径）
+- **Dead code removal**: 删除 6 个无引用私有函数 + 1 个孤立常量 (-88 LOC)
+- **Test coverage**: +17 routing convergence tests, +2 archive knowledge_sync tests, classify exclusion + checkpoint split 补齐
+- **Blueprint restructure**: P0–P3a 压缩为一行摘要；Px runtime_surface_consolidation 独立里程碑（post-P4）
+- **P3a archived**: plan → `history/2026-05/20260507_p3a_contract_aligned_surface_cleanup/`
+
+### Plan Packages
+
+- `20260507_p3a_contract_aligned_surface_cleanup` (archived)
+
+<details>
+<summary>File details</summary>
+
+**Runtime** — Execution routing + archive audit trail + dead code removal:
+  - `runtime/engine.py` (+207 derive functions, -36 dead code)
+  - `runtime/archive_lifecycle.py` (+47 knowledge_sync pipeline)
+  - `runtime/router.py` (-26 dead function + constant + imports)
+  - `runtime/workspace_preflight.py` (-20 dead function)
+  - `runtime/action_projection.py`
+  - `runtime/checkpoint_request.py`
+  - `runtime/deterministic_guard.py`
+  - `runtime/develop_callback.py`
+  - `runtime/handoff.py`
+  - `runtime/output.py`
+  - `runtime/plan_orchestrator.py`
+  - `runtime/vnext_phase_boundary.py`
+
+**Contracts** — Schema cleanup:
+  - `runtime/contracts/decision_tables.schema.json`
+  - `runtime/contracts/decision_tables.yaml`
+  - `runtime/contracts/failure_recovery_table.schema.json`
+  - `runtime/contracts/failure_recovery_table.yaml`
+  - `runtime/contracts/signal_priority_table.schema.json`
+
+**Tests** — 689 tests, 49 subtests:
+  - `tests/test_runtime_engine.py` (+337 routing convergence + archive assertions)
+  - `tests/test_runtime_plan_registry.py` (+70 knowledge_sync receipt tests)
+  - `tests/test_context_v1_scope.py`
+  - `tests/test_runtime_decision.py`
+  - `tests/test_runtime_decision_tables.py`
+  - `tests/test_runtime_failure_recovery.py`
+  - `tests/test_runtime_gate.py`
+  - `tests/test_runtime_plan_reuse.py`
+  - `tests/test_runtime_router.py`
+  - `tests/test_runtime_state.py`
+  - `tests/test_bundle_smoke.py`
+  - `tests/fixtures/context_fail_close_contract.yaml`
+  - `tests/pytest_entries/fail_close_contract_entry.py`
+
+**Blueprint** — Milestone compression + Px:
+  - `.sopify-skills/blueprint/tasks.md`
+  - `.sopify-skills/blueprint/design.md`
+  - `.sopify-skills/blueprint/protocol.md`
+  - `.sopify-skills/blueprint/README.md`
+  - `.sopify-skills/history/index.md`
+  - `.sopify-skills/history/2026-05/20260507_p3a_contract_aligned_surface_cleanup/`
+
+**Docs & Skills**:
+  - `README.md`, `README.zh-CN.md`
+  - `Claude/Skills/CN/CLAUDE.md`, `Claude/Skills/EN/CLAUDE.md`
+  - `Codex/Skills/CN/AGENTS.md`, `Codex/Skills/EN/AGENTS.md`
+  - `scripts/check-prompt-runtime-gate-smoke.py`
+
+</details>
+
 ## [2026-05-07.143021] - 2026-05-07
 
 ### Summary
