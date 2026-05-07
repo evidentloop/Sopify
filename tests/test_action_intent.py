@@ -497,6 +497,18 @@ class GateActionProposalTests(unittest.TestCase):
             set(SIDE_EFFECT_DELTA_CHANGE_TYPES),
         )
 
+    def test_action_proposal_schema_p2_canonical_pairing(self) -> None:
+        """P2: schema side_effect includes canonical_for mapping."""
+        from runtime.gate import _build_action_proposal_schema
+        from runtime.action_intent import ACTION_TYPES, _CANONICAL_ACTION_EFFECT
+        schema = _build_action_proposal_schema()
+        se_schema = schema["side_effect"]
+        self.assertIn("canonical_for", se_schema)
+        canonical = se_schema["canonical_for"]
+        for at in ACTION_TYPES:
+            self.assertIn(at, canonical, f"{at} missing from schema canonical_for")
+            self.assertEqual(canonical[at], _CANONICAL_ACTION_EFFECT[at])
+
     def test_retry_contract_gate_passed_false(self) -> None:
         from runtime.gate import _build_action_proposal_retry_contract
         import tempfile
@@ -1948,29 +1960,68 @@ class ActionEffectPairingTests(unittest.TestCase):
         self.assertEqual(result.reason_code, "validator.action_effect_pairing_mismatch")
 
     def test_modify_files_with_none_rejected(self) -> None:
-        """modify_files + none → pairing mismatch (before subject check matters)."""
-        from runtime.action_intent import ActionProposal, DECISION_REJECT
+        """modify_files + none → pairing mismatch (bypasses subject gate with valid subject)."""
+        import hashlib
+        import tempfile
+        from pathlib import Path as P
 
-        proposal = ActionProposal("modify_files", "none", "high")
-        result = self.validator.validate(proposal, self._empty_ctx())
-        # Subject check fires first for bound-subject actions, but modify_files
-        # without subject → bound_subject_missing. Test the pairing separately
-        # by constructing with plan_subject to bypass subject gate.
-        # Actually, subject check runs first. So modify_files+none without
-        # subject hits subject_missing. That's fine — both gates reject.
-        self.assertEqual(result.decision, DECISION_REJECT)
+        from runtime.action_intent import (
+            ActionProposal,
+            DECISION_REJECT,
+            PlanSubjectProposal,
+            ValidationContext,
+        )
+
+        with tempfile.TemporaryDirectory() as td:
+            plan_dir = P(td) / ".sopify-skills" / "plan" / "test_plan"
+            plan_dir.mkdir(parents=True)
+            plan_file = plan_dir / "plan.md"
+            plan_file.write_text("# test")
+            digest = hashlib.sha256(plan_file.read_bytes()).hexdigest()
+            ctx = ValidationContext(workspace_root=td)
+            proposal = ActionProposal(
+                "modify_files", "none", "high",
+                evidence=("modify",),
+                plan_subject=PlanSubjectProposal(
+                    subject_ref=".sopify-skills/plan/test_plan",
+                    revision_digest=digest,
+                ),
+            )
+            result = self.validator.validate(proposal, ctx)
+            self.assertEqual(result.decision, DECISION_REJECT)
+            self.assertEqual(result.reason_code, "validator.action_effect_pairing_mismatch")
 
     def test_checkpoint_response_with_execute_command_rejected(self) -> None:
-        """checkpoint_response + execute_command is semantically invalid."""
-        from runtime.action_intent import ActionProposal, DECISION_REJECT
+        """checkpoint_response + execute_command → pairing mismatch."""
+        import hashlib
+        import tempfile
+        from pathlib import Path as P
 
-        proposal = ActionProposal(
-            "checkpoint_response", "execute_command", "high",
-            evidence=("checkpoint response",),
+        from runtime.action_intent import (
+            ActionProposal,
+            DECISION_REJECT,
+            PlanSubjectProposal,
+            ValidationContext,
         )
-        result = self.validator.validate(proposal, self._empty_ctx())
-        # Subject gate fires first (bound_subject_missing), which is also REJECT.
-        self.assertEqual(result.decision, DECISION_REJECT)
+
+        with tempfile.TemporaryDirectory() as td:
+            plan_dir = P(td) / ".sopify-skills" / "plan" / "test_plan"
+            plan_dir.mkdir(parents=True)
+            plan_file = plan_dir / "plan.md"
+            plan_file.write_text("# test")
+            digest = hashlib.sha256(plan_file.read_bytes()).hexdigest()
+            ctx = ValidationContext(workspace_root=td)
+            proposal = ActionProposal(
+                "checkpoint_response", "execute_command", "high",
+                evidence=("checkpoint response",),
+                plan_subject=PlanSubjectProposal(
+                    subject_ref=".sopify-skills/plan/test_plan",
+                    revision_digest=digest,
+                ),
+            )
+            result = self.validator.validate(proposal, ctx)
+            self.assertEqual(result.decision, DECISION_REJECT)
+            self.assertEqual(result.reason_code, "validator.action_effect_pairing_mismatch")
 
     def test_cancel_flow_with_write_files_rejected(self) -> None:
         """cancel_flow + write_files → pairing mismatch."""
@@ -1995,12 +2046,35 @@ class ActionEffectPairingTests(unittest.TestCase):
 
     def test_execute_existing_plan_with_none_rejected(self) -> None:
         """execute_existing_plan + none → pairing mismatch."""
-        from runtime.action_intent import ActionProposal, DECISION_REJECT
+        import hashlib
+        import tempfile
+        from pathlib import Path as P
 
-        proposal = ActionProposal("execute_existing_plan", "none", "high")
-        result = self.validator.validate(proposal, self._empty_ctx())
-        # Subject gate fires first for bound-subject actions.
-        self.assertEqual(result.decision, DECISION_REJECT)
+        from runtime.action_intent import (
+            ActionProposal,
+            DECISION_REJECT,
+            PlanSubjectProposal,
+            ValidationContext,
+        )
+
+        with tempfile.TemporaryDirectory() as td:
+            plan_dir = P(td) / ".sopify-skills" / "plan" / "test_plan"
+            plan_dir.mkdir(parents=True)
+            plan_file = plan_dir / "plan.md"
+            plan_file.write_text("# test")
+            digest = hashlib.sha256(plan_file.read_bytes()).hexdigest()
+            ctx = ValidationContext(workspace_root=td)
+            proposal = ActionProposal(
+                "execute_existing_plan", "none", "high",
+                evidence=("execute",),
+                plan_subject=PlanSubjectProposal(
+                    subject_ref=".sopify-skills/plan/test_plan",
+                    revision_digest=digest,
+                ),
+            )
+            result = self.validator.validate(proposal, ctx)
+            self.assertEqual(result.decision, DECISION_REJECT)
+            self.assertEqual(result.reason_code, "validator.action_effect_pairing_mismatch")
 
     def test_canonical_pairing_table_covers_all_action_types(self) -> None:
         """Every ACTION_TYPE must appear in _CANONICAL_ACTION_EFFECT."""

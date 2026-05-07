@@ -71,6 +71,7 @@
 
 - 执行 `design.md` sunset 表中标注为 P3a 的 legacy surface 最终清理与复核
 - 清理旧 route/alias 到 canonical route family 的迁移残留
+- **Execution routing 收敛**：P2 已闭合 admission contract（subject + delta + pairing），但授权后仍经 old Router；P3a 收敛为 validator-authorized → deterministic execution，不再经 Router 做意图分类
 - 清理 failure recovery / deterministic guard / decision tables 中基于旧 contract 的分支
 - 清理 state 文件中超出 canonical budget 的遗留面
 - 不新增 checkpoint type、不扩 ActionProposal schema、不重做 gate 架构
