@@ -117,6 +117,7 @@ P4a keep-list 确认后执行。先删后并，不先设计新结构。
 - [ ] 产品层 ↔ 实现层 contract matrix 正式化（ownership / admission / lifecycle responsibilities）
 - [ ] Protocol Compliance Phase 2：在 Phase 1 文件断言之上，参考 Superpowers headless behavioral test 做端到端行为验证；扩展 Convention smoke 到完整最小生命周期（含 knowledge_sync / blueprint writeback）。外部启发：Superpowers headless Claude 测试，准入 T1 Adoption。_触发条件：P4c 验收通过后评估是否提升为里程碑_
 - [ ] 第三方宿主自助接入 Convention 证明：不指定下一个官方深适配目标，先把 Convention quickstart + compliance check 做出来，再由外部宿主自行验证接入。_触发条件：P4c 验收通过后评估是否提升为里程碑_
+- [ ] 第三方 CLI 宿主能力边界治理（P4a→P4c bridge）：在 P4a freeze 边界基础上，明确 host capability ladder（convention_only / payload_capable / deep_verified）、接入判定清单（官方入口 / payload 落点 / repo-local 优先级 / skills 目录支持）、prompt 镜像治理原则（不再手工增生新目录树）、官方支持准入门槛（什么宿主才值得进 installer/hosts/* + --target + README 安装矩阵，防止"能消费 AGENTS.md"被误判为"应成为官方 target"）。P4c 消费该结论，为 convention_only 第三方宿主保留合法位置。不预先指定下一个官方深适配目标。_触发条件：P4a freeze 完成后启动设计；P4c 消费结论_
 - [ ] First-Use Adoption Proof：验证非作者用户/宿主能安装、触发、理解、走通 Sopify 首次使用链路。覆盖 install/bootstrap 文案压缩、status/doctor 用户语言化验收、scripts 用户面与维护面分离、至少一个非作者首次采用 walkthrough。前提：P4c 已确保默认路径不暴露内部 taxonomy。边界：只做首次采用证明与用户面收口，不重开 protocol/runtime 产品定位，不回头扩 machine contract，不把维护者脚本整理泛化成大规模重构。语义方向待收窄（External Adoption Proof 或 User-Facing Onboarding Convergence），编号待定。_触发条件：P4c 验收通过后评估是否提升为里程碑_
 
 ## 明确延后项
