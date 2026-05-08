@@ -1,0 +1,75 @@
+version: 1
+mode: "observe_only"
+selection_policy: "explicit_only"
+priority_policy: "heuristic_v1"
+priority_fallback: "p2"
+plans:
+  - plan_id: "20260418_cross_review_engine"
+    snapshot:
+      path: ".sopify-skills/plan/20260418_cross_review_engine"
+      title: "Cross-Review 独立内核方案"
+      level: "standard"
+      topic_key: "cross_review_engine"
+      lifecycle_state: "deferred"
+      created_at: "2026-05-04T14:45:24+00:00"
+    governance:
+      priority: null
+      priority_source: null
+      priority_confirmed_at: null
+      status: "deferred"
+      note: ""
+    advice:
+      suggested_priority: "p2"
+      suggested_source: "heuristic_v1"
+      suggested_reason:
+        - "未识别明确紧急或降级信号，先按默认建议观察"
+      suggested_at: "2026-05-05T11:12:58+00:00"
+    meta:
+      source: "runtime_backfill"
+      updated_at: "2026-05-05T11:12:58+00:00"
+  - plan_id: "20260508_p3b_perimeter_cleanup"
+    snapshot:
+      path: ".sopify-skills/plan/20260508_p3b_perimeter_cleanup"
+      title: "P3b: Perimeter Cleanup"
+      level: "light"
+      topic_key: "p3b_perimeter_cleanup"
+      lifecycle_state: "active"
+      created_at: "2026-05-08T00:00:00+00:00"
+    governance:
+      priority: "p3b"
+      priority_source: "roadmap"
+      priority_confirmed_at: "2026-05-08T00:00:00+00:00"
+      status: "draft"
+      note: "4 切片: S1(release gate) → S2(replay下线+旧概念清理) → S3(tests分类) → S4(CHANGELOG+README)"
+    advice:
+      suggested_priority: "p3b"
+      suggested_source: "roadmap"
+      suggested_reason:
+        - "tasks.md P3b milestone, serial dependency on P3a"
+      suggested_at: "2026-05-08T00:00:00+00:00"
+    meta:
+      source: "plan_intake"
+      updated_at: "2026-05-08T00:00:00+00:00"
+  - plan_id: "20260507_p3a_contract_aligned_surface_cleanup"
+    snapshot:
+      path: ".sopify-skills/plan/20260507_p3a_contract_aligned_surface_cleanup"
+      title: "P3a Contract-Aligned Surface Cleanup"
+      level: "standard"
+      topic_key: "contract_aligned_surface_cleanup"
+      lifecycle_state: "active"
+      created_at: "2026-05-07T00:00:00+00:00"
+    governance:
+      priority: "p3a"
+      priority_source: "roadmap"
+      priority_confirmed_at: "2026-05-07T00:00:00+00:00"
+      status: "draft"
+      note: "四阶段: A(legacy删除) → B(routing收敛) → C(减重) + D(audit trail独立)"
+    advice:
+      suggested_priority: "p3a"
+      suggested_source: "roadmap"
+      suggested_reason:
+        - "tasks.md P3a milestone, serial dependency on P2"
+      suggested_at: "2026-05-07T00:00:00+00:00"
+    meta:
+      source: "plan_intake"
+      updated_at: "2026-05-07T00:00:00+00:00"
