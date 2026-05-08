@@ -44,7 +44,7 @@ plan_status: completed
 ### 旧概念清理（P3a 已 sunset surface 残留）
 
 - [x] 2.12 tests 中验证 P3a 已 sunset surface 的断言——更新或删除
-- [ ] 2.13 prompt 中引用已 sunset contract 的段落——清除（prompt asset 本体含 replay 字面量，待 prompt asset 整体更新时处理）
+- [x] 2.13 prompt 中引用已 sunset contract 的段落——清除（Codex/Skills + Claude/Skills CN|EN：AGENTS/CLAUDE.md 路由表/策略块/技能行、footer replay 引用、replay/ 目录条目均已移除；skills/sopify/workflow-learning/ 目录（安装链路 shipped surface）全部删除）
 - [x] 2.14 handoff/output 旧兼容投影——清除
 - [x] 2.15 reason phrasing / phase label 特判——清除
 

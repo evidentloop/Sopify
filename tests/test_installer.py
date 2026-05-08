@@ -1299,7 +1299,7 @@ class HostPromptContractTests(unittest.TestCase):
             adapter=CODEX_ADAPTER,
             language_directory="CN",
             next_template_line="Next: {下一步提示}",
-            footer_contract_line="- footer 不展示生成时间；若需要机器可审计时间戳，内部摘要 / replay 文件可继续使用 ISO 8601（可带时区）。",
+            footer_contract_line="- footer 不展示生成时间；若需要机器可审计时间戳，内部摘要文件可继续使用 ISO 8601（可带时区）。",
             runtime_language="zh-CN",
         )
 
@@ -1353,7 +1353,7 @@ class HostPromptContractTests(unittest.TestCase):
             adapter=CLAUDE_ADAPTER,
             language_directory="EN",
             next_template_line="Next: {Next step hint}",
-            footer_contract_line="- the footer does not display generated time; if a machine-auditable timestamp is needed, internal summary / replay artifacts may keep ISO 8601 timestamps with timezone data.",
+            footer_contract_line="- the footer does not display generated time; if a machine-auditable timestamp is needed, internal summary files may keep ISO 8601 timestamps with timezone data.",
             runtime_language="en-US",
         )
 

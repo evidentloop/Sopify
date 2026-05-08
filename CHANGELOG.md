@@ -6,6 +6,21 @@ Format: Summary → Changed → Plan Packages. File-level details live in `git l
 
 ## [Unreleased]
 
+## [2026-05-08.191000] - 2026-05-08
+
+### Summary
+
+- Archived 1 plan package(s); Changes across: Skills, Tests.
+
+### Changed
+
+- **Skills**: Synced prompt-layer skills (12 files)
+- **Tests**: Updated automated coverage (1 files)
+
+### Plan Packages
+
+- `20260508_p3b_perimeter_cleanup` (archived)
+
 ## [2026-05-07.220011] - 2026-05-07
 
 ### Summary
