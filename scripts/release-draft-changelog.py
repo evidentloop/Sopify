@@ -3,8 +3,8 @@
 
 Output structure (per release entry):
   1. Summary   — 1-3 sentence user-visible impact
-  2. Plan pkgs — grouped by plan_id / feature_key / lifecycle_state
-  3. Details   — file list in <details> collapsible block
+  2. Changed   — category-level semantic bullets (no per-file lists)
+  3. Plan pkgs — grouped by plan_id / feature_key / lifecycle_state
 """
 
 from __future__ import annotations

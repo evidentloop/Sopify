@@ -81,10 +81,10 @@ archive_ready: false
 
 ### CHANGELOG 去文件列表化
 
-- [ ] 4.1 旧 102 条自动生成条目直接压成阶段摘要（不逐条迁移）
-- [ ] 4.2 新条目格式只保留 Summary + Changed，不列文件
-- [ ] 4.3 修 `scripts/release-draft-changelog.py` 只产摘要，不产文件清单
-- [ ] 4.4 同步更新 `CONTRIBUTING.md` changelog 说明
+- [x] 4.1 旧 102 条自动生成条目直接压成阶段摘要（不逐条迁移）
+- [x] 4.2 新条目格式只保留 Summary + Changed，不列文件
+- [x] 4.3 修 `scripts/release-draft-changelog.py` 只产摘要，不产文件清单
+- [x] 4.4 同步更新 `CONTRIBUTING.md` changelog 说明
 
 ### README 首屏降噪与默认入口翻转
 
