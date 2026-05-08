@@ -2,13 +2,14 @@
 plan_id: 20260508_p3b_perimeter_cleanup
 feature_key: p3b_perimeter_cleanup
 level: standard
-lifecycle_state: active
+lifecycle_state: archived
 knowledge_sync:
-  project: aligned
-  background: aligned
-  design: aligned
-  tasks: aligned
-archive_ready: false
+  project: skip
+  background: skip
+  design: skip
+  tasks: skip
+archive_ready: true
+plan_status: completed
 ---
 
 # 任务清单: P3b Perimeter Cleanup
