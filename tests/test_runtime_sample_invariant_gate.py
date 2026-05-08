@@ -1,3 +1,4 @@
+# Test classification: contract
 from __future__ import annotations
 
 from tests.runtime_test_support import *
@@ -89,10 +90,6 @@ class SampleInvariantAssetTests(unittest.TestCase):
             ],
         )
 
-        replay_required = {
-            "A-5_mixed_clause_after_comma",
-            "A-8_analysis_only_no_write_process_semantic",
-        }
         # A-5 was simplified during proposal removal — negative/boundary examples removed
         cases_with_full_examples = {
             "A-5_mixed_clause_after_comma",
@@ -103,8 +100,6 @@ class SampleInvariantAssetTests(unittest.TestCase):
                 self.assertTrue(case["negative_examples"], msg=case["case_id"])
                 self.assertTrue(case["boundary_examples"], msg=case["case_id"])
             self.assertTrue(case["forbidden_side_effects"], msg=case["case_id"])
-            if case["case_id"] in replay_required:
-                self.assertTrue(case.get("replay_examples"), msg=case["case_id"])
 
     def test_fixture_aligns_with_fail_close_matrix_and_effect_profiles(self) -> None:
         failure_cases = _failure_cases_by_id()

@@ -25,7 +25,7 @@ from .models import (
 
 CHECKPOINT_REQUEST_SCHEMA_VERSION = "1"
 CHECKPOINT_KINDS = ("clarification", "decision")
-CHECKPOINT_SOURCE_STAGES = ("analyze", "design", "develop", "replay", "consult", "custom")
+CHECKPOINT_SOURCE_STAGES = ("analyze", "design", "develop", "consult", "custom")
 CHECKPOINT_REASON_MISSING_BUT_TRADEOFF_DETECTED = "checkpoint_request_missing_but_tradeoff_detected"
 DEVELOP_RESUME_CONTEXT_REQUIRED_FIELDS = (
     "active_run_stage",

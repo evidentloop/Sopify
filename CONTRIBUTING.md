@@ -36,9 +36,7 @@ python3 /path/to/project/.sopify-runtime/scripts/sopify_runtime.py \
   --workspace-root /path/to/project "Refactor the database layer"
 
 # Optional: portable smoke checks in the target workspace
-python3 -m unittest discover \
-  -s /path/to/project/.sopify-runtime/tests \
-  -p 'test_runtime.py' -v
+python3 -m pytest /path/to/project/.sopify-runtime/tests/test_runtime.py -v
 bash /path/to/project/.sopify-runtime/scripts/check-runtime-smoke.sh
 ```
 
@@ -107,7 +105,7 @@ bash scripts/check-skills-sync.sh
 bash scripts/check-version-consistency.sh
 python3 scripts/generate-builtin-catalog.py
 python3 scripts/check-skill-eval-gate.py
-python3 -m unittest discover tests -v
+python3 -m pytest tests -v
 ```
 
 Repo-local runtime validation:
@@ -144,7 +142,7 @@ Behavior summary:
 
 - `pre-commit` runs `scripts/release-preflight.sh` and then `scripts/release-sync.sh`.
 - Release-managed files are re-staged into the same commit when checks pass.
-- When `CHANGELOG.md -> [Unreleased]` is empty, `release-sync` auto-drafts grouped notes from the current staged files.
+- When `CHANGELOG.md -> [Unreleased]` is empty, `release-sync` auto-drafts summary-level notes (category bullets, no per-file lists) from the current staged files.
 - `commit-msg` only appends `Release-Sync`, `Release-Version`, and `Release-Date` when the pre-commit handoff exists.
 - Plan A scoped commits must include `Context-Checkpoint: A|B|C|D`; the hook only enforces this when staged files touch Plan A runtime/test surfaces or the checkpoint governance assets themselves.
 - Scoped Plan A pull requests must keep `Context-Checkpoint`, `Decision IDs`, `Blocked by`, and `Out-of-scope touched` filled in `.github/pull_request_template.md`; CI validates the template plus PR body metadata on matching diffs.

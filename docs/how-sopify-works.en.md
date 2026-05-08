@@ -94,8 +94,7 @@ Checkpoint rules:
 │   └── sessions/<session_id>/...   # parallel review isolation
 ├── user/
 │   └── preferences.md
-├── project.md
-└── replay/                      # optional replay data (still ignored)
+└── project.md
 ```
 
 Layer notes:
@@ -103,7 +102,7 @@ Layer notes:
 - `blueprint/` stores durable knowledge and stable contracts
 - `plan/` stores active work packages, not long-lived blueprint state; the directory is tracked, but `_registry.yaml` remains locally ignored
 - `history/` stores closed-out plans and is tracked
-- `state/` and `replay/` remain local runtime data ignored by git
+- `state/` is the local runtime data layer ignored by git
 
 ## Appendix: Plan Lifecycle
 

@@ -94,8 +94,7 @@ Checkpoint 规则：
 │   └── sessions/<session_id>/...   # 并发 review 隔离
 ├── user/
 │   └── preferences.md
-├── project.md
-└── replay/                      # 可选回放（继续 ignored）
+└── project.md
 ```
 
 层级说明：
@@ -103,7 +102,7 @@ Checkpoint 规则：
 - `blueprint/` 承载长期知识与稳定契约
 - `plan/` 保存当前工作方案，不等同于长期蓝图；目录本身纳入版本管理，但 `_registry.yaml` 继续保持本地忽略
 - `history/` 只存已收口方案，并纳入版本管理
-- `state/` 与 `replay/` 仍是宿主与 runtime 的本地运行态数据层
+- `state/` 是宿主与 runtime 的本地运行态数据层
 
 ## 附录：Plan 生命周期
 

@@ -4,7 +4,6 @@ from .engine import run_runtime
 from .models import (
     PlanArtifact,
     RecoveredContext,
-    ReplayEvent,
     RouteDecision,
     RunState,
     RuntimeConfig,
@@ -19,7 +18,6 @@ __all__ = [
     "PlanArtifact",
     "PreferencesPreloadResult",
     "RecoveredContext",
-    "ReplayEvent",
     "RouteDecision",
     "RunState",
     "RuntimeConfig",

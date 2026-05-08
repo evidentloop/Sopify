@@ -64,6 +64,7 @@
 - 枚举 keep-list：protocol.md、gate contract（gate_receipt schema）、handoff/receipt machine truth fields、archive truth（ArchiveCheckResult / ArchiveApplyResult）、install.sh/install.ps1 contract（SOURCE_CHANNEL, SOURCE_REF）、builtin_catalog.py 导出接口（freeze 指接口契约形态——schema / entry_kind / metadata contract，不指具体 skill 枚举或文件字节；能力上下线属内容变更，不违反 freeze）、skill_eval baseline/SLO
 - **冻结 persistence surface 分类**：keep-list 覆盖到目录级别（参照 design.md "Persistence Surface 分层"表），明确哪些目录属于长期知识/主链真相/凭证/可删派生，作为 P4b 减重和 P4c 宿主消费治理的红线
 - 输出：design.md 加 "Frozen External Surface" 表（与 Persistence Surface 分层互补——后者分类所有持久化面，Frozen 表只冻结外部消费面的 keep-list；不重复造表）
+- **Output rendering fields 分类**：逐字段审计 `runtime/output.py` 渲染层，分三类——machine truth projection（handoff/receipt 投影）/ human hint（Next 等面向人的提示）/ internal taxonomy leak（gate_status 等不应默认暴露的内部术语）。审计结果写入 Frozen External Surface 表，作为 P4c output contract convergence 的输入
 - 不写代码，纯边界确认
 
 ### P4b: Runtime Surface Consolidation
@@ -91,6 +92,7 @@ P4a keep-list 确认后执行。先删后并，不先设计新结构。
 - **宿主消费边界**：宿主只允许消费"主链机器真相"层（current_run/current_plan/current_handoff/current_clarification/current_decision）和"可审计凭证"层（gate_receipt/archive_receipt）；不得消费 state/sessions/* 内部细节、last_route 等 runtime-only/derived 面（参照 design.md "Persistence Surface 分层"表）
 - **验收 (a) 文档递进顺序**：渐进式披露 Layer 0 Protocol ≤120 行 → Layer 1 Gate → Layer 2 Phase → Layer 3 Reference（不进 prompt）
 - **验收 (b) 运行时首接触感知**：新用户首次使用时，只感知到"中断可恢复"和"需要拍板时会停"两个语义；blueprint / checkpoint taxonomy / runtime state 等内部概念不在默认运行时路径中主动暴露。doctor/status 不主动呈现 checkpoint 分类体系，~go 入口不前置 blueprint 概念
+- **Output contract convergence**：基于 P4a 审计分类，收敛 `runtime/output.py` 渲染层——① 状态符语义：定义 canonical route family → 符号映射（当前 consult=`!` 无明确约束）；② Next 降级：明确为 human hint，不再混合 `required_host_action` + `route_name` 推导，宿主消费 handoff 不依赖 Next；③ Changes 重定义：`loaded_files`（恢复上下文）从 Changed（实际写入）中拆出，或重命名为 Touched/Files；④ Gate 行简化：默认输出不暴露 `gate_status`/`blocking_reason`/`plan_completion` 三元组，详细诊断留给 doctor/status
 - **Builtin skill capability disclosure**：宿主文案稳定表达 builtin skill 的当前能力边界与可消费方式；AGENTS.md 只做消费投影，builtin_catalog 为唯一 truth source。当前 analyze/design/develop 是 phase-bound workflow skill（entry_kind=null, triggers=[]），不宣称 standalone invocation。若后续要支持 builtin skill 显式单独调用，必须先 formalize 独立的 invocation metadata contract / invocation syntax；在该 contract 明确前，本项只做披露，不预设其进入 P2 或单列里程碑。边界：只覆盖 builtin skill，不扩展到外部 skill discovery/routing/distribution（background.md 明确排除）
 
 ## 未完成长期项

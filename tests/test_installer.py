@@ -1,3 +1,4 @@
+# Test classification: distribution
 from __future__ import annotations
 
 import importlib.util
@@ -892,7 +893,6 @@ class WorkspaceBootstrapIgnorePolicyTests(unittest.TestCase):
             self.assertIn("# BEGIN sopify-managed", exclude_content)
             self.assertIn(".sopify-runtime/", exclude_content)
             self.assertIn(".sopify-skills/state/", exclude_content)
-            self.assertIn(".sopify-skills/replay/", exclude_content)
             self.assertFalse((workspace_root / ".gitignore").exists())
 
     def test_installed_helper_keeps_commit_lock_sticky_until_explicit_go_init_switches_back(self) -> None:
@@ -1294,11 +1294,12 @@ class HostPromptContractTests(unittest.TestCase):
             self.assertIn("必须继续遵守对应 checkpoint 的机器契约", prompt)
 
     def test_codex_cn_installed_prompt_assets_keep_footer_contract(self) -> None:
+        # Footer contract aligned: replay reference removed from source and assertion.
         self._assert_installed_footer_contract(
             adapter=CODEX_ADAPTER,
             language_directory="CN",
             next_template_line="Next: {下一步提示}",
-            footer_contract_line="- footer 不展示生成时间；若需要机器可审计时间戳，内部摘要 / replay 文件可继续使用 ISO 8601（可带时区）。",
+            footer_contract_line="- footer 不展示生成时间；若需要机器可审计时间戳，内部摘要文件可继续使用 ISO 8601（可带时区）。",
             runtime_language="zh-CN",
         )
 
@@ -1347,11 +1348,12 @@ class HostPromptContractTests(unittest.TestCase):
             self.assertIn("must still honor the machine contract", prompt)
 
     def test_claude_en_installed_prompt_assets_keep_footer_contract(self) -> None:
+        # Footer contract aligned: replay reference removed from source and assertion.
         self._assert_installed_footer_contract(
             adapter=CLAUDE_ADAPTER,
             language_directory="EN",
             next_template_line="Next: {Next step hint}",
-            footer_contract_line="- the footer does not display generated time; if a machine-auditable timestamp is needed, internal summary / replay artifacts may keep ISO 8601 timestamps with timezone data.",
+            footer_contract_line="- the footer does not display generated time; if a machine-auditable timestamp is needed, internal summary files may keep ISO 8601 timestamps with timezone data.",
             runtime_language="en-US",
         )
 

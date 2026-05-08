@@ -161,7 +161,6 @@ def build_bundle_manifest(
             "preferences_preload": True,
             "runtime_gate": True,
             "runtime_entry_guard": True,
-            "replay_capture": True,
             "session_scoped_review_state": True,
             "soft_execution_ownership": True,
             "writes_clarification_file": True,
@@ -183,13 +182,11 @@ def build_bundle_manifest(
                 "exec_plan",
                 "decision_pending",
                 "decision_resume",
-                "replay",
                 "consult",
             ],
             "host_bridge_status": {
                 "develop": "required",
                 "develop_callback": "required",
-                "replay": "required",
             },
             "entry_guard": {
                 "strict_runtime_entry": True,

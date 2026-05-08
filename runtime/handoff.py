@@ -62,7 +62,6 @@ _ROUTE_HANDOFF_KIND = {
     "exec_plan": "develop",
     # consult family
     "consult": "consult",
-    "replay": "consult",
     # archive family
     "archive_lifecycle": "archive",
     # clarification family
@@ -95,7 +94,6 @@ def build_runtime_handoff(
     resolved_context: RecoveredContext,
     current_plan: PlanArtifact | None,
     kb_artifact: KbArtifact | None,
-    replay_session_dir: str | None,
     skill_result: Mapping[str, Any] | None,
     notes: Sequence[str],
 ) -> RuntimeHandoff | None:
@@ -125,7 +123,6 @@ def build_runtime_handoff(
         current_run=current_run,
         current_plan=resolved_plan,
         kb_artifact=kb_artifact,
-        replay_session_dir=replay_session_dir,
         skill_result=skill_result,
         current_clarification=resolved_context.current_clarification,
         current_decision=resolved_context.current_decision,
@@ -239,7 +236,7 @@ def _required_host_action(
         return "continue_host_develop"
     if route_name == "proposal_rejected":
         return "continue_host_consult"
-    if route_name == "consult" or route_name == "replay":
+    if route_name == "consult":
         return "continue_host_consult"
     return "continue_host_develop"
 
@@ -251,7 +248,6 @@ def _collect_handoff_artifacts(
     current_run: RunState | None,
     current_plan: PlanArtifact | None,
     kb_artifact: KbArtifact | None,
-    replay_session_dir: str | None,
     skill_result: Mapping[str, Any] | None,
     current_clarification: Any | None,
     current_decision: Any | None,
@@ -344,8 +340,6 @@ def _collect_handoff_artifacts(
             history_index = next((path for path in kb_artifact.files if path.endswith("history/index.md")), None)
             if history_index:
                 artifacts["history_index_path"] = history_index
-    if replay_session_dir:
-        artifacts["replay_session_dir"] = replay_session_dir
     if skill_result:
         artifacts["skill_result_keys"] = sorted(skill_result.keys())
         tradeoff_signal = has_tradeoff_checkpoint_signal(skill_result)

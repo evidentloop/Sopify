@@ -28,9 +28,6 @@ cases:
     forbidden_side_effects:
       - materialize_plan
       - submit_checkpoint
-    replay_examples:
-      - utterance: "你之前说：这次又被误路由成 proposal 了。说下原因，不要改。"
-        scenario: runtime_explain_only_consult
 
   - case_id: A-2_decision_selection_with_suffix_text
     frozen_role: backlog
@@ -64,9 +61,6 @@ cases:
     forbidden_side_effects:
       - materialize_new_plan_package
       - rewrite_reserved_plan_id
-    replay_examples:
-      - utterance: "取消这个 checkpoint，不要取消全部"
-        scenario: decision_pending_local_cancel
 
   - case_id: A-7_question_like_retopic_baseline
     frozen_role: baseline
@@ -105,6 +99,4 @@ cases:
       - checkpoint_submission
       - plan_materialization
       - execution
-    replay_examples:
-      - utterance: "分析下这个方案的评分、风险和还有什么需要我决策"
-        scenario: active_plan_meta_review_router
+

@@ -41,7 +41,7 @@ from .archive_lifecycle import (
 )
 from .handoff import build_runtime_handoff
 from .kb import bootstrap_kb, ensure_blueprint_index, ensure_blueprint_scaffold
-from .models import ClarificationState, DecisionState, ExecutionGate, KbArtifact, PlanArtifact, RecoveredContext, ReplayEvent, RouteDecision, RunState, RuntimeConfig, RuntimeHandoff, RuntimeResult, SkillActivation, SkillMeta
+from .models import ClarificationState, DecisionState, ExecutionGate, KbArtifact, PlanArtifact, RecoveredContext, RouteDecision, RunState, RuntimeConfig, RuntimeHandoff, RuntimeResult, SkillActivation, SkillMeta
 from .plan_registry import (
     PlanRegistryError,
     encode_priority_note_event,
@@ -55,8 +55,7 @@ from .plan_scaffold import (
     reserve_plan_identity,
     request_explicitly_wants_new_plan,
 )
-from .replay import ReplayWriter, build_decision_replay_event
-from .router import Router, estimate_complexity, decide_capture_mode
+from .router import Router, estimate_complexity
 from .skill_resolver import resolve_route_candidate_skills
 from .action_intent import (
     ActionProposal,
@@ -96,7 +95,7 @@ _ABORTABLE_DECISION_STATUSES = frozenset({"pending", "collecting", "cancelled", 
 _CANONICAL_ROUTE_FAMILIES: dict[str, str] = {
     "plan_only": "plan", "workflow": "plan", "light_iterate": "plan",
     "quick_fix": "develop", "resume_active": "develop", "exec_plan": "develop",
-    "consult": "consult", "replay": "consult",
+    "consult": "consult",
     "archive_lifecycle": "archive",
     "clarification_pending": "clarification", "clarification_resume": "clarification",
     "decision_pending": "decision", "decision_resume": "decision",
@@ -195,25 +194,6 @@ def _derive_route_from_authorized_proposal(
                 complexity="simple",
             )
 
-    # Apply capture_mode normalization — shared with Router.classify _with_capture.
-    capture = decide_capture_mode(config.workflow_learning_auto_capture, route.complexity)
-    if capture != route.capture_mode:
-        route = RouteDecision(
-            route_name=route.route_name,
-            request_text=route.request_text,
-            reason=route.reason,
-            command=route.command,
-            complexity=route.complexity,
-            plan_level=route.plan_level,
-            candidate_skill_ids=route.candidate_skill_ids,
-            should_recover_context=route.should_recover_context,
-            plan_package_policy=route.plan_package_policy,
-            should_create_plan=route.should_create_plan,
-            capture_mode=capture,
-            runtime_skill_id=route.runtime_skill_id,
-            active_run_action=route.active_run_action,
-            artifacts=route.artifacts,
-        )
     return route
 
 
@@ -946,13 +926,10 @@ def run_runtime(
     notes: list[str] = list(snapshot.notes)
     plan_artifact: PlanArtifact | None = None
     skill_result: Mapping[str, Any] | None = None
-    replay_session_dir: str | None = None
     handoff: RuntimeHandoff | None = None
     activation: SkillActivation | None = None
     generated_files: tuple[str, ...] = ()
-    replay_events: list[ReplayEvent] = []
     effective_route = classified_route
-    confirmed_decision_for_replay: DecisionState | None = None
     registry_changed_hint = False
 
     current_clarification = recovered.current_clarification
@@ -1060,7 +1037,7 @@ def run_runtime(
         )
         notes.extend(clarification_notes)
     elif effective_route.route_name == "decision_resume":
-        effective_route, plan_artifact, decision_notes, kb_artifact, confirmed_decision_for_replay = _handle_decision_resume(
+        effective_route, plan_artifact, decision_notes, kb_artifact, _ = _handle_decision_resume(
             effective_route,
             state_store=review_store,
             current_decision=recovered.current_decision,
@@ -1240,7 +1217,7 @@ def run_runtime(
         review_store.set_last_route(effective_route)
 
     # Resolve once after all route-side mutations, then let store selection,
-    # handoff, replay, and output consume the same fresh post-route truth.
+    # handoff, and output consume the same fresh post-route truth.
     result_snapshot = resolve_context_snapshot(
         config=config,
         review_store=review_store,
@@ -1283,51 +1260,6 @@ def run_runtime(
         current_decision=resolved_result_context.current_decision,
     )
 
-    if effective_route.capture_mode != "off":
-        writer = ReplayWriter(config)
-        run_state = resolved_result_context.current_run
-        run_id = run_state.run_id if run_state is not None else _make_run_id(effective_route.request_text)
-        replay_event = ReplayEvent(
-            ts=iso_now(),
-            phase=_phase_for_route(effective_route),
-            intent=effective_route.request_text or effective_route.route_name,
-            action=f"route:{effective_route.route_name}",
-            key_output=(plan_artifact.summary if plan_artifact is not None else effective_route.reason),
-            decision_reason=effective_route.reason,
-            result="success",
-            artifacts=tuple(plan_artifact.files if plan_artifact is not None else ()),
-            metadata={"activation": activation.to_dict()} if activation is not None else {},
-        )
-        replay_events.append(replay_event)
-        current_decision = resolved_result_context.current_decision
-        if current_decision is not None and effective_route.route_name == "decision_pending":
-            replay_events.append(
-                build_decision_replay_event(
-                    current_decision,
-                    language=config.language,
-                    action="checkpoint_created",
-                )
-            )
-        if confirmed_decision_for_replay is not None:
-            replay_events.append(
-                build_decision_replay_event(
-                    confirmed_decision_for_replay,
-                    language=config.language,
-                    action="confirmed",
-                )
-            )
-        session_dir = writer.append_event(run_id, replay_event)
-        for extra_event in replay_events[1:]:
-            writer.append_event(run_id, extra_event)
-        writer.render_documents(
-            run_id,
-            run_state=resolved_result_context.current_run,
-            route=effective_route,
-            plan_artifact=plan_artifact or resolved_result_context.current_plan,
-            events=replay_events,
-        )
-        replay_session_dir = str(session_dir.relative_to(config.workspace_root))
-
     if effective_route.route_name == "cancel_active":
         handoff = None
     else:
@@ -1364,7 +1296,6 @@ def run_runtime(
             resolved_context=handoff_context,
             current_plan=current_plan,
             kb_artifact=kb_artifact,
-            replay_session_dir=replay_session_dir,
             skill_result=skill_result,
             notes=notes,
         )
@@ -1456,7 +1387,6 @@ def run_runtime(
         kb_artifact=kb_artifact,
         plan_artifact=plan_artifact,
         skill_result=skill_result,
-        replay_session_dir=replay_session_dir,
         handoff=handoff,
         activation=activation,
         generated_files=generated_files,
@@ -1701,8 +1631,6 @@ def _activation_target(
     current_clarification: ClarificationState | None,
     current_decision: DecisionState | None,
 ) -> tuple[str, str]:
-    if decision.runtime_skill_id == "workflow-learning" or decision.route_name == "replay":
-        return ("workflow-learning", "复盘学习")
     if decision.route_name in {"resume_active", "exec_plan", "quick_fix", "archive_lifecycle"}:
         return ("develop", "开发实施")
     if decision.route_name in {"clarification_pending", "clarification_resume"}:

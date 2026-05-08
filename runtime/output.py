@@ -25,7 +25,6 @@ _PHASE_LABELS = {
         "archive_lifecycle": "命令完成",
         "decision_pending": "方案设计",
         "decision_resume": "方案设计",
-        "replay": "咨询问答",
         "consult": "咨询问答",
         "proposal_rejected": "操作被拒绝",
         "state_conflict": "状态冲突",
@@ -44,7 +43,6 @@ _PHASE_LABELS = {
         "archive_lifecycle": "Command Complete",
         "decision_pending": "Solution Design",
         "decision_resume": "Solution Design",
-        "replay": "Q&A",
         "consult": "Q&A",
         "proposal_rejected": "Action Rejected",
         "state_conflict": "State Conflict",
@@ -56,7 +54,6 @@ _LABELS = {
     "zh-CN": {
         "plan": "方案",
         "summary": "概要",
-        "replay": "回放",
         "route": "路由",
         "reason": "原因",
         "status": "状态",
@@ -121,7 +118,6 @@ _LABELS = {
     "en-US": {
         "plan": "Plan",
         "summary": "Summary",
-        "replay": "Replay",
         "route": "Route",
         "reason": "Reason",
         "status": "Status",
@@ -255,7 +251,6 @@ def _core_lines(result: RuntimeResult, language: str) -> list[str]:
     route_name = result.route.route_name
 
     if route_name == "plan_only" and result.plan_artifact is not None:
-        replay_value = result.replay_session_dir or labels["missing"]
         current_run = result.recovered_context.current_run
         lines = [
             f"{labels['plan']}: {result.plan_artifact.path}",
@@ -269,7 +264,6 @@ def _core_lines(result: RuntimeResult, language: str) -> list[str]:
                 f"{labels['stage']}: {current_run.stage if current_run is not None else labels['missing']}",
                 _execution_gate_line(result, language),
                 f"{labels['handoff']}: {_handoff_label(result, language)}",
-                f"{labels['replay']}: {replay_value}",
             ]
         )
         return lines
@@ -365,7 +359,6 @@ def _core_lines(result: RuntimeResult, language: str) -> list[str]:
         return [
             f"{labels['status']}: {labels['cleared']}",
             f"{labels['route']}: {route_name}",
-            f"{labels['replay']}: {result.replay_session_dir or labels['missing']}",
         ]
 
     return [
@@ -443,7 +436,7 @@ def _status_symbol(result: RuntimeResult) -> str:
         return "✓"
     if route_name == "proposal_rejected":
         return "!"
-    if route_name in {"workflow", "light_iterate", "quick_fix", "consult", "replay", "resume_active", "exec_plan"}:
+    if route_name in {"workflow", "light_iterate", "quick_fix", "consult", "resume_active", "exec_plan"}:
         return "!"
     if result.notes:
         return "!"
@@ -479,7 +472,7 @@ def _status_message(result: RuntimeResult, language: str) -> str:
         return labels["clarification_handoff"]
     if route_name == "quick_fix":
         return labels["quick_fix_handoff"]
-    if route_name in {"consult", "replay"}:
+    if route_name == "consult":
         return labels["consult_handoff"]
     if route_name == "decision_pending":
         return labels["decision_pending_handoff"]

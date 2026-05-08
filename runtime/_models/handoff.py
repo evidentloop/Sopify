@@ -1,4 +1,4 @@
-"""Recovered-context, handoff, replay, and result contracts."""
+"""Recovered-context, handoff, and result contracts."""
 
 from __future__ import annotations
 
@@ -100,7 +100,7 @@ class RuntimeHandoff:
 
 @dataclass(frozen=True)
 class SkillActivation:
-    """Structured activation fact shared by output, replay, and daily summary."""
+    """Structured activation fact shared by output and daily summary."""
 
     skill_id: str
     skill_name: str
@@ -141,57 +141,6 @@ class SkillActivation:
 
 
 @dataclass(frozen=True)
-class ReplayEvent:
-    """Append-only replay event payload."""
-
-    ts: str
-    phase: str
-    intent: str
-    action: str
-    key_output: str
-    decision_reason: str
-    result: str
-    risk: str = ""
-    alternatives: tuple[str, ...] = ()
-    highlights: tuple[str, ...] = ()
-    artifacts: tuple[str, ...] = ()
-    metadata: Mapping[str, Any] = field(default_factory=dict)
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "ts": self.ts,
-            "phase": self.phase,
-            "intent": self.intent,
-            "action": self.action,
-            "key_output": self.key_output,
-            "decision_reason": self.decision_reason,
-            "result": self.result,
-            "risk": self.risk,
-            "alternatives": list(self.alternatives),
-            "highlights": list(self.highlights),
-            "artifacts": list(self.artifacts),
-            "metadata": _json_mapping(self.metadata),
-        }
-
-    @classmethod
-    def from_dict(cls, data: Mapping[str, Any]) -> "ReplayEvent":
-        return cls(
-            ts=str(data.get("ts") or ""),
-            phase=str(data.get("phase") or ""),
-            intent=str(data.get("intent") or ""),
-            action=str(data.get("action") or ""),
-            key_output=str(data.get("key_output") or ""),
-            decision_reason=str(data.get("decision_reason") or ""),
-            result=str(data.get("result") or ""),
-            risk=str(data.get("risk") or ""),
-            alternatives=tuple(str(item) for item in (data.get("alternatives") or ()) if str(item).strip()),
-            highlights=tuple(str(item) for item in (data.get("highlights") or ()) if str(item).strip()),
-            artifacts=tuple(str(item) for item in (data.get("artifacts") or ()) if str(item).strip()),
-            metadata=_json_mapping(data.get("metadata")),
-        )
-
-
-@dataclass(frozen=True)
 class RuntimeResult:
     """Top-level runtime result returned by the engine."""
 
@@ -201,7 +150,6 @@ class RuntimeResult:
     kb_artifact: Optional[KbArtifact] = None
     plan_artifact: Optional[PlanArtifact] = None
     skill_result: Optional[Mapping[str, Any]] = None
-    replay_session_dir: Optional[str] = None
     handoff: Optional[RuntimeHandoff] = None
     activation: Optional[SkillActivation] = None
     generated_files: tuple[str, ...] = ()
@@ -215,7 +163,6 @@ class RuntimeResult:
             "kb_artifact": self.kb_artifact.to_dict() if self.kb_artifact else None,
             "plan_artifact": self.plan_artifact.to_dict() if self.plan_artifact else None,
             "skill_result": _json_mapping(self.skill_result),
-            "replay_session_dir": self.replay_session_dir,
             "handoff": self.handoff.to_dict() if self.handoff else None,
             "activation": self.activation.to_dict() if self.activation else None,
             "generated_files": list(self.generated_files),

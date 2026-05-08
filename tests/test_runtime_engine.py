@@ -1,3 +1,4 @@
+# Test classification: contract
 from __future__ import annotations
 
 from dataclasses import replace
@@ -955,7 +956,7 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertEqual(current_run.resolution_id, current_handoff.resolution_id)
             self.assertEqual(current_handoff.artifacts["resume_context"]["working_summary"], "develop callback 已接入，需要确认认证边界。")
 
-    def test_develop_quality_report_updates_handoff_and_replay(self) -> None:
+    def test_develop_quality_report_updates_handoff(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
             _enter_active_develop_context(workspace)
@@ -967,7 +968,7 @@ class EngineIntegrationTests(unittest.TestCase):
                     "task_refs": ["2.1"],
                     "changed_files": ["runtime/engine.py", "runtime/handoff.py"],
                     "working_summary": "已把 develop 质量 contract 接到继续开发 handoff。",
-                    "verification_todo": ["补 develop replay 断言"],
+                    "verification_todo": ["补 develop handoff 断言"],
                     "quality_result": {
                         "schema_version": "1",
                         "verification_source": "project_native",
@@ -994,10 +995,6 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertEqual(handoff.artifacts["retry_count"], 0)
             self.assertEqual(handoff.artifacts["review_result"]["spec_compliance"]["status"], "passed")
             self.assertIn("develop_quality_contract", handoff.artifacts)
-            session_text = (workspace / submission.replay_session_dir / "session.md").read_text(encoding="utf-8")
-            breakdown_text = (workspace / submission.replay_session_dir / "breakdown.md").read_text(encoding="utf-8")
-            self.assertIn("质量结果=passed", session_text)
-            self.assertIn("任务: 2.1", breakdown_text)
 
     def test_develop_quality_report_requires_checkpoint_for_scope_mismatch(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1457,7 +1454,6 @@ class EngineIntegrationTests(unittest.TestCase):
             first = run_runtime("~go plan 补 runtime 骨架", workspace_root=workspace, user_home=workspace / "home")
             self.assertEqual(first.route.route_name, "plan_only")
             self.assertIsNotNone(first.plan_artifact)
-            self.assertIsNotNone(first.replay_session_dir)
             self.assertTrue((workspace / ".sopify-skills" / "project.md").exists())
             self.assertTrue((workspace / ".sopify-skills" / "blueprint" / "README.md").exists())
             self.assertTrue((workspace / ".sopify-skills" / "blueprint" / "background.md").exists())
@@ -1623,7 +1619,6 @@ class EngineIntegrationTests(unittest.TestCase):
                 resolved_context=RecoveredContext(),
                 current_plan=archived_plan,
                 kb_artifact=None,
-                replay_session_dir=None,
                 skill_result=None,
                 notes=(),
             )
@@ -2179,15 +2174,6 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertEqual(resumed.handoff.required_host_action, "continue_host_develop")
             self.assertFalse((workspace / ".sopify-skills" / "state" / "current_decision.json").exists())
 
-    def test_engine_handoff_contracts_cover_replay(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            workspace = Path(temp_dir)
-
-            replay = run_runtime("回放最近一次实现", workspace_root=workspace, user_home=workspace / "home")
-            self.assertIsNotNone(replay.handoff)
-            self.assertEqual(replay.handoff.handoff_kind, "consult")
-            self.assertEqual(replay.handoff.required_host_action, "continue_host_consult")
-
     def test_rendered_plan_output_and_repo_local_helper(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
@@ -2210,12 +2196,6 @@ class EngineIntegrationTests(unittest.TestCase):
                 next_prefix="Next:",
             )
 
-            events_path = workspace / result.replay_session_dir / "events.jsonl"
-            event_payload = json.loads(events_path.read_text(encoding="utf-8").splitlines()[0])
-            self.assertEqual(event_payload["metadata"]["activation"]["skill_id"], "design")
-            self.assertEqual(event_payload["metadata"]["activation"]["route_name"], "plan_only")
-            self.assertIn("display_time", event_payload["metadata"]["activation"])
-
             script_path = REPO_ROOT / "scripts" / "go_plan_runtime.py"
             completed = subprocess.run(
                 [sys.executable, str(script_path), "--workspace-root", str(workspace), "--no-color", "补 runtime 骨架"],
@@ -2226,7 +2206,6 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertEqual(completed.returncode, 0, msg=completed.stderr)
             self.assertIn("[tmp", completed.stdout)
             self.assertTrue((workspace / ".sopify-skills" / "state" / "current_plan.json").exists())
-            self.assertTrue((workspace / ".sopify-skills" / "replay" / "sessions").exists())
             self.assertTrue((workspace / ".sopify-skills" / "project.md").exists())
             self.assertIn(".sopify-skills/project.md", rendered)
 
@@ -2621,7 +2600,8 @@ class EngineIntegrationTests(unittest.TestCase):
                 ["normal_runtime_followup", "checkpoint_only", "error_visible_retry", "action_proposal_retry"],
             )
             self.assertEqual(manifest["limits"]["runtime_payload_required_skill_ids"], [])
-            self.assertEqual(len(manifest["builtin_skills"]), 6)
+            self.assertEqual(len(manifest["builtin_skills"]), 5)
+            self.assertNotIn("workflow-learning", {skill["skill_id"] for skill in manifest["builtin_skills"]})
             self.assertNotIn("model-compare", {skill["skill_id"] for skill in manifest["builtin_skills"]})
 
             runtime_script = bundle_root / "scripts" / "sopify_runtime.py"
@@ -2684,7 +2664,6 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertTrue((workspace / gate_payload["state"]["current_handoff_path"]).exists())
             self.assertTrue((workspace / ".sopify-skills" / "state" / "current_gate_receipt.json").exists())
             self.assertTrue((workspace / gate_payload["state"]["current_plan_path"]).exists())
-            self.assertTrue((workspace / ".sopify-skills" / "replay" / "sessions").exists())
             self.assertTrue((workspace / ".sopify-skills" / "project.md").exists())
             self.assertTrue((workspace / ".sopify-skills" / "blueprint" / "README.md").exists())
             self.assertFalse((workspace / ".sopify-skills" / "history" / "index.md").exists())
@@ -2842,45 +2821,6 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertEqual(inspect_payload["status"], "ready")
             self.assertEqual(inspect_payload["required_host_action"], "continue_host_develop")
             self.assertEqual(inspect_payload["quality_contract"]["max_retry_count"], 1)
-
-            quality_submitted = subprocess.run(
-                [
-                    sys.executable,
-                    str(helper_script),
-                    "--workspace-root",
-                    str(workspace),
-                    "submit-quality",
-                    "--payload-json",
-                    json.dumps(
-                        {
-                            "schema_version": "1",
-                            "task_refs": ["5.1"],
-                            "changed_files": ["runtime/develop_callback.py"],
-                            "working_summary": "已记录 develop 质量结果。",
-                            "verification_todo": ["补 bundle helper 测试"],
-                            "quality_result": {
-                                "schema_version": "1",
-                                "verification_source": "project_native",
-                                "command": "python -m unittest tests.test_runtime_engine -v",
-                                "scope": "runtime/develop_callback.py",
-                                "result": "passed",
-                                "retry_count": 0,
-                                "review_result": {
-                                    "spec_compliance": {"status": "passed", "summary": "满足当前任务范围"},
-                                    "code_quality": {"status": "passed", "summary": "修改面合理"},
-                                },
-                            },
-                        }
-                    ),
-                ],
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            self.assertEqual(quality_submitted.returncode, 0, msg=quality_submitted.stderr)
-            quality_payload = json.loads(quality_submitted.stdout)
-            self.assertEqual(quality_payload["result"], "passed")
-            self.assertEqual(quality_payload["required_host_action"], "continue_host_develop")
 
             submitted = subprocess.run(
                 [
@@ -3397,7 +3337,7 @@ class StaleReceiptCrossRunIntegrationTests(unittest.TestCase):
 
 
 class RoutingConvergenceTests(unittest.TestCase):
-    """Phase B — action_type→route_name convergence & capture_mode parity."""
+    """Phase B — action_type→route_name convergence & capture_mode defaults."""
 
     def _make_plan_subject(self, workspace: Path, plan_artifact: PlanArtifact):
         """Create a valid PlanSubjectProposal for the given plan.
@@ -3546,10 +3486,10 @@ class RoutingConvergenceTests(unittest.TestCase):
             )
         self.assertIn(route.route_name, {"workflow", "light_iterate"})
 
-    def test_modify_files_capture_mode_parity(self) -> None:
-        """Derive path must produce same capture_mode as decide_capture_mode for its complexity."""
+    def test_modify_files_capture_mode_defaults_off(self) -> None:
+        """Replay sunset keeps derived capture_mode on the deprecated off default."""
         from runtime.engine import _derive_route_from_authorized_proposal
-        from runtime.router import decide_capture_mode
+
         with tempfile.TemporaryDirectory() as td:
             workspace = Path(td)
             (workspace / ".sopify-skills").mkdir(parents=True)
@@ -3559,8 +3499,7 @@ class RoutingConvergenceTests(unittest.TestCase):
                 proposal, "修改 router.py 增加 timeout 参数",
                 skills=(), config=config, snapshot=None,
             )
-            expected = decide_capture_mode(config.workflow_learning_auto_capture, route.complexity)
-        self.assertEqual(route.capture_mode, expected)
+        self.assertEqual(route.capture_mode, "off")
 
     # -- B6: checkpoint_response active/terminal split --
 

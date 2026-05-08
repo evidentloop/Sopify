@@ -1,3 +1,4 @@
+# Test classification: contract
 """Deterministic tests for ActionValidator (P0-B) and side-effect mapping (P0-E),
 plus integration tests for ActionProposal gate flow (P0-G).
 

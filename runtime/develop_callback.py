@@ -36,7 +36,6 @@ from .decision_policy import has_tradeoff_checkpoint_signal
 from .handoff import build_runtime_handoff
 from .context_snapshot import resolve_context_snapshot
 from .models import PlanArtifact, RecoveredContext, RouteDecision, RunState, RuntimeConfig, RuntimeHandoff
-from .replay import ReplayWriter, build_develop_quality_replay_event
 from .state import StateStore, iso_now
 
 _HOST_FACING_TRUTH_KIND_DEVELOP_CALLBACK = "develop_callback"
@@ -81,7 +80,6 @@ class DevelopQualitySubmission:
     quality_result: Mapping[str, Any]
     run_state: RunState
     handoff: RuntimeHandoff
-    replay_session_dir: str | None
     delegated_callback: DevelopCallbackSubmission | None = None
 
 
@@ -195,7 +193,6 @@ def submit_develop_callback(
         ),
         current_plan=context.current_plan,
         kb_artifact=None,
-        replay_session_dir=None,
         skill_result={"checkpoint_request": request.to_dict()},
         notes=(
             f"Develop callback created: {request.checkpoint_id}",
@@ -255,19 +252,11 @@ def submit_develop_quality_report(
             quality_result=quality_result,
             config=config,
         )
-        replay_session_dir = _record_develop_quality_replay(
-            config=config,
-            context=context,
-            quality_context=quality_context,
-            quality_result=quality_result,
-            run_state=delegated.run_state,
-        )
         return DevelopQualitySubmission(
             quality_context=quality_context,
             quality_result=quality_result,
             run_state=delegated.run_state,
             handoff=delegated.handoff,
-            replay_session_dir=replay_session_dir,
             delegated_callback=delegated,
         )
 
@@ -280,19 +269,11 @@ def submit_develop_quality_report(
         quality_result=quality_result,
     )
     state_store.set_current_handoff(handoff)
-    replay_session_dir = _record_develop_quality_replay(
-        config=config,
-        context=context,
-        quality_context=quality_context,
-        quality_result=quality_result,
-        run_state=run_state,
-    )
     return DevelopQualitySubmission(
         quality_context=quality_context,
         quality_result=quality_result,
         run_state=run_state,
         handoff=handoff,
-        replay_session_dir=replay_session_dir,
     )
 
 
@@ -551,42 +532,6 @@ def _with_quality_handoff(
         observability=observability,
         resolution_id=current_handoff.resolution_id,
     )
-
-
-def _record_develop_quality_replay(
-    *,
-    config: RuntimeConfig,
-    context: ActiveDevelopContext,
-    quality_context: Mapping[str, Any],
-    quality_result: Mapping[str, Any],
-    run_state: RunState | None = None,
-) -> str:
-    payload = dict(quality_context)
-    payload["develop_quality_result"] = quality_result
-    writer = ReplayWriter(config)
-    event = build_develop_quality_replay_event(
-        ts=iso_now(),
-        payload=payload,
-        language=config.language,
-    )
-    run_state = run_state or context.current_run
-    session_dir = writer.append_event(run_state.run_id, event)
-    writer.render_documents(
-        run_state.run_id,
-        run_state=run_state,
-        route=RouteDecision(
-            route_name="resume_active",
-            request_text=quality_context["working_summary"],
-            reason="Develop quality result recorded",
-            complexity="medium",
-            candidate_skill_ids=("develop",),
-            should_recover_context=True,
-            should_create_plan=False,
-        ),
-        plan_artifact=context.current_plan,
-        events=writer.load_events(run_state.run_id),
-    )
-    return str(session_dir.relative_to(config.workspace_root))
 
 
 def _develop_callback_run_state(

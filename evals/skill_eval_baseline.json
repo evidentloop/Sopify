@@ -103,14 +103,6 @@
       "target_skill": "design"
     },
     {
-      "id": "replay_keyword_intent",
-      "request": "回放最近一次实现",
-      "expected_route": "replay",
-      "expected_candidate_skills": ["workflow-learning"],
-      "expectation": "positive",
-      "target_skill": "workflow-learning"
-    },
-    {
       "id": "explicit_go_exec_command",
       "request": "~go exec",
       "expected_route": "exec_plan",

@@ -4,6 +4,7 @@
 
 ## 索引
 
+- `2026-05-08` [`20260508_p3b_perimeter_cleanup`](2026-05/20260508_p3b_perimeter_cleanup/) - standard - 任务清单: P3b Perimeter Cleanup
 - `2026-05-08` [`20260507_p3a_contract_aligned_surface_cleanup`](2026-05/20260507_p3a_contract_aligned_surface_cleanup/) - standard - P3a Contract-Aligned Surface Cleanup: execution routing 收敛 + knowledge_sync audit trail + dead path cleanup (-88 LOC) + Runtime 减重剥离为 Px
 - `2026-05-07` [`20260506_p2_local_action_contracts`](2026-05/20260506_p2_local_action_contracts/) - standard - P2 Local Action Contracts: subject binding 泛化 + side_effect_delta schema + action-effect canonical pairing（admission contract 闭合）
 - `2026-05-06` [`20260506_p15_verifier_normative_slice`](2026-05/20260506_p15_verifier_normative_slice/) - standard - P1.5-D Verifier Minimum Normative Slice: protocol §6 升格 normative（verdict/evidence/source MUST）+ 消费路径 contract + design.md 引用修正
@@ -16,7 +17,6 @@
 - `2026-05-04` [`20260326_phase1-2-3-plan`](2026-03/20260326_phase1-2-3-plan/) - archived - Phase 1-2-3 旧总纲（B1/B2/B3 语义，已被 P0→P4 蓝图取代）
 - `2026-05-04` [`20260417_ux_perception_tuning`](2026-04/20260417_ux_perception_tuning/) - archived - UX 感知层调优（B/C 已完成，A 放弃；不独立拆包）
 - `2026-05-04` [`20260429_host_prompt_governance`](2026-04/20260429_host_prompt_governance/) - archived(upstreamed) - Host Prompt Governance（核心观点已进蓝图 P3b/P4，设计推演保留供回看）
-
 - `2026-04-30` [`20260429_standard-archive-finalize-archive-checkpoint`](2026-04/20260429_standard-archive-finalize-archive-checkpoint/) - standard - 任务清单: 为“显式主体与生命周期收敛”主题写第一子切片方案文档：新建 standard 方案包，只覆...
 - `2026-05-01` [`20260501_convention_smoke`](2026-05/20260501_convention_smoke/) - smoke - Convention 模式跨宿主最小 roundtrip 验证（Host B: Claude Sonnet + Host C: Codex/GPT-5，5/5 pass）
 - `2026-05-01` [`20260429_legacy_feature_cleanup`](2026-05/20260429_legacy_feature_cleanup/) - standard - Legacy Feature Cleanup: consult override 删除 + model compare 功能面移除

@@ -1,5 +1,5 @@
 <!-- bootstrap: lang=en-US; encoding=UTF-8 -->
-<!-- SOPIFY_VERSION: 2026-05-07.220011 -->
+<!-- SOPIFY_VERSION: 2026-05-08.191000 -->
 <!-- ARCHITECTURE: Adaptive Workflow + Layered Rules -->
 
 # Sopify - Adaptive AI Programming Assistant
@@ -69,7 +69,7 @@ Next: {Next step hint}
 **Footer Contract:**
 - the footer always follows the `Changes` block
 - `Next:` must be the final line in the footer.
-- the footer does not display generated time; if a machine-auditable timestamp is needed, internal summary / replay artifacts may keep ISO 8601 timestamps with timezone data.
+- the footer does not display generated time; if a machine-auditable timestamp is needed, internal summary files may keep ISO 8601 timestamps with timezone data.
 
 **Status Symbols:**
 | Symbol | Meaning |
@@ -142,20 +142,6 @@ Note: when `current_handoff.json.required_host_action == confirm_decision`, the 
 Note: when `current_handoff.json.required_host_action == continue_host_develop`, the host still owns real code changes; but if implementation hits another user-facing branch, the host must not ask a free-form question or hand-write `current_decision.json / current_handoff.json`. It must call `scripts/develop_callback_runtime.py submit --payload-json ...` instead (vendored: `.sopify-runtime/scripts/develop_callback_runtime.py`). The payload must contain `checkpoint_kind` plus `resume_context`; the current minimum `resume_context` fields are `active_run_stage / current_plan_path / task_refs / changed_files / working_summary / verification_todo`.
 Note: when `current_handoff.json.required_host_action == continue_host_consult`, the host may continue the discussion only after consuming the current turn's gate contract. It must not self-route before the gate, and it must not re-decide consult vs non-consult after the gate. The answer must be grounded in the current gate contract plus any consult context exposed by `handoff.artifacts`; if that context is missing, degrade explicitly against the current request instead of inferring a different route from chat semantics.
 
-**workflow-learning proactive capture policy:**
-```yaml
-workflow:
-  learning:
-    auto_capture: by_requirement # always | by_requirement | manual | off
-```
-
-| Value | Behavior |
-|------|----------|
-| `always` | Proactively capture all development tasks (full) |
-| `by_requirement` | Capture by complexity: simple=off, medium=summary, complex=full |
-| `manual` | Capture only after explicit request like "start recording this task" |
-| `off` | Do not proactively create new logs; replay/review intent and replay from existing sessions still work |
-
 ---
 
 ## Auto Rules
@@ -220,7 +206,6 @@ Complex: Files > 5, architectural changes, new features
 │   ├── preferences.md
 │   └── feedback.jsonl
 ├── project.md               # Technical conventions, not a duplicate of background/design
-└── replay/                  # Optional replay capability, still ignored
 ```
 
 ### A6 | Lifecycle Management
@@ -290,7 +275,6 @@ Semantic analysis routing:
 | Route | Condition | Behavior |
 |-------|-----------|----------|
 | Q&A | Pure question, no code changes | Run gate first, then answer through consult handoff in the host session |
-| Workflow Learning | Mentions replay/review/why this choice (intent recognition is always enabled) | Call workflow-learning for trace capture and explanation |
 | Quick Fix | ≤2 files, clear modification | Direct execution |
 | Light Iteration | 3-5 files, clear requirements | Light plan + execution |
 | Full Development | >5 files or architectural changes | Full 3-phase workflow |
@@ -432,7 +416,6 @@ Next: Please verify the functionality
 | `develop` | Enter development | Code execution, KB sync |
 | `kb` | Knowledge base operations | Init, update strategies |
 | `templates` | Create documents | All template definitions |
-| `workflow-learning` | User asks replay/review/why, or `auto_capture` proactively applies | Full trace logging, replay, step-by-step explanation |
 
 **Loading:** On-demand, loaded when entering corresponding phase.
 

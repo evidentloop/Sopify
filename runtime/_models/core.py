@@ -27,7 +27,6 @@ class RuntimeConfig:
     workflow_mode: str
     require_score: int
     auto_decide: bool
-    workflow_learning_auto_capture: str
     plan_level: str
     plan_directory: str
     ehrb_level: str
@@ -45,10 +44,6 @@ class RuntimeConfig:
     @property
     def plan_root(self) -> Path:
         return self.runtime_root / "plan"
-
-    @property
-    def replay_root(self) -> Path:
-        return self.runtime_root / "replay" / "sessions"
 
 
 @dataclass(frozen=True)

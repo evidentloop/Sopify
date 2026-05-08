@@ -16,7 +16,7 @@ from ._models.decision import (
     DecisionSubmission,
     DecisionValidation,
 )
-from ._models.handoff import RecoveredContext, ReplayEvent, RuntimeHandoff, RuntimeResult, SkillActivation
+from ._models.handoff import RecoveredContext, RuntimeHandoff, RuntimeResult, SkillActivation
 from ._models.proposal import PlanProposalState
 
 __all__ = [
@@ -36,7 +36,6 @@ __all__ = [
     "PlanArtifact",
     "PlanProposalState",
     "RecoveredContext",
-    "ReplayEvent",
     "RouteDecision",
     "RunState",
     "RuntimeConfig",

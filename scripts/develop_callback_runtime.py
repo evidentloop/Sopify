@@ -116,7 +116,6 @@ def _submit_quality(*, config, payload_json: str) -> dict[str, object]:
         "route_name": submission.handoff.route_name,
         "checkpoint_kind": checkpoint_kind,
         "handoff_file": ".sopify-skills/state/current_handoff.json",
-        "replay_session_dir": submission.replay_session_dir,
     }
 
 

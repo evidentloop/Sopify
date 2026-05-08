@@ -33,23 +33,9 @@ SUPPORTED_ROUTE_NAMES = (
     "decision_pending",
     "decision_resume",
     "state_conflict",
-    "replay",
     "consult",
 )
 
-_REPLAY_KEYWORDS = (
-    "回放",
-    "回看",
-    "重放",
-    "复盘",
-    "回顾实现",
-    "总结这次实现",
-    "为什么这么做",
-    "为什么选这个方案",
-    "why did",
-    "replay",
-    "review the implementation",
-)
 _CONTINUE_KEYWORDS = {"继续", "下一步", "继续执行", "继续吧", "go on", "continue", "resume", "next"}
 _CANCEL_KEYWORDS = {"取消", "强制取消", "停止", "终止", "算了", "放弃", "abort", "cancel", "stop", "force cancel"}
 _ARCHITECTURE_KEYWORDS = ("架构", "系统", "runtime", "workflow", "engine", "adapter", "plugin", "新功能", "重构", "refactor")
@@ -285,16 +271,6 @@ class Router:
             if pending_decision is not None:
                 return self._with_capture(pending_decision)
 
-        if _contains_intent(text, _REPLAY_KEYWORDS):
-            return RouteDecision(
-                route_name="replay",
-                request_text=text,
-                reason="Matched replay or review intent keywords",
-                candidate_skill_ids=_candidate_skills("replay", skills, "workflow-learning"),
-                should_recover_context=True,
-                runtime_skill_id=_runtime_skill("replay", skills, "workflow-learning"),
-            )
-
         if (global_active_run is not None or review_active_run is not None) and _normalize(text) in _CANCEL_KEYWORDS:
             return RouteDecision(
                 route_name="cancel_active",
@@ -398,23 +374,8 @@ class Router:
         )
 
     def _with_capture(self, decision: RouteDecision) -> RouteDecision:
-        capture_mode = decide_capture_mode(self.config.workflow_learning_auto_capture, decision.complexity)
-        return RouteDecision(
-            route_name=decision.route_name,
-            request_text=decision.request_text,
-            reason=decision.reason,
-            command=decision.command,
-            complexity=decision.complexity,
-            plan_level=decision.plan_level,
-            candidate_skill_ids=decision.candidate_skill_ids,
-            should_recover_context=decision.should_recover_context,
-            plan_package_policy=decision.plan_package_policy,
-            should_create_plan=decision.should_create_plan,
-            capture_mode=capture_mode,
-            runtime_skill_id=decision.runtime_skill_id,
-            active_run_action=decision.active_run_action,
-            artifacts=decision.artifacts,
-        )
+        # capture_mode is deprecated (replay sunset P3b); no-op passthrough.
+        return decision
 
 
 def _classify_command(text: str, *, skills: Iterable[SkillMeta], config: RuntimeConfig) -> RouteDecision | None:
@@ -831,17 +792,4 @@ def _runtime_skill(route_name: str, skills: Iterable[SkillMeta], skill_id: str) 
     )
 
 
-def decide_capture_mode(policy: str, complexity: str) -> str:
-    """Determine capture mode from auto-capture policy and complexity level.
 
-    Shared by Router.classify and engine derive to ensure identical normalization.
-    """
-    if policy == "always":
-        return "full"
-    if policy == "manual" or policy == "off":
-        return "off"
-    if complexity == "simple":
-        return "off"
-    if complexity == "medium":
-        return "summary"
-    return "full"

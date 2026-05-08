@@ -1,5 +1,5 @@
 <!-- bootstrap: lang=zh-CN; encoding=UTF-8 -->
-<!-- SOPIFY_VERSION: 2026-05-07.220011 -->
+<!-- SOPIFY_VERSION: 2026-05-08.191000 -->
 <!-- ARCHITECTURE: Adaptive Workflow + Layered Rules -->
 
 # Sopify - 自适应 AI 编程助手
@@ -69,7 +69,7 @@ Next: {下一步提示}
 **Footer 契约：**
 - footer 固定跟在 `Changes` 区块之后
 - `Next:` 必须作为 footer 最后一行。
-- footer 不展示生成时间；若需要机器可审计时间戳，内部摘要 / replay 文件可继续使用 ISO 8601（可带时区）。
+- footer 不展示生成时间；若需要机器可审计时间戳，内部摘要文件可继续使用 ISO 8601（可带时区）。
 
 **状态符：**
 | 符号 | 含义 |
@@ -142,20 +142,6 @@ Next: {下一步提示}
 说明：当 `current_handoff.json.required_host_action == continue_host_develop` 时，宿主继续负责真实代码修改；但若开发中再次出现“需要用户补事实 / 拍板选路”的分叉，宿主不得自由追问，也不得手写 `current_decision.json / current_handoff.json`，而必须调用 `scripts/develop_callback_runtime.py submit --payload-json ...`（vendored 对应 `.sopify-runtime/scripts/develop_callback_runtime.py`）回调 runtime。payload 必须包含 `checkpoint_kind` 与 `resume_context`；当前 `resume_context` 至少要求 `active_run_stage / current_plan_path / task_refs / changed_files / working_summary / verification_todo`。
 说明：当 `current_handoff.json.required_host_action == continue_host_consult` 时，宿主只可在已消费当前回合 gate contract 的前提下继续问答；不得在 gate 前自行路由，也不得在 gate 后再次重判 consult / 非 consult。宿主的回答应基于当前 gate contract 与 `handoff.artifacts` 暴露的 consult context（如有）生成；若缺少额外 consult context，应显式按当前请求降级回答，而不是用宿主侧语义分析补出另一条路由。
 
-**workflow-learning 主动记录策略：**
-```yaml
-workflow:
-  learning:
-    auto_capture: by_requirement # always | by_requirement | manual | off
-```
-
-| 值 | 行为 |
-|-----|------|
-| `always` | 所有开发任务主动记录（full） |
-| `by_requirement` | 按复杂度主动记录：simple=off，medium=summary，complex=full |
-| `manual` | 仅在用户明确要求“开始记录这次任务”后记录 |
-| `off` | 不主动新建记录；但回放/复盘意图识别与已有记录回放仍可用 |
-
 ---
 
 ## Auto Rules (自动规则)
@@ -220,7 +206,6 @@ workflow:
 │   ├── preferences.md
 │   └── feedback.jsonl
 ├── project.md               # 技术约定，不与 background/design 重复
-└── replay/                  # 可选回放能力，继续忽略
 ```
 
 ### A6 | 生命周期管理
@@ -290,7 +275,6 @@ progressive: 按需创建文件 (默认)
 | 路由 | 条件 | 行为 |
 |-----|------|-----|
 | 咨询问答 | 纯问题，无代码变更 | 先过 gate，再按 consult handoff 由宿主回答 |
-| 复盘学习 | 提到回放/复盘/为什么这么做（意图识别始终开启） | 调用 workflow-learning，生成记录与讲解 |
 | 快速修复 | ≤2 文件，明确修改 | 直接执行 |
 | 轻量迭代 | 3-5 文件，清晰需求 | light 方案 + 执行 |
 | 完整开发 | >5 文件或架构变更 | 3 阶段完整流程 |
@@ -432,7 +416,6 @@ Next: 请验证功能
 | `develop` | 进入开发实施 | 代码执行、KB同步 |
 | `kb` | 知识库操作 | 初始化、更新策略 |
 | `templates` | 创建文档 | 所有模板定义 |
-| `workflow-learning` | 用户要求回放/复盘/原因讲解，或 `auto_capture` 命中主动记录策略 | 完整记录、回放、逐步讲解 |
 
 **读取方式：** 按需读取，进入对应阶段时加载。
 

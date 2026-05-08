@@ -1,7 +1,7 @@
 """Structured quality-loop contracts shared by develop runtime surfaces.
 
 The host still owns real code changes during `continue_host_develop`, but the
-quality loop needs a stable machine-readable contract so handoff, replay, and
+quality loop needs a stable machine-readable contract so handoff and
 checkpoint callbacks can agree on the same fields and value domains.
 """
 

@@ -30,7 +30,6 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "mode": "adaptive",
         "require_score": 7,
         "auto_decide": False,
-        "learning": {"auto_capture": "by_requirement"},
     },
     "plan": {
         "level": "auto",
@@ -44,8 +43,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
 }
 
 _ALLOWED_TOP_LEVEL = {"brand", "language", "output_style", "title_color", "workflow", "plan", "advanced"}
-_ALLOWED_WORKFLOW = {"mode", "require_score", "auto_decide", "learning"}
-_ALLOWED_LEARNING = {"auto_capture"}
+_ALLOWED_WORKFLOW = {"mode", "require_score", "auto_decide"}
 _ALLOWED_PLAN = {"level", "directory"}
 _ALLOWED_ADVANCED = {"ehrb_level", "kb_init", "cache_project"}
 
@@ -53,7 +51,6 @@ _ALLOWED_LANGUAGES = {"zh-CN", "en-US"}
 _ALLOWED_OUTPUT_STYLES = {"minimal", "classic"}
 _ALLOWED_TITLE_COLORS = {"green", "blue", "yellow", "cyan", "none"}
 _ALLOWED_WORKFLOW_MODES = {"strict", "adaptive", "minimal"}
-_ALLOWED_CAPTURE_MODES = {"always", "by_requirement", "manual", "off"}
 _ALLOWED_PLAN_LEVELS = {"auto", "light", "standard", "full"}
 _ALLOWED_EHRB_LEVELS = {"strict", "normal", "relaxed"}
 _ALLOWED_KB_INIT = {"full", "progressive"}
@@ -90,6 +87,9 @@ def load_runtime_config(
     if project_data:
         _deep_merge(merged, project_data)
 
+    # Strip deprecated config keys (P3b replay sunset)
+    merged.get("workflow", {}).pop("learning", None)
+
     _validate_config(merged, source_paths=(global_path if global_data else None, project_path if project_data else None))
 
     return RuntimeConfig(
@@ -103,7 +103,6 @@ def load_runtime_config(
         workflow_mode=str(merged["workflow"]["mode"]),
         require_score=int(merged["workflow"]["require_score"]),
         auto_decide=bool(merged["workflow"]["auto_decide"]),
-        workflow_learning_auto_capture=str(merged["workflow"]["learning"]["auto_capture"]),
         plan_level=str(merged["plan"]["level"]),
         plan_directory=str(merged["plan"]["directory"]),
         ehrb_level=str(merged["advanced"]["ehrb_level"]),
@@ -164,10 +163,6 @@ def _validate_config(config: Mapping[str, Any], *, source_paths: tuple[Optional[
         raise ConfigError("workflow.require_score must be an integer between 1 and 10")
     if not isinstance(workflow["auto_decide"], bool):
         raise ConfigError("workflow.auto_decide must be boolean")
-    learning = _expect_mapping(workflow.get("learning"), path="workflow.learning")
-    _assert_allowed_keys(learning, _ALLOWED_LEARNING, path="workflow.learning")
-    if learning["auto_capture"] not in _ALLOWED_CAPTURE_MODES:
-        raise ConfigError(f"Unsupported workflow.learning.auto_capture: {learning['auto_capture']}")
 
     plan = _expect_mapping(config.get("plan"), path="plan")
     _assert_allowed_keys(plan, _ALLOWED_PLAN, path="plan")

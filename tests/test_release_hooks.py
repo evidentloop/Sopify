@@ -1,3 +1,4 @@
+# Test classification: distribution
 from __future__ import annotations
 
 from pathlib import Path
@@ -300,10 +301,11 @@ class ReleaseHookTests(unittest.TestCase):
             unreleased = _unreleased_body(text)
             self.assertIn("### Summary", unreleased)
             self.assertIn("Changes across:", unreleased)
-            self.assertIn("<details>", unreleased)
-            self.assertIn("`runtime/gate.py`", unreleased)
-            self.assertIn("`scripts/release-sync.sh`", unreleased)
-            self.assertIn("`tests/test_runtime_gate.py`", unreleased)
+            self.assertIn("### Changed", unreleased)
+            self.assertIn("**Runtime**", unreleased)
+            self.assertIn("**Scripts**", unreleased)
+            self.assertIn("**Tests**", unreleased)
+            self.assertNotIn("<details>", unreleased)
 
     def test_release_sync_auto_drafts_unreleased_before_version_bump(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -324,8 +326,10 @@ class ReleaseHookTests(unittest.TestCase):
             release_body = _release_body(changelog, "2026-03-21.010203")
             self.assertIn("## [2026-03-21.010203] - 2026-03-21", changelog)
             self.assertIn("### Summary", release_body)
-            self.assertIn("`runtime/gate.py`", release_body)
-            self.assertIn("`tests/test_runtime_gate.py`", release_body)
+            self.assertIn("### Changed", release_body)
+            self.assertIn("**Runtime**", release_body)
+            self.assertIn("**Tests**", release_body)
+            self.assertNotIn("<details>", release_body)
             self.assertIn("badge/version-2026--03--21.010203-orange.svg", (root / "README.md").read_text(encoding="utf-8"))
             self.assertIn("<!-- SOPIFY_VERSION: 2026-03-21.010203 -->", (root / "Codex/Skills/CN/AGENTS.md").read_text(encoding="utf-8"))
             self.assertIn("<!-- SOPIFY_VERSION: 2026-03-21.010203 -->", (root / "Claude/Skills/CN/CLAUDE.md").read_text(encoding="utf-8"))
@@ -391,7 +395,7 @@ class ReleaseHookTests(unittest.TestCase):
             unreleased = _unreleased_body(changelog.read_text(encoding="utf-8"))
             # Plan package path is now included for attribution
             self.assertIn("`20260324_task`", unreleased)
-            self.assertIn("`runtime/gate.py`", unreleased)
+            self.assertIn("**Runtime**", unreleased)
             # Non-package .sopify-skills/ paths still excluded
             self.assertNotIn("history/index.md", unreleased)
             # Blueprint internals still excluded

@@ -1,3 +1,4 @@
+# Test classification: contract
 from __future__ import annotations
 
 from tests.runtime_test_support import *
@@ -149,13 +150,11 @@ class RouterTests(unittest.TestCase):
             store.set_current_run(run_state)
             resume_route = router.classify("继续", skills=skills)
             cancel_route = router.classify("取消", skills=skills)
-            replay_route = router.classify("回放最近一次实现", skills=skills)
             consult_route = router.classify("这个方案为什么要这样拆？", skills=skills)
 
             self.assertEqual(resume_route.route_name, "resume_active")
             self.assertTrue(resume_route.should_recover_context)
             self.assertEqual(cancel_route.route_name, "cancel_active")
-            self.assertEqual(replay_route.route_name, "replay")
             self.assertEqual(consult_route.route_name, "consult")
 
     def test_consult_guard_for_process_semantics_forces_runtime_first(self) -> None:
@@ -609,46 +608,6 @@ class RouterTests(unittest.TestCase):
 
             self.assertEqual(decision.route_name, "workflow")
             self.assertEqual(decision.candidate_skill_ids, ("custom-workflow", "analyze", "design", "develop"))
-
-    def test_runtime_skill_resolution_prefers_workspace_runtime_skill_over_builtin(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            workspace = Path(temp_dir)
-            user_home = workspace / "home"
-            custom_skill = workspace / ".agents" / "skills" / "custom-replay"
-            custom_skill.mkdir(parents=True)
-            (custom_skill / "SKILL.md").write_text(
-                "---\nname: custom-replay\ndescription: custom replay helper\n---\n\n# custom-replay\n",
-                encoding="utf-8",
-            )
-            (custom_skill / "skill.yaml").write_text(
-                "id: custom-replay\n"
-                "mode: runtime\n"
-                "runtime_entry: custom_runtime.py\n"
-                "supports_routes:\n"
-                "  - replay\n"
-                "host_support:\n"
-                "  - codex\n"
-                "permission_mode: dual\n"
-                "metadata:\n"
-                "  priority: 1\n",
-                encoding="utf-8",
-            )
-            (custom_skill / "custom_runtime.py").write_text(
-                "def run_skill(**kwargs):\n    return {'ok': True}\n",
-                encoding="utf-8",
-            )
-
-            config = load_runtime_config(workspace)
-            store = StateStore(config)
-            store.ensure()
-            router = Router(config, state_store=store)
-            skills = SkillRegistry(config, user_home=user_home).discover()
-
-            decision = router.classify("回放最近一次实现", skills=skills)
-
-            self.assertEqual(decision.route_name, "replay")
-            self.assertEqual(decision.candidate_skill_ids, ("custom-replay", "workflow-learning"))
-            self.assertEqual(decision.runtime_skill_id, "custom-replay")
 
     def test_runtime_handoff_preserves_direct_edit_runtime_required_reason_code(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

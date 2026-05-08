@@ -126,7 +126,6 @@ _SOPIFY_MANAGED_IGNORE_END = "# END sopify-managed"
 _SOPIFY_MANAGED_IGNORE_ENTRIES = (
     ".sopify-runtime/",
     ".sopify-skills/state/",
-    ".sopify-skills/replay/",
     ".sopify-skills/plan/_registry.yaml",
 )
 REASON_STUB_SELECTED = "STUB_SELECTED"

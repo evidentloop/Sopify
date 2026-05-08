@@ -88,17 +88,6 @@ _BUILTIN_SPECS: tuple[_BuiltinSkillSpec, ...] = (
         },
         handoff_kind="template",
     ),
-    _BuiltinSkillSpec(
-        skill_id="workflow-learning",
-        names={"zh-CN": "workflow-learning", "en-US": "workflow-learning"},
-        descriptions={
-            "zh-CN": "工作流学习子技能；用于回放、复盘与决策解释。",
-            "en-US": "Workflow-learning sub-skill for replay, review, and decision explanation.",
-        },
-        handoff_kind="consult",
-        supports_routes=("replay",),
-        triggers=("回放", "复盘", "为什么这么做", "replay", "review the implementation"),
-    ),
 )
 
 

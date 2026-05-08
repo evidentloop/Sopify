@@ -1,3 +1,4 @@
+# Test classification: contract
 from __future__ import annotations
 
 import unittest
@@ -19,7 +20,6 @@ _RETIRED_HOST_ACTIONS = frozenset({
     "archive_review",
     "continue_host_quick_fix",
     "continue_host_workflow",
-    "host_replay_bridge_required",
     "archive_completed",
 })
 
