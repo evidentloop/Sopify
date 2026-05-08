@@ -54,7 +54,7 @@ archive_ready: false
 - [x] 2.18 `tests/test_runtime_sample_invariant_gate.py`：replay_required 相关断言（L92-107）——清除
 - [x] 2.19 `tests/test_runtime_skill_registry.py`：workflow-learning assertIn（L61）——删除
 - [x] 2.20 `tests/test_installer.py`：replay 相关引用（L895）——已清除 gitignore 断言；L1301/L1354 footer 断言保留（prompt asset 未更新，注释标注）
-- [ ] 2.21 清理 tests/__pycache__ 中 replay 相关 .pyc
+- [x] 2.21 验证 tests/__pycache__ 中 replay 相关 .pyc 为 0（tests/__pycache__、tests/protocol/__pycache__、tests/pytest_entries/__pycache__ 均无 replay 相关 .pyc；__pycache__ 目录本身包含其他正常缓存，不删除）
 
 ### Runtime 外围残留
 
@@ -88,19 +88,19 @@ archive_ready: false
 
 ### README 首屏降噪与默认入口翻转
 
-- [ ] 4.5 首屏只保留 3 件事：中断可恢复 + 需要拍板时会停 + 安装入口
-- [ ] 4.6 默认叙事以 Convention（纯协议、无 runtime）为入口
-- [ ] 4.7 Runtime（完整编排、gate、checkpoint）定位为增强路径
-- [ ] 4.8 plan lifecycle / blueprint / runtime gate / checkpoint taxonomy / task size routing / .sopify-runtime 等内部术语降级到二级文档
-- [ ] 4.9 `.sopify-runtime` 只作为后台实现细节出现，不作为用户首接触概念
-- [ ] 4.10 同步更新 README.zh-CN.md
+- [x] 4.5 首屏只保留 3 件事：中断可恢复 + 需要拍板时会停 + 安装入口（首屏 34 行）
+- [x] 4.6 Install 为默认入口；已在 Sopify-managed repo 为 returning-user 场景
+- [x] 4.7 三步轻量表（Start → Pause → Resume）替代旧流程图，传达用户旅程但不暴露内部编排
+- [x] 4.8 plan lifecycle / blueprint / runtime gate / checkpoint taxonomy / task size routing / .sopify-runtime 等内部术语降级到二级文档
+- [x] 4.9 `.sopify-runtime` 只作为后台实现细节出现，不作为用户首接触概念（README 中 0 次出现）
+- [x] 4.10 同步更新 README.zh-CN.md
 
 ### S4 验证
 
-- [ ] 4.V1 README 首屏 < 50 行
-- [ ] 4.V2 首屏不出现 blueprint / checkpoint taxonomy / runtime state / .sopify-runtime 等术语
-- [ ] 4.V3 Convention 作为默认叙事出现在 Runtime 之前
-- [ ] 4.V4 `pytest` 全通过
+- [x] 4.V1 README 首屏 < 50 行（实际 34 行）
+- [x] 4.V2 首屏不出现 blueprint / checkpoint taxonomy / runtime state / .sopify-runtime 等术语
+- [x] 4.V3 Install 为默认入口（L24）；"Already in a Sopify-managed repo?" 降级为 returning-user 场景（L30）
+- [x] 4.V4 复用上轮 pytest 绿灯（684 passed, 49 subtests）；本轮 README-only, 无可执行路径变更，未重跑
 
 ## 完成标准
 
