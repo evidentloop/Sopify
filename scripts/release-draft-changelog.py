@@ -290,7 +290,7 @@ def render_draft(changed_files: list[str], root: Path) -> str:
 
     blocks: list[str] = []
 
-    # Layer 1: Summary placeholder
+    # Layer 1: Summary
     summary_parts: list[str] = []
     if plan_packages:
         archived = [pid for pid, info in plan_packages.items() if info["lifecycle"] == "archived"]
@@ -305,34 +305,21 @@ def render_draft(changed_files: list[str], root: Path) -> str:
     if summary_parts:
         blocks.append("### Summary\n\n- " + "; ".join(summary_parts) + ".")
 
-    # Layer 2: Plan packages
+    # Layer 2: Changed (category-level bullets, no file lists)
+    changed_lines: list[str] = []
+    for title, summary in SECTION_DEFINITIONS:
+        if grouped[title]:
+            changed_lines.append(f"- **{title}**: {summary} ({len(grouped[title])} files)")
+    if changed_lines:
+        blocks.append("### Changed\n\n" + "\n".join(changed_lines))
+
+    # Layer 3: Plan packages
     if plan_packages:
         pkg_lines = ["### Plan Packages", ""]
         for plan_id in sorted(plan_packages):
             info = plan_packages[plan_id]
             pkg_lines.append(f"- `{plan_id}` ({info['lifecycle']})")
         blocks.append("\n".join(pkg_lines))
-
-    # Layer 3: File details in collapsible block
-    detail_lines: list[str] = []
-    for title, summary in SECTION_DEFINITIONS:
-        if grouped[title]:
-            detail_lines.append(f"**{title}** — {summary}:")
-            detail_lines.extend(f"  - `{path}`" for path in grouped[title])
-            detail_lines.append("")
-    if plan_packages:
-        detail_lines.append("**Plan package files**:")
-        for plan_id in sorted(plan_packages):
-            for f in plan_packages[plan_id]["files"]:
-                detail_lines.append(f"  - `{f}`")
-        detail_lines.append("")
-
-    if detail_lines:
-        blocks.append(
-            "<details>\n<summary>File details</summary>\n\n"
-            + "\n".join(detail_lines)
-            + "\n</details>"
-        )
 
     return "\n\n".join(blocks)
 
