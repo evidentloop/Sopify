@@ -54,7 +54,7 @@ plan_status: completed
 - [x] 2.17 `tests/test_runtime_decision.py`：`replay_session_dir=None` 引用（L604）——清除
 - [x] 2.18 `tests/test_runtime_sample_invariant_gate.py`：replay_required 相关断言（L92-107）——清除
 - [x] 2.19 `tests/test_runtime_skill_registry.py`：workflow-learning assertIn（L61）——删除
-- [x] 2.20 `tests/test_installer.py`：replay 相关引用（L895）——已清除 gitignore 断言；L1301/L1354 footer 断言保留（prompt asset 未更新，注释标注）
+- [x] 2.20 `tests/test_installer.py`：replay 相关引用（L895）——已清除 gitignore 断言；L1301/L1354 footer 断言已同步更新（prompt asset replay 引用已移除，断言与当前 source 对齐，注释已同步）
 - [x] 2.21 验证 tests/__pycache__ 中 replay 相关 .pyc 为 0（tests/__pycache__、tests/protocol/__pycache__、tests/pytest_entries/__pycache__ 均无 replay 相关 .pyc；__pycache__ 目录本身包含其他正常缓存，不删除）
 
 ### Runtime 外围残留
