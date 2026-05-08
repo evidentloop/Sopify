@@ -126,6 +126,6 @@ Launch examples:
   python3 $BUNDLE_DIR/scripts/sopify_runtime.py --allow-direct-entry --workspace-root $TARGET_ROOT "~go plan 重构数据库层"
   python3 $BUNDLE_DIR/scripts/runtime_gate.py enter --workspace-root $TARGET_ROOT --request "~go plan 重构数据库层"
   python3 $BUNDLE_DIR/scripts/go_plan_runtime.py --workspace-root $TARGET_ROOT "重构数据库层"
-  python3 -m unittest discover -s $BUNDLE_DIR/tests -p 'test_runtime.py' -v
+  python3 -m pytest $BUNDLE_DIR/tests/test_runtime.py -v
   bash $BUNDLE_DIR/scripts/check-runtime-smoke.sh
 EOF
