@@ -104,9 +104,9 @@ archive_ready: false
 
 ## 完成标准
 
-- [ ] `pytest` 全通过
-- [ ] `release-preflight.sh` 正常退出
-- [ ] `grep -rn "replay" runtime/*.py` 无生产代码命中
-- [ ] README 首屏符合降噪标准
-- [ ] 所有 test 文件有分类标注
-- [ ] CHANGELOG 无文件列表格式条目
+- [x] `pytest` 全通过（684 passed, 49 subtests, 242s）
+- [x] `release-preflight.sh` 正常退出（all checks passed, eval gate PASSED, all metrics 1.0/0.0）
+- [x] `grep -rn "replay" runtime/*.py` 无生产代码命中
+- [x] README 首屏符合降噪标准（38 行，Install-first，0 次 Convention mode）
+- [x] 所有 test 文件有分类标注（31 文件）
+- [x] CHANGELOG 无文件列表格式条目
