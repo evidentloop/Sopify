@@ -1,3 +1,4 @@
+# Test classification: contract
 """Protocol Compliance Suite Phase 1.
 
 Validates compliance items 1-5 from protocol.md §5 (Phase 1 scope).

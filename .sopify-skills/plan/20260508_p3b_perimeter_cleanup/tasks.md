@@ -21,8 +21,8 @@ archive_ready: false
 
 - [x] 1.1 `release-preflight.sh`：从 `unittest discover` 改为 `pytest`
 - [x] 1.2 `evals/skill_eval_report.json` 加入 `.gitignore`；baseline 和 SLO 文件保留
-- [ ] 1.3 验证：`bash scripts/release-preflight.sh` 正常退出
-- [ ] 1.4 (补) CONTRIBUTING.md / CONTRIBUTING_CN.md / scripts/sync-runtime-assets.sh 中 unittest discover 统一为 pytest
+- [x] 1.3 验证：`bash scripts/release-preflight.sh` 正常退出
+- [x] 1.4 (补) CONTRIBUTING.md / CONTRIBUTING_CN.md / scripts/sync-runtime-assets.sh 中 unittest discover 统一为 pytest
 
 ## S2: Replay 下线 + 旧概念清理 + Runtime 外围残留
 
@@ -62,20 +62,20 @@ archive_ready: false
 
 ### S2 验证（硬验收）
 
-- [ ] 2.V1 `pytest` 全通过（待跑）
+- [x] 2.V1 `pytest` 全通过（684 passed, 49 subtests）
 - [x] 2.V2 `grep -rn "replay" runtime/*.py | grep -v "^Binary" | grep -v __pycache__` 仅剩注释（config.py:90 sunset 注释, router.py:377 deprecated 注释）
 - [x] 2.V3 `grep -rn "workflow.learning" runtime/*.py | grep -v __pycache__` 无命中
-- [ ] 2.V4 `python3 -c "from runtime.builtin_catalog import load_builtin_skills; ..."` 待跑
+- [x] 2.V4 `python3 -c "from runtime.builtin_catalog import load_builtin_skills; from pathlib import Path; skills = load_builtin_skills(repo_root=Path('.'), language='zh-CN'); assert 'workflow-learning' not in [s.name for s in skills]"` workflow-learning 不在枚举中
 - [x] 2.V5 `test -f runtime/builtin_skill_packages/workflow-learning/skill.yaml && echo FAIL || echo OK` 输出 OK
 - [x] 2.V6 `grep -c "workflow-learning" runtime/builtin_catalog.generated.json` 输出 0
 - [x] 2.V7 `grep -c 'replay_session_dir' runtime/handoff.py` 输出 0
-- [ ] 2.V8 `grep -rn "replay" tests/*.py | grep -v __pycache__` 仅剩 test_installer.py footer 字面量（prompt asset 待更新）
+- [x] 2.V8 `grep -rn "replay" tests/*.py | grep -v __pycache__` 仅剩 test_installer.py footer 字面量（prompt asset 待更新）
 
 ## S3: Tests 分类标注
 
-- [ ] 3.1 `tests/test_*.py` 按 contract / smoke / distribution / implementation-mirror 标注
-- [ ] 3.2 输出分类汇总表
-- [ ] 3.3 验证：所有 test 文件都有明确分类标注；`pytest` 全通过
+- [x] 3.1 `tests/test_*.py` + `tests/protocol/test_*.py` 按 contract / smoke / distribution / implementation-mirror 标注（31 文件）
+- [x] 3.2 分类汇总：contract 23 | smoke 1 | distribution 6 | implementation-mirror 1（test_runtime_knowledge_layout.py）
+- [x] 3.3 验证：所有 test 文件都有 `# Test classification:` 标注；`pytest` 684 passed, 49 subtests
 
 ## S4: CHANGELOG 压缩 + README 首屏降噪
 

@@ -1,3 +1,4 @@
+# Test classification: distribution
 from __future__ import annotations
 
 from pathlib import Path
