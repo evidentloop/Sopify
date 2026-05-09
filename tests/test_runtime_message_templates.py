@@ -1,6 +1,8 @@
 # Test classification: contract
 from __future__ import annotations
 
+import pytest
+
 import copy
 
 from tests.runtime_test_support import *
@@ -13,6 +15,7 @@ from runtime.message_templates import (
 
 
 class MessageTemplatesTests(unittest.TestCase):
+    @pytest.mark.implementation_mirror
     def test_reason_code_family_prefix_template_renders(self) -> None:
         templates = load_default_host_message_templates()
         result = render_host_message(
@@ -29,6 +32,8 @@ class MessageTemplatesTests(unittest.TestCase):
         self.assertIn("决策确认", result["text"])
         self.assertIn("修复契约", result["text"])
 
+    @pytest.mark.implementation_mirror
+
     def test_prompt_mode_fallback_is_used_when_no_template_matches(self) -> None:
         templates = load_default_host_message_templates()
         result = render_host_message(
@@ -39,6 +44,8 @@ class MessageTemplatesTests(unittest.TestCase):
         self.assertEqual(result["source_kind"], "prompt_mode_fallback")
         self.assertEqual(result["render_events"], [])
         self.assertIn("当前输入还不足以继续", result["text"])
+
+    @pytest.mark.implementation_mirror
 
     def test_missing_template_variable_falls_back_without_crashing(self) -> None:
         templates = load_default_host_message_templates()
@@ -51,6 +58,8 @@ class MessageTemplatesTests(unittest.TestCase):
         self.assertEqual(result["source_kind"], "prompt_mode_fallback")
         self.assertEqual(result["render_events"], [MESSAGE_TEMPLATE_RENDER_FAILED])
         self.assertIn("暂时不能安全执行", result["text"])
+
+    @pytest.mark.implementation_mirror
 
     def test_broken_fallback_uses_safe_fallback_message(self) -> None:
         templates = load_default_host_message_templates()

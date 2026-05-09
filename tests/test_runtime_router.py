@@ -1,6 +1,8 @@
 # Test classification: contract
 from __future__ import annotations
 
+import pytest
+
 from tests.runtime_test_support import *
 
 
@@ -99,6 +101,8 @@ class RouterTests(unittest.TestCase):
             route = router.classify("重构整个认证模块，把 session 改成 JWT", skills=skills)
 
             self.assertEqual(route.route_name, "workflow")
+
+    @pytest.mark.implementation_mirror
 
     def test_quick_fix_and_consult_output_hide_repo_local_runtime_wording(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

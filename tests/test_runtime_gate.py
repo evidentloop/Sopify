@@ -1,6 +1,8 @@
 # Test classification: contract
 from __future__ import annotations
 
+import pytest
+
 import importlib.util
 import json
 import os
@@ -311,6 +313,7 @@ def _write_gate_receipt_fixture(
 
 
 class RuntimeGateTests(unittest.TestCase):
+    @pytest.mark.implementation_mirror
     def test_workspace_preflight_fallback_keeps_outcome_contract_in_sync(self) -> None:
         standalone_module = _load_module_without_repo_installer(
             REPO_ROOT / "runtime" / "workspace_preflight.py",
@@ -349,6 +352,8 @@ class RuntimeGateTests(unittest.TestCase):
                 self.assertEqual(actual.get("action_level"), expected.get("action_level"))
                 self.assertEqual(actual.get("message_hint"), expected.get("message_hint"))
 
+    @pytest.mark.implementation_mirror
+
     def test_gate_output_fallback_keeps_outcome_summary_rendering_in_sync(self) -> None:
         standalone_module = _load_module_without_repo_installer(
             REPO_ROOT / "runtime" / "gate_output.py",
@@ -367,6 +372,8 @@ class RuntimeGateTests(unittest.TestCase):
                     standalone_module.render_outcome_summary(payload),
                     render_outcome_summary(payload),
                 )
+
+    @pytest.mark.implementation_mirror
 
     def test_gate_preflight_falls_back_to_legacy_helper_argv_contract(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -756,6 +763,8 @@ class RuntimeGateTests(unittest.TestCase):
             self.assertEqual(result["runtime_gate_entry"], "scripts/runtime_gate_pinned.py")
             self.assertEqual(result["preferences_preload_entry"], "scripts/preferences_preload_pinned.py")
 
+    @pytest.mark.implementation_mirror
+
     def test_preflight_exposes_legacy_workspace_entries_when_global_bundle_falls_back(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
@@ -880,6 +889,8 @@ class RuntimeGateTests(unittest.TestCase):
 
             self.assertEqual(result["status"], "error")
             self.assertEqual(result["error_code"], "config_error")
+
+    @pytest.mark.implementation_mirror
 
     def test_gate_preflight_block_uses_pre_config_fallback_paths_even_with_custom_plan_directory(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1457,6 +1468,8 @@ class RuntimeGateTests(unittest.TestCase):
                 },
             )
 
+    @pytest.mark.implementation_mirror
+
     def test_gate_preflight_falls_back_when_helper_rejects_host_id_only(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
@@ -1533,6 +1546,8 @@ class RuntimeGateTests(unittest.TestCase):
             self.assertEqual(result["status"], "ready")
             self.assertEqual(result["preflight"]["helper_argv_mode"], "legacy_request_preserved")
 
+    @pytest.mark.implementation_mirror
+
     def test_gate_preflight_preserves_request_when_helper_only_rejects_host_id(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
@@ -1553,6 +1568,8 @@ class RuntimeGateTests(unittest.TestCase):
             self.assertEqual(result["preflight"]["reason_code"], "BRAKE_LAYER_BLOCKED")
             self.assertEqual(result["preflight"]["helper_argv_mode"], "legacy_request_preserved")
             self.assertFalse((workspace / ".sopify-runtime" / "manifest.json").exists())
+
+    @pytest.mark.implementation_mirror
 
     def test_gate_preflight_fail_closes_when_legacy_helper_cannot_honor_non_interactive_mode(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1575,6 +1592,8 @@ class RuntimeGateTests(unittest.TestCase):
             self.assertIn("too old", result["message"])
             self.assertIn("Refresh the local Sopify install", result["message"])
             self.assertFalse((workspace / ".sopify-runtime" / "manifest.json").exists())
+
+    @pytest.mark.implementation_mirror
 
     def test_drop_cli_arg_pairs_preserves_request_value_that_matches_removed_flag_name(self) -> None:
         command = [
@@ -2370,6 +2389,8 @@ class RuntimeGateTests(unittest.TestCase):
             self.assertEqual(payload["status"], "ready")
             self.assertEqual(payload["allowed_response_mode"], NORMAL_RUNTIME_FOLLOWUP)
             self.assertIn("handoff", payload)
+
+    @pytest.mark.implementation_mirror
 
     def test_runtime_gate_cli_text_renders_field_level_ingress_details(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

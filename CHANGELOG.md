@@ -6,6 +6,51 @@ Format: Summary → Changed → Plan Packages. File-level details live in `git l
 
 ## [Unreleased]
 
+## [2026-05-09.175537] - 2026-05-09
+
+### Summary
+
+- Archived 1 plan package(s); Changes across: Docs, Runtime, Skills.
+
+### Changed
+
+- **Docs**: Refined public documentation (2 files)
+- **Runtime**: Updated runtime internals (2 files)
+- **Skills**: Synced prompt-layer skills (4 files)
+
+### Plan Packages
+
+- `20260509_p4b_runtime_surface_consolidation` (archived)
+
+## [2026-05-09.170825] - 2026-05-09
+
+### Summary
+
+- Archived 1 plan package(s); Changes across: Runtime.
+
+### Changed
+
+- **Runtime**: Updated runtime internals (2 files)
+
+### Plan Packages
+
+- `20260509_p4b_runtime_surface_consolidation` (archived)
+
+## [2026-05-09.152019] - 2026-05-09
+
+### Summary
+
+- Updated 1 active plan package(s); Changes across: Scripts, Changed.
+
+### Changed
+
+- **Scripts**: Adjusted maintenance scripts (1 files)
+- **Changed**: Updated project files (1 files)
+
+### Plan Packages
+
+- `20260509_p4b_runtime_surface_consolidation` (active)
+
 ## [2026-05-08.191000] - 2026-05-08
 
 ### Summary

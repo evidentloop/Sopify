@@ -4,6 +4,7 @@
 
 ## 索引
 
+- `2026-05-09` [`20260509_p4b_runtime_surface_consolidation`](2026-05/20260509_p4b_runtime_surface_consolidation/) - standard - P4b Runtime Surface Consolidation: prove-kept-or-delete 全量扫描证明 runtime 已近最小体积（24,334 LOC），实删 15 LOC，<20K 目标在现有 contract 约束下不可达
 - `2026-05-09` [`20260509_host_capability_governance`](2026-05/20260509_host_capability_governance/) - standard - Host Capability Governance（P4a→P4c bridge）：3 级 canonical 梯度定义 + 接入判定 Checklist + Convention Quickstart 最小交付面 + Prompt 镜像治理原则
 - `2026-05-09` [`20260509_p4a_external_surface_freeze`](2026-05/20260509_p4a_external_surface_freeze/) - standard - P4a External Surface Freeze: Frozen External Surface keep-list（15 条）+ Output Rendering Audit（20 条字段分类）
 - `2026-05-08` [`20260508_p3b_perimeter_cleanup`](2026-05/20260508_p3b_perimeter_cleanup/) - standard - 任务清单: P3b Perimeter Cleanup

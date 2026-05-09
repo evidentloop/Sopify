@@ -1592,14 +1592,6 @@ def _find_skill(skills: tuple[SkillMeta, ...], skill_id: str) -> SkillMeta | Non
     return None
 
 
-def _phase_for_route(decision: RouteDecision) -> str:
-    if decision.route_name in {"plan_only", "workflow", "light_iterate", "clarification_pending", "clarification_resume", "decision_pending", "decision_resume"}:
-        return "design"
-    if decision.route_name in {"resume_active", "exec_plan", "quick_fix"}:
-        return "develop"
-    return "analysis"
-
-
 def _build_skill_activation(
     *,
     decision: RouteDecision,

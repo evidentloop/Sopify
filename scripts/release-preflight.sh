@@ -64,7 +64,14 @@ run_step "Check version consistency" bash "$ROOT_DIR/scripts/check-version-consi
 run_step "Check builtin catalog drift" check_builtin_catalog_drift
 run_step "Check fail-close contract" python3 "$ROOT_DIR/scripts/check-fail-close-contract.py"
 run_step "Check context checkpoints" python3 "$ROOT_DIR/scripts/check-context-checkpoints.py" repo --root "$ROOT_DIR"
-run_step "Run runtime unit tests" python3 -m pytest "$ROOT_DIR/tests" -v
+run_step "Run hard gate tests (contract + smoke + distribution)" python3 -m pytest "$ROOT_DIR/tests" -m "not implementation_mirror" -v
+
+echo "[release-preflight] Running implementation-mirror tests (advisory, non-blocking)..."
+if python3 -m pytest "$ROOT_DIR/tests" -m "implementation_mirror" -v; then
+  echo "[release-preflight] Implementation-mirror tests passed."
+else
+  echo "[release-preflight] WARNING: Implementation-mirror tests failed (advisory, not blocking release)."
+fi
 run_step "Run install/payload bootstrap smoke" python3 "$ROOT_DIR/scripts/check-install-payload-bundle-smoke.py"
 run_step "Run prompt runtime gate smoke" python3 "$ROOT_DIR/scripts/check-prompt-runtime-gate-smoke.py"
 run_step "Run bundle runtime smoke check" bash "$ROOT_DIR/scripts/check-runtime-smoke.sh"

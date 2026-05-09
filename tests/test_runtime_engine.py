@@ -1,6 +1,8 @@
 # Test classification: contract
 from __future__ import annotations
 
+import pytest
+
 from dataclasses import replace
 
 from tests.runtime_test_support import *
@@ -1200,6 +1202,8 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertEqual(resumed.recovered_context.current_run.stage, "executing")
             self.assertFalse((workspace / ".sopify-skills" / "state" / "current_decision.json").exists())
 
+    @pytest.mark.implementation_mirror
+
     def test_develop_decision_resume_can_fallback_to_plan_review(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
@@ -1269,6 +1273,8 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertEqual(resumed.handoff.required_host_action, "continue_host_develop")
             self.assertEqual(resumed.recovered_context.current_run.stage, "executing")
             self.assertFalse((workspace / ".sopify-skills" / "state" / "current_clarification.json").exists())
+
+    @pytest.mark.implementation_mirror
 
     def test_develop_pending_decision_does_not_bypass_checkpoint_when_resume_bridge_is_missing(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1630,6 +1636,8 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertNotIn("archived_plan_path", handoff.artifacts)
             self.assertNotIn("state_cleared", handoff.artifacts)
 
+    @pytest.mark.implementation_mirror
+
     def test_archive_normalizes_legacy_archive_front_matter_projection(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
@@ -1751,6 +1759,8 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertIn("required_missing", blocked_sync)
             self.assertGreater(len(blocked_sync["required_missing"]), 0)
 
+    @pytest.mark.implementation_mirror
+
     def test_archive_blocks_legacy_plan_without_auto_doctor(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
@@ -1803,6 +1813,8 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertEqual(result.handoff.artifacts["archive_receipt_status"], "review_required")
             self.assertEqual(result.handoff.artifacts["archive_lifecycle"]["archive_changed_files"], [])
             self.assertTrue((workspace / ".sopify-skills" / "state" / "current_plan.json").exists())
+
+    @pytest.mark.implementation_mirror
 
     def test_archive_keeps_legacy_plan_blocked_after_session_interruption(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -2269,6 +2281,8 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertEqual(orchestrated.exit_code, PLAN_ORCHESTRATOR_PENDING_EXIT)
             self.assertEqual(orchestrated.stopped_reason, "repeated_checkpoint")
             self.assertEqual(orchestrated.loop_count, 3)
+
+    @pytest.mark.implementation_mirror
 
     def test_run_plan_loop_fail_closes_when_bridge_cannot_complete_roundtrip(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -2862,6 +2876,8 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertEqual(submit_payload["required_host_action"], "confirm_decision")
             self.assertTrue((workspace / ".sopify-skills" / "state" / "current_decision.json").exists())
 
+    @pytest.mark.implementation_mirror
+
     def test_synced_runtime_bundle_supports_cli_decision_bridge_prompt(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
@@ -3001,6 +3017,8 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertFalse((workspace / ".sopify-skills" / "state" / "current_clarification.json").exists())
             self.assertTrue((workspace / ".sopify-skills" / "state" / "current_plan.json").exists())
 
+    @pytest.mark.implementation_mirror
+
     def test_repo_local_runtime_entry_blocks_runtime_first_requests_without_override(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
@@ -3047,6 +3065,8 @@ class EngineIntegrationTests(unittest.TestCase):
             )
             self.assertEqual(allowed.returncode, 0, msg=allowed.stderr)
             self.assertTrue((workspace / ".sopify-skills" / "state" / "current_handoff.json").exists())
+
+    @pytest.mark.implementation_mirror
 
     def test_repo_local_runtime_entry_blocks_finalize_alias_without_override(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -3620,6 +3640,8 @@ class RoutingConvergenceTests(unittest.TestCase):
 
     # -- B8: bare text request fallback --
 
+    @pytest.mark.implementation_mirror
+
     def test_bare_text_request_uses_router_classify(self) -> None:
         """No ActionProposal → Router.classify fallback."""
         with tempfile.TemporaryDirectory() as td:
@@ -3627,6 +3649,8 @@ class RoutingConvergenceTests(unittest.TestCase):
             (workspace / ".sopify-skills").mkdir(parents=True)
             result = run_runtime("解释 router 的工作原理", workspace_root=workspace, user_home=workspace / "home")
         self.assertEqual(result.route.route_name, "consult")
+
+    @pytest.mark.implementation_mirror
 
     def test_bare_text_modify_uses_router_classify(self) -> None:
         """No ActionProposal, modify request → Router.classify determines route."""

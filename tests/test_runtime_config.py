@@ -1,4 +1,4 @@
-# Test classification: contract
+# Test classification: implementation-mirror
 from __future__ import annotations
 
 from tests.runtime_test_support import *

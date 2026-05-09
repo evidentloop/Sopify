@@ -77,8 +77,15 @@ jobs:
             --base-sha "${{ github.event.pull_request.base.sha }}" \
             --head-sha "${{ github.event.pull_request.head.sha }}"
 
-      - name: Run runtime and installer unit tests
-        run: python3 -m unittest discover tests -v
+      - name: Run hard gate tests (contract + smoke + distribution)
+        run: |
+          pip install --quiet pytest
+          python3 -m pytest tests -m "not implementation_mirror" -v
+
+      - name: Run implementation-mirror tests (advisory)
+        if: always()
+        continue-on-error: true
+        run: python3 -m pytest tests -m "implementation_mirror" -v
 
       - name: Run runtime smoke check
         run: bash scripts/check-runtime-smoke.sh

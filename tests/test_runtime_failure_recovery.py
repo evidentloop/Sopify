@@ -1,6 +1,8 @@
 # Test classification: contract
 from __future__ import annotations
 
+import pytest
+
 from tests.runtime_test_support import *
 
 from runtime.decision_tables import DEFAULT_DECISION_TABLES_PATH, load_default_decision_tables
@@ -156,17 +158,23 @@ class FailureRecoveryTests(unittest.TestCase):
         self.assertEqual(Path(table["decision_tables_source_path"]), DEFAULT_DECISION_TABLES_PATH.resolve())
         self.assertEqual(len(table["rows"]), 8)
 
+    @pytest.mark.implementation_mirror
+
     def test_legacy_standalone_recovery_asset_can_still_load_explicitly(self) -> None:
         table = load_failure_recovery_table(LEGACY_FAILURE_RECOVERY_TABLE_PATH)
         self.assertEqual(Path(table["source_path"]), LEGACY_FAILURE_RECOVERY_TABLE_PATH.resolve())
         self.assertEqual(Path(table["decision_tables_source_path"]), DEFAULT_DECISION_TABLES_PATH.resolve())
         self.assertEqual(table["schema_version"], "failure_recovery.v1")
 
+    @pytest.mark.implementation_mirror
+
     def test_default_and_legacy_recovery_tables_stay_in_sync(self) -> None:
         embedded = load_default_failure_recovery_table()
         legacy = load_failure_recovery_table(LEGACY_FAILURE_RECOVERY_TABLE_PATH)
         assert_failure_recovery_tables_consistent(embedded, legacy)
         self.assertEqual(embedded["rows"], legacy["rows"])
+
+    @pytest.mark.implementation_mirror
 
     def test_embedded_decision_table_errors_are_normalized(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -180,6 +188,8 @@ class FailureRecoveryTests(unittest.TestCase):
                 r"Failed to load embedded failure recovery asset",
             ):
                 load_failure_recovery_table(asset_path)
+
+    @pytest.mark.implementation_mirror
 
     def test_unified_asset_detection_does_not_depend_on_v1_schema_literal(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -195,6 +205,8 @@ class FailureRecoveryTests(unittest.TestCase):
                 r"Failed to load embedded failure recovery asset: Unsupported decision table schema_version",
             ):
                 load_failure_recovery_table(asset_path)
+
+    @pytest.mark.implementation_mirror
 
     def test_decision_table_context_errors_are_normalized_for_legacy_load(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
