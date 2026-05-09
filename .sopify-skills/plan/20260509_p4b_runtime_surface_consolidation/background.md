@@ -24,9 +24,9 @@ P4a 已冻结外部消费面 keep-list（15 条），Host Capability Governance 
 | message_templates.py 模板精简 | 20–60 | 渲染模板胶水 |
 | action_intent.py fallback | 20–40 | decision fallback router |
 | 其他散布 compat | 100–200 | archive_lifecycle, context_v1_scope 等 |
-| **合计** | **2,355–3,590** | |
+| **合计** | **2,355–3,590** | **实际：15 LOC** |
 
-**诚实评估**：纯删除（compat/bridge/dead）可以从 25.5K 降到约 22–23K。但这是基于按文件修枝的保守估算；改用 prove-kept-or-delete 方法论（keep-list 外默认整段删除）可能发现更多可删面。如仍不足 <20K，优先继续发现语义死面，仅在有结构性价值时合并，不做 LOC 化妆。蓝图已明确"不先承诺合并方案——删完再评估"。
+**P4b-close 结论**：prove-kept-or-delete 全量扫描证明，原估计基于错误假设（fallback/bridge/compat 被视为"可删旧面"，实际多已变为 machine contract / distribution contract / hard gate 保护面）。实际死代码仅 15 LOC。最终 baseline：24,334 LOC。详见 design.md Phase 2 执行结论。
 
 ## 与蓝图里程碑的关系
 

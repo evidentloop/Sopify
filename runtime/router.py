@@ -767,11 +767,6 @@ def _split_active_plan_review_fragments(text: str) -> tuple[str, ...]:
 
 
 
-def _contains_intent(text: str, keywords: Iterable[str]) -> bool:
-    lowered = text.lower()
-    return any(keyword.lower() in lowered for keyword in keywords)
-
-
 def _normalize(text: str) -> str:
     return " ".join(text.strip().lower().split())
 
@@ -783,13 +778,6 @@ def _candidate_skills(route_name: str, skills: Iterable[SkillMeta], *preferred: 
         fallback_preferred=tuple(preferred),
     )
 
-
-def _runtime_skill(route_name: str, skills: Iterable[SkillMeta], skill_id: str) -> str | None:
-    return resolve_runtime_skill_id(
-        route_name,
-        skills,
-        fallback_preferred=skill_id,
-    )
 
 
 
