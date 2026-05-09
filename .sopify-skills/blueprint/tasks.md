@@ -20,7 +20,7 @@
 | P2 | local_action_contracts | P1.5 | 已完成。在主体已绑定前提下收敛局部动作 contract |
 | P3a | contract_aligned_cleanup | P2 | 已完成。以 protocol/validator 已稳定为前提，清理 runtime 旧 contract 面 |
 | P3b | perimeter_cleanup | P3a | 已完成。外围面清理：release gate 修复、CHANGELOG 去文件列表化、tests 分类、旧概念清理 |
-| P4a | external_surface_freeze | P3b | 薄切片：冻结不可删外部消费面 keep-list |
+| P4a | external_surface_freeze | P3b | 已完成。薄切片：冻结不可删外部消费面 keep-list |
 | P4b | runtime_surface_consolidation | P4a | Runtime 结构性减重（26K→<20K），先删后并 |
 | P4c | host_consumption_governance | P4a | 宿主只消费 contract，不定义 truth |
 
@@ -48,15 +48,9 @@
 
 ✅ 已完成。Release gate 修复、CHANGELOG 压缩、tests 分类标注、replay/workflow-learning 下线、README 首屏降噪、旧概念清理。归档：`history/2026-05/20260508_p3b_perimeter_cleanup/`
 
-### P4a: External Surface Freeze
+### P4a: External Surface Freeze（已完成）
 
-薄切片。列出不可删除的外部消费面 keep-list，作为 P4b 减重的红线边界。
-
-- 枚举 keep-list：protocol.md、gate contract（gate_receipt schema）、handoff/receipt machine truth fields、archive truth（ArchiveCheckResult / ArchiveApplyResult）、install.sh/install.ps1 contract（SOURCE_CHANNEL, SOURCE_REF）、builtin_catalog.py 导出接口（freeze 指接口契约形态——schema / entry_kind / metadata contract，不指具体 skill 枚举或文件字节；能力上下线属内容变更，不违反 freeze）、skill_eval baseline/SLO
-- **冻结 persistence surface 分类**：keep-list 覆盖到目录级别（参照 design.md "Persistence Surface 分层"表），明确哪些目录属于长期知识/主链真相/凭证/可删派生，作为 P4b 减重和 P4c 宿主消费治理的红线
-- 输出：design.md 加 "Frozen External Surface" 表（与 Persistence Surface 分层互补——后者分类所有持久化面，Frozen 表只冻结外部消费面的 keep-list；不重复造表）
-- **Output rendering fields 分类**：逐字段审计 `runtime/output.py` 渲染层，分三类——machine truth projection（handoff/receipt 投影）/ human hint（Next 等面向人的提示）/ internal taxonomy leak（gate_status 等不应默认暴露的内部术语）。审计结果写入 Frozen External Surface 表，作为 P4c output contract convergence 的输入
-- 不写代码，纯边界确认
+✅ 已完成。Frozen External Surface keep-list（15 条）+ Output Rendering Audit（20 条字段分类 + 5 个已知热点）。纯文档变更，不写运行代码。归档：`history/2026-05/20260509_p4a_external_surface_freeze/`
 
 ### P4b: Runtime Surface Consolidation
 

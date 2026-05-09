@@ -1,0 +1,29 @@
+version: 1
+mode: "observe_only"
+selection_policy: "explicit_only"
+priority_policy: "heuristic_v1"
+priority_fallback: "p2"
+plans:
+  - plan_id: "20260418_cross_review_engine"
+    snapshot:
+      path: ".sopify-skills/plan/20260418_cross_review_engine"
+      title: "Cross-Review 独立内核方案"
+      level: "standard"
+      topic_key: "cross_review_engine"
+      lifecycle_state: "active"
+      created_at: "2026-05-04T14:45:24+00:00"
+    governance:
+      priority: null
+      priority_source: null
+      priority_confirmed_at: null
+      status: "deferred"
+      note: ""
+    advice:
+      suggested_priority: "p2"
+      suggested_source: "heuristic_v1"
+      suggested_reason:
+        - "未识别明确紧急或降级信号，先按默认建议观察"
+      suggested_at: "2026-05-05T11:12:58+00:00"
+    meta:
+      source: "runtime_backfill"
+      updated_at: "2026-05-05T11:12:58+00:00"

@@ -4,6 +4,7 @@
 
 ## 索引
 
+- `2026-05-09` [`20260509_p4a_external_surface_freeze`](2026-05/20260509_p4a_external_surface_freeze/) - standard - P4a External Surface Freeze: Frozen External Surface keep-list（15 条）+ Output Rendering Audit（20 条字段分类）
 - `2026-05-08` [`20260508_p3b_perimeter_cleanup`](2026-05/20260508_p3b_perimeter_cleanup/) - standard - 任务清单: P3b Perimeter Cleanup
 - `2026-05-08` [`20260507_p3a_contract_aligned_surface_cleanup`](2026-05/20260507_p3a_contract_aligned_surface_cleanup/) - standard - P3a Contract-Aligned Surface Cleanup: execution routing 收敛 + knowledge_sync audit trail + dead path cleanup (-88 LOC) + Runtime 减重剥离为 Px
 - `2026-05-07` [`20260506_p2_local_action_contracts`](2026-05/20260506_p2_local_action_contracts/) - standard - P2 Local Action Contracts: subject binding 泛化 + side_effect_delta schema + action-effect canonical pairing（admission contract 闭合）
