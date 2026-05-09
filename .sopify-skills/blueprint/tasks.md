@@ -19,7 +19,7 @@
 | P1.5 | execution_authorization_spine | P1 | 已完成。操作化 ADR-017 ExecutionAuthorizationReceipt，规划授权链路 |
 | P2 | local_action_contracts | P1.5 | 已完成。在主体已绑定前提下收敛局部动作 contract |
 | P3a | contract_aligned_cleanup | P2 | 已完成。以 protocol/validator 已稳定为前提，清理 runtime 旧 contract 面 |
-| P3b | perimeter_cleanup | P3a | 外围面清理：release gate 修复、CHANGELOG 去文件列表化、tests 分类、旧概念清理 |
+| P3b | perimeter_cleanup | P3a | 已完成。外围面清理：release gate 修复、CHANGELOG 去文件列表化、tests 分类、旧概念清理 |
 | P4a | external_surface_freeze | P3b | 薄切片：冻结不可删外部消费面 keep-list |
 | P4b | runtime_surface_consolidation | P4a | Runtime 结构性减重（26K→<20K），先删后并 |
 | P4c | host_consumption_governance | P4a | 宿主只消费 contract，不定义 truth |
@@ -44,18 +44,9 @@
 
 ✅ 已完成。runtime 旧 contract 面清理 + execution routing 收敛 + knowledge_sync audit trail + dead path cleanup。Runtime 结构性减重（26K→<20K）剥离为 P4b。归档：`history/2026-05/20260507_p3a_contract_aligned_surface_cleanup/`
 
-### P3b: Perimeter Cleanup
+### P3b: Perimeter Cleanup（已完成）
 
-以 P3a 完成为前提。清理外围面，为 P4 系列减重扫清障碍。
-
-- **Release gate 修复**：`release-preflight.sh` 从 `unittest discover`（当前环境挂死）改为 `pytest`
-- **CHANGELOG 去文件列表化**：旧 102 条自动生成条目直接压成阶段摘要（不逐条迁移）；新条目只写 Summary + Changed，不列文件；修 `release-draft-changelog.py` 只产摘要，不产文件清单；同步更新 CONTRIBUTING.md changelog 说明
-- **Tests 分类**：`tests/test_*.py` 按 contract（必保）/ smoke（必保）/ distribution（必保）/ implementation-mirror（可砍）标注，为 P4b 减重做分类基础
-- **旧概念清理**：tests 中验证 P3a 已 sunset surface 的断言、prompt 中引用已 sunset contract 的段落、handoff/output/replay 旧兼容投影、reason phrasing / phase label 特判
-- **evals 生成物治理**：`evals/skill_eval_report.json` 是脚本生成物，从 repo 真值中移除（`.gitignore`），baseline 和 SLO 保留
-- **README 首屏降噪与默认入口翻转**：首屏只保留"中断可恢复 + 需要拍板时会停 + 安装入口"三件事；默认叙事以 Convention（纯协议、无 runtime）为入口，Runtime（完整编排、gate、checkpoint）定位为增强路径；plan lifecycle / blueprint / runtime gate / checkpoint taxonomy / task size routing / .sopify-runtime 等内部术语降级到二级文档（how-sopify-works / protocol.md），不在首接触面前置暴露。`.sopify-runtime` 只作为后台实现细节出现，不作为用户首接触概念。目的：为 P4c 运行时首接触验收创造前提
-- **replay 能力下线**：删除 replay/ 目录数据；移除 runtime 中 replay 写入逻辑（replay.py、engine.py replay 事件、develop_callback.py replay 记录、handoff.py replay_session_dir 附件、output.py replay 展示）；清 README / skill 列表 / docs 中对 replay 和 workflow-learning 的引用。replay 不进机器事实链（纯 append-only，无回读），下线不影响 gate/router/handoff 决策链路。workflow-learning 能力同步下线，未来如需重设计另行评估
-- **Runtime 减重外围清理**：清 tests / prompt / projection / docs 中对 P3a 已删 surface 的引用残留
+✅ 已完成。Release gate 修复、CHANGELOG 压缩、tests 分类标注、replay/workflow-learning 下线、README 首屏降噪、旧概念清理。归档：`history/2026-05/20260508_p3b_perimeter_cleanup/`
 
 ### P4a: External Surface Freeze
 
