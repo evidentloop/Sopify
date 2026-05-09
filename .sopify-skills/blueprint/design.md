@@ -341,6 +341,64 @@ ActionProposal 的标量 `side_effect` 字段表达粗粒度权限层级（`none
 
 > replay/ 已在 P3b 列为能力下线（tasks.md P3b），不再列入 persistence surface。
 
+#### Frozen External Surface（P4a keep-list）
+
+P4b 减重和 P4c 宿主消费治理的红线边界。只冻结 artifact / schema / host-visible contract，不冻结 Python 内部 API、route 枚举、输出文案措辞。未列入本表的面默认为 runtime 内部实现，P4b 可删。
+
+| surface | kind | consumer | freeze_level | why_kept | non-goals / not frozen |
+|---------|------|----------|-------------|----------|----------------------|
+| protocol.md §6 Verifier: `verdict`, `evidence`, `source` | doc_contract | host / external_tool | semantics | 跨宿主验证结果的标准格式；宿主消费 verdict 做风险判断 | `scope`（SHOULD，非 MUST）；verifier 内部实现方式 |
+| protocol.md §6 ExecutionAuthorizationReceipt: `plan_id`, `plan_path`, `plan_revision_digest`, `gate_status`, `action_proposal_id`, `authorization_source`, `fingerprint`, `authorized_at` | doc_contract | host / external_tool | semantics | fail-closed 授权回执；跨宿主可恢复的授权证明 | receipt 内部生成方式；fingerprint 算法（可演进） |
+| protocol.md §7 Subject Identity: `subject_type`, `subject_ref`, `revision_digest` | doc_contract | host / external_tool | semantics | 操作主体绑定；admission fail-closed 的前提 | subject resolution 的 runtime 实现方式 |
+| protocol.md §7 plan_subject block: `subject_ref`, `revision_digest` | doc_contract | host | semantics | bound-subject 操作的必要条件 | action applicability matrix 的具体枚举值（实现细节） |
+| `current_gate_receipt.json` top-level: `schema_version`, `status`, `gate_passed`, `workspace_root`, `session_id`, `preflight`, `preferences`, `runtime`, `handoff`, `state`, `trigger_evidence`, `observability`, `allowed_response_mode`, `evidence`, `action_proposal_schema` | gate_contract | host / external_tool | schema | gate 入口判定的完整凭证；诊断/审计依赖；`action_proposal_schema` 在 action_proposal_retry 模式下为当前回合必须消费的 gate contract | receipt 内部子字段结构（observability payload 可演进）；`receipt_path`/`receipt_write_error` 为条件性写入，不冻 |
+| `current_handoff.json` top-level: `schema_version`, `route_name`, `run_id`, `plan_id`, `plan_path`, `handoff_kind`, `required_host_action`, `recommended_skill_ids`, `artifacts`, `notes`, `observability`, `resolution_id` | machine_truth | host | schema | 宿主消费 handoff 做执行交接；跨宿主恢复的核心数据 | 内部组装方式（Python to_dict/from_dict）；observability 子字段可演进 |
+| Archive truth — ArchiveCheckResult: `status`, `subject`, `notes`, `knowledge_sync_result` | machine_truth | host | schema | archive 前检查结果；宿主据此决定是否归档 | Python dataclass 名称和内部方法 |
+| Archive truth — ArchiveApplyResult: `status`, `subject`, `archived_plan`, `kb_artifact`, `notes`, `registry_updated`, `state_cleared`, `knowledge_sync_result` | machine_truth | host | schema | archive 执行结果的完整凭证 | Python dataclass 名称和内部方法 |
+| `install.sh` / `install.ps1` user params: `--target`, `--ref`, `--workspace`, `-h` | install_contract | user | existence | 用户安装入口的稳定参数 | 内部转发参数（`--source-channel`, `--source-resolved-ref`, `--source-asset-name`）；`SOURCE_CHANNEL`/`SOURCE_REF` 为 distribution metadata，非用户面稳定接口，默认值可变；freeze 口径以用户入口 contract 为主 |
+| `builtin_catalog.generated.json` file-level: `schema_version`, `generated_at`, `source`, `skills`; per-skill: `id`, `names`, `descriptions`, `mode`, `entry_kind`, `handoff_kind`, `contract_version`, `supports_routes`, `triggers`, `metadata`, `tools`, `disallowed_tools`, `allowed_paths`, `requires_network`, `host_support`, `permission_mode`, `runtime_entry` | machine_truth | host | schema | 宿主消费 skill 清单做能力发现和 prompt 注入 | 具体 skill 枚举（能力上下线属内容变更，不违反 freeze）；Python API 签名（`load_builtin_skills()`） |
+| `evals/skill_eval_slo.json` + `evals/skill_eval_baseline.json` | gate_contract | external_tool | existence | 发布门禁的存在性和最小语义（SLO 定义 pass/fail） | 具体维度 taxonomy（selection/discovery/navigation 可演进）；具体分数阈值（可调） |
+| Persistence: `blueprint/` `plan/` `history/` `project.md` | persistence_red_line | user / host | existence | 长期知识；人 + 宿主 + runtime 共同消费 | 目录内部文件结构（可增删文件） |
+| Persistence: `user/preferences.md` · `user/feedback.jsonl` | persistence_red_line | user / host | existence | 偏好审计；tracked 不可删 | 文件内部格式可演进 |
+| Persistence: `state/current_run` · `current_plan` · `current_handoff` · `current_clarification` · `current_decision` | persistence_red_line | host | existence | 主链机器真相；运行期不可删 | 具体 JSON 内部子字段结构（由上方 schema freeze 覆盖） |
+| Persistence: `state/current_gate_receipt` · `current_archive_receipt` | persistence_red_line | external_tool | existence | 可审计凭证；运行期不可删 | 非主链依赖；诊断用途 |
+
+> **未列入面默认可删**：`state/sessions/*`、`state/last_route.json`、runtime 内部模块边界、route name 全集、output 渲染文案措辞均为 runtime 内部实现，不在 keep-list 内。P4b 减重时可自由处置。
+
+#### Output Rendering Audit（P4a 审计）
+
+output.py 渲染层逐字段分类。只做分类，不做改造决策（改造属 P4c）。
+
+| field / section | source | classification | note |
+|----------------|--------|---------------|------|
+| Title: `[brand] phase status_symbol` | derived（route_name → phase label 映射） | human_hint | phase label 和 ✓/?/! 均为人类可读提示，不是 machine truth |
+| `Plan: <path>` / `Current Plan: <path>` | plan_artifact.path / current_plan.path | machine_truth_projection | resume_active/exec_plan 路径渲染 Current Plan，其余路径渲染 Plan |
+| `Summary: <summary>` | plan_artifact.summary / clarification.summary | machine_truth_projection | |
+| `Stage: <stage>` | current_run.stage | machine_truth_projection | |
+| `Gate: gate_status / blocking_reason / plan_completion` | current_run.execution_gate 或 handoff.artifacts | internal_taxonomy_leak | 三元组直接暴露 runtime 内部 gate 状态机；默认输出中不应前置 |
+| `Handoff: <path>` | handoff 文件路径 | machine_truth_projection | |
+| `Status: <message>` | derived（route_name + gate_status + handoff） | human_hint | 消息模板由 route_name 和 required_host_action 推导 |
+| `Priority note` | result.notes（plan_registry 事件） | human_hint | |
+| `Missing Facts: <facts>` | current_clarification.missing_facts | machine_truth_projection | |
+| `Questions: <questions>` | current_clarification.questions | machine_truth_projection | |
+| `Question: <question>` + `Options: <options>` | current_decision | machine_truth_projection | |
+| `Decision Status: awaiting confirmation` | derived（recommended_option_id） | human_hint | |
+| `Conflict Code: <code>` + `Reason: <message>` | state_conflict payload | machine_truth_projection | |
+| `Quarantined: <count>` | quarantined_items | machine_truth_projection | |
+| `Entry Guard Reason: <code>` | handoff.artifacts.entry_guard_reason_code | internal_taxonomy_leak | runtime 内部守卫码，非宿主需消费的 contract |
+| `Archive: <path>` + archive status | plan_artifact / archive result | machine_truth_projection | |
+| `Route: <route_name>` | result.route.route_name | internal_taxonomy_leak | 仅在 cancel_active 和 fallback 路径直接暴露内部 route 名 |
+| `Reason: <reason>` | result.notes / route.reason / route_name（fallback） | mixed（machine_truth_projection + internal） | fallback 到 route_name 时属于 internal taxonomy leak |
+| `Changes: N files` + file list | kb_artifact.files + plan_artifact.files + loaded_files + generated_files + state paths | mixed（machine_truth_projection + internal） | 混合了实际写入文件和恢复上下文加载文件（loaded_files）；loaded 不是 Changed |
+| `Next: <hint>` | derived（required_host_action + route_name + handoff_kind） | human_hint | 推导逻辑混合了内部 route_name 和 handoff contract 字段 |
+
+**已知热点汇总**：
+- **Gate 三元组 leak**：`gate_status / blocking_reason / plan_completion` 直接渲染 runtime 内部 gate 状态机到默认输出
+- **Changes 混层**：`loaded_files`（恢复上下文）与实际写入文件混在同一个 Changes 区块
+- **Next 推导**：human hint 但内部依赖 route_name + required_host_action 交叉推导，逻辑复杂
+- **Route 名泄露**：cancel_active 和 fallback 路径直接渲染 route_name
+- **Entry Guard Reason**：内部守卫码不应在默认输出中暴露
+
 ### 削减预算表
 
 | 维度 | 当前 | Target | Hard Max | 计算口径 |
