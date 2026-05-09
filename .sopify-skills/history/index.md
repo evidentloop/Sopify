@@ -4,6 +4,7 @@
 
 ## 索引
 
+- `2026-05-09` [`20260509_host_capability_governance`](2026-05/20260509_host_capability_governance/) - standard - Host Capability Governance（P4a→P4c bridge）：3 级 canonical 梯度定义 + 接入判定 Checklist + Convention Quickstart 最小交付面 + Prompt 镜像治理原则
 - `2026-05-09` [`20260509_p4a_external_surface_freeze`](2026-05/20260509_p4a_external_surface_freeze/) - standard - P4a External Surface Freeze: Frozen External Surface keep-list（15 条）+ Output Rendering Audit（20 条字段分类）
 - `2026-05-08` [`20260508_p3b_perimeter_cleanup`](2026-05/20260508_p3b_perimeter_cleanup/) - standard - 任务清单: P3b Perimeter Cleanup
 - `2026-05-08` [`20260507_p3a_contract_aligned_surface_cleanup`](2026-05/20260507_p3a_contract_aligned_surface_cleanup/) - standard - P3a Contract-Aligned Surface Cleanup: execution routing 收敛 + knowledge_sync audit trail + dead path cleanup (-88 LOC) + Runtime 减重剥离为 Px
