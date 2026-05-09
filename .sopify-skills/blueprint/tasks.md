@@ -21,8 +21,9 @@
 | P3a | contract_aligned_cleanup | P2 | 已完成。以 protocol/validator 已稳定为前提，清理 runtime 旧 contract 面 |
 | P3b | perimeter_cleanup | P3a | 已完成。外围面清理：release gate 修复、CHANGELOG 去文件列表化、tests 分类、旧概念清理 |
 | P4a | external_surface_freeze | P3b | 已完成。薄切片：冻结不可删外部消费面 keep-list |
-| P4b | runtime_surface_consolidation | P4a | Runtime 结构性减重（26K→<20K），先删后并 |
-| P4c | host_consumption_governance | P4a | 宿主只消费 contract，不定义 truth |
+| P4b | runtime_surface_consolidation | P4a | 已完成。prove-kept-or-delete 证明 <20K 不可达，实删 15 LOC |
+| P4b.5 | runtime_optionality_audit | P4b | 设计/审计型：宿主接入层级矩阵，定义 runtime 可选边界 |
+| P4c | host_consumption_governance | P4b.5 | 宿主只消费 contract，不定义 truth |
 
 ### P0: Blueprint Rebaseline（已完成）
 
@@ -52,23 +53,21 @@
 
 ✅ 已完成。Frozen External Surface keep-list（15 条）+ Output Rendering Audit（20 条字段分类 + 5 个已知热点）。纯文档变更，不写运行代码。归档：`history/2026-05/20260509_p4a_external_surface_freeze/`
 
-### P4b: Runtime Surface Consolidation
+### P4b: Runtime Surface Consolidation（已完成，待归档）
 
-P4a keep-list 确认后执行。先删后并，不先设计新结构。
+✅ 已完成。prove-kept-or-delete 全量扫描证明 runtime 在当前 contract 约束下已接近最小可行体积（24,334 LOC）。<20K 目标在不改 distribution/installer contract 的约束下不可达。交付物：Phase 0 test re-audit（653 hard / 31 soft gate）、Phase 1 CI/preflight 真实降载、Phase 2 全量死代码扫描（15 LOC 删除）。详见 `plan/20260509_p4b_runtime_surface_consolidation/design.md` Phase 2 执行结论。方案包尚在 `plan/`，归档至 `history/` 待后续执行。
 
-- 目标：runtime/*.py LOC 26K → <20K
-- 红线：ActionProposal → Validator → Handoff/Receipt/Archive 主链完整；keep-list 内保留，keep-list 外默认删除
-- 执行顺序（硬约束，不可并行跳跃）：
-  1. release gate 范围收口 — 发布门禁从全量测试缩为 contract + smoke + distribution + eval gate（runner 切换在 P3b 完成）
-  2. runtime 旧面删除 — 砍 compat / bridge / fallback / 旧分支；此时 implementation-mirror tests 仍在，作为管道完整性验证
-  3. implementation-mirror tests 收口 — runtime 瘦身稳定后，删除保护对象已不存在的镜像测试
-- 不允许在 release gate 未降载前同步大规模删除 runtime 与 mirror tests
-- 约束：不改 machine contract、不改 protocol 语义、不扩 canonical budget
-- 不先承诺合并方案 — 删完再评估是否需要并文件
+### P4b.5: Runtime Optionality & Host Onboarding Audit（待开）
+
+设计/审计型，不大改代码。P4b 证明 runtime 不能靠内部删代码大幅瘦身，根因是大量 runtime 代码实际承载 distribution/installer contract。下一步需定义宿主接入层级，明确"runtime 可选"的规则边界。
+
+- 产出：宿主接入层级矩阵（convention_only / payload_capable / deep_verified），每层定义必须消费、可选消费、禁止依赖的面
+- 不改代码：只做策略和 blast radius 审计，为 P4c 定边界
+- 位置：P4b-close 后、P4c 前执行
 
 ### P4c: Host Consumption Governance
 
-宿主只消费稳定 contract，不再定义 machine truth。独立于减重，P4a 之后可与 P4b 并行或顺序执行。
+宿主只消费稳定 contract，不再定义 machine truth。P4b.5 宿主接入层级矩阵就绪后执行。
 
 - prompt 不定义机器契约、不维护路由表
 - doctor/status 输出只渲染 machine truth，不作为 truth source
@@ -82,6 +81,14 @@ P4a keep-list 确认后执行。先删后并，不先设计新结构。
 
 ## 未完成长期项
 
+### P4b 后续路线（P4c 后视评估）
+
+- [ ] P4d New Host Pilot：选 1 个非 deep 宿主做试点（convention_only 或 payload_capable），不接完整 runtime。验证 P4b.5/P4c 的分层是否真正降低接入成本。可与 P4c 后期并行启动。
+- [ ] P5 Contract Surface Shrinkage：在 P4d 验证后，按 evidence 逐项删除或降级 deep runtime 专属的 contract surface（bridge capability / manifest entry / installer bundle 项）。此时已知哪些 contract 是新宿主需要 vs 历史包袱。
+- [ ] P6 Runtime Sunset / Reference Runtime：将 runtime 明确降级为 reference implementation 或 deep host hardening layer。新宿主默认走 Protocol/Convention 模式，runtime 不再承载新增产品能力。可能与 P5 合并。
+
+### 其他长期项
+
 - [ ] 补宿主级 first-hop ingress proof / diagnostics
 - [ ] `~compare` shortlist facade 收敛进默认主链路
 - [-] `workflow-learning` 独立 helper 与更稳定 replay retrieval → P3b replay 能力下线后，未来如需重设计另行评估
@@ -90,7 +97,7 @@ P4a keep-list 确认后执行。先删后并，不先设计新结构。
 
 - [ ] CrossReview Phase 4a：advisory skill 接入 develop 后审查
 - [ ] Plan intake checklist（在 intake 模板/脚本落地前，后续新 plan 开包时手工回答以下问题）：
-  1. 主命中哪个蓝图里程碑（P3b / P4a / P4b / P4c）？若不命中主线，须显式标记为"长期项"或"延后项"，不强行归类
+  1. 主命中哪个蓝图里程碑（P4b.5 / P4c / P4d / P5 / P6）？若不命中主线，须显式标记为"长期项"或"延后项"，不强行归类
   2. 这次改动定义的是 contract acceptance boundary，还是 execution strategy / implementation wave？（前者进 blueprint，后者留方案包）
   3. 是否新增、删除、替代 action / route / state / checkpoint / receipt 中的任一 machine truth？若是，对照 `design.md` 削减预算表
   4. 若涉及 legacy surface，替代 contract 是否已在 `design.md` sunset 表中对应里程碑稳定？
