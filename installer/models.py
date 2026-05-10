@@ -48,6 +48,19 @@ class FeatureId(StrEnum):
     SMOKE_VERIFIED = "smoke_verified"
 
 
+class EnhancementGroup(StrEnum):
+    """Opt-in consumption enhancement groups declared by host adapters.
+
+    Each group maps to a set of contract surfaces from the consumption matrix
+    (see blueprint/design.md). This enum is a declaration axis orthogonal to
+    FeatureId (installation capability axis).
+    """
+
+    CONTINUATION = "continuation"
+    INTERACTION = "interaction"
+    AUDIT = "audit"
+
+
 @dataclass(frozen=True)
 class HostCapability:
     """Product-facing capability declaration for one supported host."""
@@ -57,6 +70,7 @@ class HostCapability:
     install_enabled: bool
     declared_features: tuple[FeatureId, ...]
     verified_features: tuple[FeatureId, ...]
+    declared_enhancements: tuple[EnhancementGroup, ...]
     entry_modes: tuple[EntryMode, ...]
     doctor_checks: tuple[str, ...]
     smoke_targets: tuple[str, ...]
@@ -68,6 +82,7 @@ class HostCapability:
             "install_enabled": self.install_enabled,
             "declared_features": [feature.value for feature in self.declared_features],
             "verified_features": [feature.value for feature in self.verified_features],
+            "declared_enhancements": [group.value for group in self.declared_enhancements],
             "entry_modes": [mode.value for mode in self.entry_modes],
             "doctor_checks": list(self.doctor_checks),
             "smoke_targets": list(self.smoke_targets),

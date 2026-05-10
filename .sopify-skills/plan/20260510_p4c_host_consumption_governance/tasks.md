@@ -28,11 +28,11 @@
 
 ## P4c-2: 增强声明/检测层
 
-- [ ] 2.1 调研增强声明的最小可行方案（manifest / bridge config / capability detection）
-- [ ] 2.2 选定最小可行声明机制
-- [ ] 2.3 定义声明协议（格式、字段、放置位置）
-- [ ] 2.4 定义检测/校验逻辑（advisory / fail-closed / host-visible diagnostics）
-- [ ] 2.5 产出本地可验证样例或参考接入证明，证明声明方式与检测逻辑可跑通
+- [x] 2.1 调研增强声明的最小可行方案（manifest / bridge config / capability detection）
+- [x] 2.2 选定最小可行声明机制
+- [x] 2.3 定义声明协议（格式、字段、放置位置）
+- [x] 2.4 定义检测/校验逻辑（advisory / fail-closed / host-visible diagnostics）
+- [x] 2.5 产出本地可验证样例或参考接入证明，证明声明方式与检测逻辑可跑通
 
 ## P4c-3a: 渲染与 truth-source 收敛层
 
