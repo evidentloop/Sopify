@@ -4,6 +4,7 @@
 
 ## 索引
 
+- `2026-05-10` [`20260510_p4b5_runtime_optionality_audit`](2026-05/20260510_p4b5_runtime_optionality_audit/) - standard - P4b.5 Runtime Optionality & Host Onboarding Audit: Forbidden Surface（F1-F8）+ 消费矩阵 + opt-in 增强组合 + 官方接入画像 + Blast Radius 审计 + 综合裁定 + P4c 前提声明
 - `2026-05-09` [`20260509_p4b_runtime_surface_consolidation`](2026-05/20260509_p4b_runtime_surface_consolidation/) - standard - P4b Runtime Surface Consolidation: prove-kept-or-delete 全量扫描证明 runtime 已近最小体积（24,334 LOC），实删 15 LOC，<20K 目标在现有 contract 约束下不可达
 - `2026-05-09` [`20260509_host_capability_governance`](2026-05/20260509_host_capability_governance/) - standard - Host Capability Governance（P4a→P4c bridge）：3 级 canonical 梯度定义 + 接入判定 Checklist + Convention Quickstart 最小交付面 + Prompt 镜像治理原则
 - `2026-05-09` [`20260509_p4a_external_surface_freeze`](2026-05/20260509_p4a_external_surface_freeze/) - standard - P4a External Surface Freeze: Frozen External Surface keep-list（15 条）+ Output Rendering Audit（20 条字段分类）

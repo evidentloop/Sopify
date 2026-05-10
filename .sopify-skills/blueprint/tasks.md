@@ -22,7 +22,7 @@
 | P3b | perimeter_cleanup | P3a | 已完成。外围面清理：release gate 修复、CHANGELOG 去文件列表化、tests 分类、旧概念清理 |
 | P4a | external_surface_freeze | P3b | 已完成。薄切片：冻结不可删外部消费面 keep-list |
 | P4b | runtime_surface_consolidation | P4a | 已完成。prove-kept-or-delete 证明 <20K 不可达，实删 15 LOC |
-| P4b.5 | runtime_optionality_audit | P4b | 设计/审计型：宿主接入层级矩阵，定义 runtime 可选边界 |
+| P4b.5 | runtime_optionality_audit | P4b | 已完成。设计/审计型：宿主接入层级矩阵 + 消费矩阵 + blast radius + 综合裁定 |
 | P4c | host_consumption_governance | P4b.5 | 宿主只消费 contract，不定义 truth |
 
 ### P0: Blueprint Rebaseline（已完成）
@@ -57,13 +57,9 @@
 
 ✅ 已完成。prove-kept-or-delete 全量扫描证明 runtime 在当前 contract 约束下已接近最小可行体积（24,334 LOC）。<20K 目标在不改 distribution/installer contract 的约束下不可达。交付物：Phase 0 test re-audit（653 hard / 31 soft gate）、Phase 1 CI/preflight 真实降载、Phase 2 全量死代码扫描（15 LOC 删除）。归档：`history/2026-05/20260509_p4b_runtime_surface_consolidation/`
 
-### P4b.5: Runtime Optionality & Host Onboarding Audit（进行中）
+### P4b.5: Runtime Optionality & Host Onboarding Audit（已完成）
 
-设计/审计型，不大改代码。P4b 证明 runtime 不能靠内部删代码大幅瘦身，根因是大量 runtime 代码实际承载 distribution/installer contract。下一步需定义宿主接入层级，明确"runtime 可选"的规则边界。
-
-- 产出：宿主接入层级矩阵（convention_only / payload_capable / deep_verified），每层定义必须消费、可选消费、禁止依赖的面
-- 不改代码：只做策略和 blast radius 审计，为 P4c 定边界
-- 位置：P4b-close 后、P4c 前执行
+✅ 已完成。设计/审计型，不改代码。交付物：S1 Forbidden Surface（F1-F8）、S2 消费矩阵 + opt-in 增强组合 + 官方接入画像、S3 Blast Radius 审计（15 功能区 + 语义来源→落盘→contract 映射）、S4 综合裁定 + P4c 前提声明。归档：`history/2026-05/20260510_p4b5_runtime_optionality_audit/`
 
 ### P4c: Host Consumption Governance
 
