@@ -181,6 +181,19 @@ _LABELS = {
     },
 }
 
+_ROUTE_FAMILIES = {
+    "completion": frozenset({"plan_only", "archive_lifecycle", "cancel_active"}),
+    "pending": frozenset({"clarification_pending", "decision_pending"}),
+    "action": frozenset({"workflow", "light_iterate", "quick_fix", "consult", "resume_active", "exec_plan"}),
+    "conflict": frozenset({"state_conflict"}),
+    "rejection": frozenset({"proposal_rejected"}),
+}
+
+_GATE_STATUS_DISPLAY = {
+    "zh-CN": {"ready": "就绪", "blocked": "阻断", "decision_required": "待决策"},
+    "en-US": {"ready": "Ready", "blocked": "Blocked", "decision_required": "Decision Required"},
+}
+
 _TITLE_COLORS = {
     "green": "\033[32m",
     "blue": "\033[34m",
@@ -208,8 +221,13 @@ def render_runtime_output(
     body = _core_lines(result, locale)
     next_hint = _next_hint(result, locale)
 
+    context_files = _collect_context_files(result)
+
     lines = [title, ""]
     lines.extend(body)
+    if context_files:
+        lines.extend(["", f"Context: {len(context_files)} files"])
+        lines.extend(f"  - {path}" for path in context_files)
     lines.extend(["", "---", f"Changes: {len(changes)} files"])
     if changes:
         lines.extend(f"  - {path}" for path in changes)
@@ -280,7 +298,6 @@ def _core_lines(result: RuntimeResult, language: str) -> list[str]:
             f"{labels['missing_facts']}: {missing_facts}",
             f"{labels['questions']}: {question_text or labels['missing']}",
         ]
-        _append_entry_guard_reason_line(lines, result=result, language=language)
         return lines
 
     if route_name == "decision_pending" and result.recovered_context.current_decision is not None:
@@ -295,7 +312,6 @@ def _core_lines(result: RuntimeResult, language: str) -> list[str]:
             f"{labels['options']}: {option_text or labels['missing']}",
             f"{labels['status']}: {_decision_pending_status(language, recommended)}",
         ]
-        _append_entry_guard_reason_line(lines, result=result, language=language)
         return lines
 
     if route_name == "state_conflict":
@@ -312,7 +328,6 @@ def _core_lines(result: RuntimeResult, language: str) -> list[str]:
                 ]
             )
         lines.append(f"{labels['quarantined']}: {len(quarantined_items)}")
-        _append_entry_guard_reason_line(lines, result=result, language=language)
         return lines
 
     if route_name == "archive_lifecycle":
@@ -323,7 +338,6 @@ def _core_lines(result: RuntimeResult, language: str) -> list[str]:
                 f"{labels['status']}: {labels['archive_success']}",
             ]
         return [
-            f"{labels['route']}: {route_name}",
             f"{labels['status']}: {labels['archive_blocked']}",
             f"{labels['reason']}: {_diagnostic_reason(result)}",
         ]
@@ -358,11 +372,9 @@ def _core_lines(result: RuntimeResult, language: str) -> list[str]:
     if route_name == "cancel_active":
         return [
             f"{labels['status']}: {labels['cleared']}",
-            f"{labels['route']}: {route_name}",
         ]
 
     return [
-        f"{labels['route']}: {route_name}",
         f"{labels['status']}: {_status_message(result, language)}",
         f"{labels['reason']}: {_diagnostic_reason(result)}",
     ]
@@ -376,10 +388,6 @@ def _collect_changes(result: RuntimeResult) -> list[str]:
             seen.add(path)
             ordered.append(path)
     for path in result.plan_artifact.files if result.plan_artifact is not None else ():
-        if path not in seen:
-            seen.add(path)
-            ordered.append(path)
-    for path in result.recovered_context.loaded_files:
         if path not in seen:
             seen.add(path)
             ordered.append(path)
@@ -397,6 +405,11 @@ def _collect_changes(result: RuntimeResult) -> list[str]:
         seen.add(CURRENT_HANDOFF_RELATIVE_PATH)
         ordered.append(CURRENT_HANDOFF_RELATIVE_PATH)
     return ordered
+
+
+def _collect_context_files(result: RuntimeResult) -> list[str]:
+    """Return loaded context files that are not part of generated changes."""
+    return list(result.recovered_context.loaded_files)
 
 
 def _next_hint(result: RuntimeResult, language: str) -> str:
@@ -420,23 +433,24 @@ def _next_hint(result: RuntimeResult, language: str) -> str:
 
 def _status_symbol(result: RuntimeResult) -> str:
     route_name = result.route.route_name
-    if route_name == "plan_only":
-        return "✓" if result.plan_artifact is not None else "!"
-    if route_name == "archive_lifecycle":
-        return "✓" if result.plan_artifact is not None else "!"
-    if route_name in {"clarification_pending"}:
+    # Completion family: success unless missing expected artifact
+    if route_name in _ROUTE_FAMILIES["completion"]:
+        if route_name in {"plan_only", "archive_lifecycle"}:
+            return "✓" if result.plan_artifact is not None else "!"
+        return "✓"
+    # Pending family: waiting for user input
+    if route_name in _ROUTE_FAMILIES["pending"]:
         return "?"
-    if route_name == "decision_pending":
-        return "?"
-    if route_name == "state_conflict":
+    # Conflict family: context-dependent
+    if route_name in _ROUTE_FAMILIES["conflict"]:
         if result.route.active_run_action == "abort_conflict" and not _state_conflict_payload(result):
             return "✓"
         return "!"
-    if route_name == "cancel_active":
-        return "✓"
-    if route_name == "proposal_rejected":
+    # Rejection family
+    if route_name in _ROUTE_FAMILIES["rejection"]:
         return "!"
-    if route_name in {"workflow", "light_iterate", "quick_fix", "consult", "resume_active", "exec_plan"}:
+    # Action family: handoff to host
+    if route_name in _ROUTE_FAMILIES["action"]:
         return "!"
     if result.notes:
         return "!"
@@ -543,7 +557,7 @@ def _diagnostic_reason(result: RuntimeResult) -> str:
         return result.notes[0]
     if result.route.reason:
         return result.route.reason
-    return result.route.route_name
+    return "—"
 
 
 def _execution_gate(result: RuntimeResult):
@@ -596,13 +610,11 @@ def _execution_gate_line(result: RuntimeResult, language: str) -> str:
         return f"{labels['execution_gate']}: {labels['missing']}"
     if hasattr(current_gate, "gate_status"):
         gate_status = current_gate.gate_status
-        blocking_reason = current_gate.blocking_reason
-        plan_completion = current_gate.plan_completion
     else:
         gate_status = str(current_gate.get("gate_status") or "blocked")
-        blocking_reason = str(current_gate.get("blocking_reason") or "none")
-        plan_completion = str(current_gate.get("plan_completion") or "incomplete")
-    return f"{labels['execution_gate']}: {gate_status} / {blocking_reason} / {plan_completion}"
+    display_map = _GATE_STATUS_DISPLAY.get(language, _GATE_STATUS_DISPLAY["en-US"])
+    display = display_map.get(gate_status, display_map["blocked"])
+    return f"{labels['execution_gate']}: {display}"
 
 
 def _decision_pending_status(language: str, recommended_option_id: str) -> str:

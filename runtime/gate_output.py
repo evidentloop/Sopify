@@ -69,10 +69,7 @@ def render_gate_text(payload: Mapping[str, Any]) -> str:
         f"  allowed_response_mode: {allowed_response_mode}",
     ]
     if runtime:
-        route_name = str(runtime.get("route_name") or "").strip()
         reason = str(runtime.get("reason") or "").strip()
-        if route_name:
-            lines.append(f"  route: {route_name}")
         if reason:
             lines.append(f"  reason: {reason}")
     if preflight:
