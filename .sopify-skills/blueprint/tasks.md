@@ -57,7 +57,7 @@
 
 ✅ 已完成。prove-kept-or-delete 全量扫描证明 runtime 在当前 contract 约束下已接近最小可行体积（24,334 LOC）。<20K 目标在不改 distribution/installer contract 的约束下不可达。交付物：Phase 0 test re-audit（653 hard / 31 soft gate）、Phase 1 CI/preflight 真实降载、Phase 2 全量死代码扫描（15 LOC 删除）。归档：`history/2026-05/20260509_p4b_runtime_surface_consolidation/`
 
-### P4b.5: Runtime Optionality & Host Onboarding Audit（待开）
+### P4b.5: Runtime Optionality & Host Onboarding Audit（进行中）
 
 设计/审计型，不大改代码。P4b 证明 runtime 不能靠内部删代码大幅瘦身，根因是大量 runtime 代码实际承载 distribution/installer contract。下一步需定义宿主接入层级，明确"runtime 可选"的规则边界。
 
@@ -78,6 +78,41 @@
 - **验收 (b) 运行时首接触感知**：新用户首次使用时，只感知到"中断可恢复"和"需要拍板时会停"两个语义；blueprint / checkpoint taxonomy / runtime state 等内部概念不在默认运行时路径中主动暴露。doctor/status 不主动呈现 checkpoint 分类体系，~go 入口不前置 blueprint 概念
 - **Output contract convergence**：基于 P4a 审计分类，收敛 `runtime/output.py` 渲染层——① 状态符语义：定义 canonical route family → 符号映射（当前 consult=`!` 无明确约束）；② Next 降级：明确为 human hint，不再混合 `required_host_action` + `route_name` 推导，宿主消费 handoff 不依赖 Next；③ Changes 重定义：`loaded_files`（恢复上下文）从 Changed（实际写入）中拆出，或重命名为 Touched/Files；④ Gate 行简化：默认输出不暴露 `gate_status`/`blocking_reason`/`plan_completion` 三元组，详细诊断留给 doctor/status
 - **Builtin skill capability disclosure**：宿主文案稳定表达 builtin skill 的当前能力边界与可消费方式；AGENTS.md 只做消费投影，builtin_catalog 为唯一 truth source。当前 analyze/design/develop 是 phase-bound workflow skill（entry_kind=null, triggers=[]），不宣称 standalone invocation。若后续要支持 builtin skill 显式单独调用，必须先 formalize 独立的 invocation metadata contract / invocation syntax；在该 contract 明确前，本项只做披露，不预设其进入 P2 或单列里程碑。边界：只覆盖 builtin skill，不扩展到外部 skill discovery/routing/distribution（background.md 明确排除）
+
+**P4c 前提声明（来自 P4b.5 S4 审计）**
+
+> 以下三部分基于 P4b.5 S1-S3 审计结论提取。P4c 开包时消费此声明，不重新证明已审计项。
+
+**P4c 可以假设的 invariant**
+
+1. **Forbidden surface 已定义**（design.md F1-F8）：state/sessions/\*、last\_route、route taxonomy、Next:/输出文案、渲染层实现、runtime 内部模块边界均为 forbidden surface，适用所有三级梯度。P4c 的任何实施项不得引入对这些面的新宿主依赖。
+2. **消费矩阵已裁定**（design.md S2 四子表）：convention\_only 和 payload\_capable 的每项 contract 文件归位（required/optional/forbidden）已确定。deep\_verified 列部分项标为"预期 required†"，待 P4c 最终裁定。P4c 直接消费此矩阵，不重新审计层级归位。
+3. **三级 ladder 不变**（design.md L409-419）：convention\_only / payload\_capable / deep\_verified 的准入定义不因 P4c 改变。payload\_capable 准入仍为"payload 安装 + prompt asset 消费"。
+4. **payload\_capable 对 runtime/ 的 blast radius 为零**（design.md S3 结论 2）：payload\_capable 不需要运行任何 runtime/ 模块。消费冻结 contract 文件不等于依赖生产者模块。
+5. **生产者 vs 消费者边界明确**（design.md S3 语义来源表）：7 个 contract 文件的语义来源已映射，全部经 state.py 统一落盘。P4c 可以改变生产者实现，不能改变 contract 文件 schema（P4a keep-list 保护）。
+6. **官方接入画像已定义**（design.md S2）：官方最低接入 = payload\_capable + 接续增强全组；对话式/全审计宿主在此基础上叠加。此画像是独立于 ladder 的接入策略层。
+7. **EAR @ convention\_only = forbidden 已闭合**（design.md S2 消费矩阵）：convention\_only 不承诺消费协议级 receipt 实例语义。此裁定不在 P4c 重新开放。
+
+**P4c 需做的实施项（由 P4b.5 推导）**
+
+1. **机器可检查投影矩阵**：将消费矩阵中的层级归位翻译为可执行的 FeatureId → 梯度映射规则（design.md L419 已预告此项属 P4c）。
+2. **增强检测机制**：P4c 需定义宿主如何声明/检测已激活的 opt-in 增强组合（接续/交互/审计）。当前无此机制，ladder 只定义准入面。
+3. **Output 渲染层收敛**：消除 forbidden surface F5（Next: 输出文案推导逻辑）和 F6（渲染层实现细节）中被新宿主事实上依赖的泄露。对应 P4c 已有的 Output contract convergence 项。
+4. **deep\_verified "预期 required†" 最终裁定**：消费矩阵中 deep\_verified 列的"预期 required†"项需在 P4c 做最终 required/optional 裁定。P4b.5 只做审计判断，不替代最终裁定。
+5. **Forbidden surface 执行保障**：P4c 需确保 F1-F8 中的每一项在实现层有对应的防泄露措施（如移除 prompt 中的 route\_name 直接暴露、收敛 Next: 推导逻辑等）。
+
+**P4c 不能做的事（红线）**
+
+1. **不改 ladder 定义**：不修改三级梯度的准入条件，不新增/删除梯度。
+2. **不新增 machine truth**：不新增 state 文件、不新增 checkpoint 类型、不新增 contract 文件。若确需新增，须走 ADR 路径并对照削减预算表。
+3. **不改 P4a keep-list schema**：contract 文件的 schema 由 P4a 冻结面保护。P4c 可以改变生产者实现，不能改变 contract 文件结构。
+4. **不让 payload\_capable 依赖 runtime/ 模块**：这是 S3 的核心审计结论。任何 P4c 实施项如果引入 payload\_capable 对 runtime 模块的运行依赖，视为违反 P4b.5 审计边界。
+5. **不消费 forbidden surface**：P4c 实施项不得引入对 F1-F8 中任何面的新宿主依赖。消除已有泄露是 P4c 的目标，不是引入新泄露。
+6. **不解决 P4d/P5/P6 范围**：P4c 不预设新宿主试点（P4d）、不预执行 contract surface 删减（P5）、不预判 runtime 降级路径（P6）。
+
+**P4c 收口附带：design.md 结构整理**
+
+> P4c 收口时，将 design.md Host Capability Governance 节中 P4b.5 的增量段（S1-S4）内化为稳定章节结构（Forbidden Surface / Consumption Matrix / Official Onboarding Profile / Blast Radius / Comprehensive Verdict）。此整理不改变观点，只优化文档结构，避免后续里程碑继续无限追加 S 段。
 
 ## 未完成长期项
 
