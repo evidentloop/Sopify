@@ -25,28 +25,28 @@ S1 → S2 → S3 → S4
 
 ### S1: Forbidden Surface 正面化
 
-- [ ] 1.1 从 design.md:340, 366 收集所有隐式 forbidden 面
-- [ ] 1.2 从 design.md:368-393 Output Rendering Audit 收集已标记为 internal_taxonomy_leak 的面
-- [ ] 1.3 将收集结果整理为显式禁止清单（适用所有三级梯度）
-- [ ] 1.4 写入 blueprint/design.md Host Capability Governance 节
+- [x] 1.1 从 design.md:340, 366 收集所有隐式 forbidden 面
+- [x] 1.2 从 design.md:368-393 Output Rendering Audit 收集已标记为 internal_taxonomy_leak 的面
+- [x] 1.3 将收集结果整理为显式禁止清单（适用所有三级梯度）
+- [x] 1.4 写入 blueprint/design.md Host Capability Governance 节
 
 ### S2: Consumption Matrix
 
-- [ ] 2.1 对接续锚点三件套（handoff / run / plan）在每级梯度归位
-- [ ] 2.2 对授权凭证三件套（gate_receipt / ExecutionAuthorizationReceipt / archive_receipt）在每级梯度归位
+- [x] 2.1 对接续锚点三件套（handoff / run / plan）在每级梯度归位
+- [x] 2.2 对授权凭证三件套（gate_receipt / ExecutionAuthorizationReceipt / archive_receipt）在每级梯度归位
   - 包括裁定 gate_receipt 消费者投影差异（design.md:354 vs 364）
   - EAR 归位理由不得以"无 runtime"为由，须以"该梯度是否承诺消费此协议面"为判据
-- [ ] 2.3 对 pending checkpoint（clarification / decision）在 payload_capable 做 required / optional / forbidden 裁定
-- [ ] 2.4 对长期知识面（blueprint / plan / history / protocol / preferences）确认所有梯度 readable
-- [ ] 2.5 物化 payload_capable 内部 opt-in 增强组合：产出一张组合表，至少覆盖接续增强 / 交互增强 / 审计增强 3 组 canonical 组合；每组定义消费哪些 contract、支持什么场景、组合间依赖链与互斥关系
-- [ ] 2.6 将完整矩阵 + 增强组合写入 blueprint/design.md
+- [x] 2.3 对 pending checkpoint（clarification / decision）在 payload_capable 做 required / optional / forbidden 裁定
+- [x] 2.4 对长期知识面（blueprint / plan / history / protocol / preferences）确认所有梯度 readable
+- [x] 2.5 物化 payload_capable 内部 opt-in 增强组合：产出一张组合表，至少覆盖接续增强 / 交互增强 / 审计增强 3 组 canonical 组合；每组定义消费哪些 contract、支持什么场景、组合间依赖链与互斥关系
+- [x] 2.6 将完整矩阵 + 增强组合写入 blueprint/design.md
 
 ### S3: Blast Radius 审计
 
-- [ ] 3.1 列出 runtime/ 所有顶层模块
-- [ ] 3.2 对每个模块评估在每级梯度的必需性（需要 / 不需要）
+- [x] 3.1 列出 runtime/ 所有顶层模块
+- [x] 3.2 对每个模块评估在每级梯度的必需性（需要 / 不需要）
   - 严守"生产者 vs 消费者"区分：新宿主消费持久化 contract 文件不等于接入契约上依赖 runtime 模块
-- [ ] 3.3 写入审计结论
+- [x] 3.3 写入审计结论
 
 ### S4: P4c Boundary Statement
 

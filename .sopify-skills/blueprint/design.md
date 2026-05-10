@@ -455,6 +455,166 @@ Deep 层（deep_verified 准入）：
 - 新宿主不进现有目录树结构；新宿主如需 prompt asset，走 payload 机制
 - 讨论框架不是"要不要再开目录树"，而是"payload 机制是否满足需求"
 
+**宿主禁止消费面（P4b.5 审计）**
+
+所有三级梯度（convention_only / payload_capable / deep_verified）均不得将以下面作为稳定消费 contract。违反此表意味着宿主与 runtime 实现细节产生耦合，P4c 治理时此类消费将被视为 leak。
+
+| # | forbidden surface | 类型 | 为什么禁止 | 来源 |
+|---|-------------------|------|-----------|------|
+| F1 | `state/sessions/*` | 运行态附属 | runtime 内部会话管理，非 contract 面；超租约后可清理 | persistence 分层表 L340 |
+| F2 | `state/last_route.json` | 可删派生 | 可从 handoff/run 派生，derived surface | persistence 分层表 L340, L328 |
+| F3 | Route name 全集 / route taxonomy | 实现细节 | runtime 内部路由枚举，不是宿主消费的 contract；keep-list 不冻结 route 枚举 | L346, L366 |
+| F4 | Gate 三元组直渲（`gate_status` / `blocking_reason` / `plan_completion`） | internal_taxonomy_leak | runtime 内部 gate 状态机，默认输出中不应前置 | Output Audit L378 |
+| F5 | `Entry Guard Reason` 内部守卫码 | internal_taxonomy_leak | runtime 内部守卫码，非宿主需消费的 contract | Output Audit L388 |
+| F6 | `Route: <route_name>` 直接暴露 | internal_taxonomy_leak | cancel_active / fallback 路径直接渲染 route_name | Output Audit L390 |
+| F7 | Output 渲染文案措辞（`Next:` / `Status:` / `Decision Status:` 等 human hint） | derived 人类提示 | 由 route_name + gate_status + handoff 推导，不是 machine truth；宿主消费 handoff contract 而非 Next 文案 | Output Audit L374, L380, L385, L393; L366 |
+| F8 | Runtime 内部模块边界（Python API 签名、class 结构、dataclass 名称） | 实现细节 | keep-list 不冻结 Python 内部 API；宿主消费的是持久化 contract 文件而非 Python 调用面 | L346, L366; keep-list non-goals 列 |
+
+> deep_verified 宿主的 runtime 内部可能事实上读取 F3-F7 中的值（如 route_name 用于渲染），但这属于 runtime 实现细节，不是宿主的 contract 承诺。P4c 收敛 output 时需消除此类 leak。
+
+**消费矩阵（P4b.5 审计）**
+
+每个主链真相文件和可审计凭证在每级梯度的消费定位。接续锚点、授权凭证、交互 checkpoint 三类面分开归位。
+
+_接续锚点（告诉下一步做什么）_
+
+| surface | 文件 | convention_only | payload_capable | deep_verified | 来源 |
+|---------|------|-----------------|-----------------|---------------|------|
+| Handoff contract | `state/current_handoff.json` | forbidden | optional | 预期 required† | L355, L414 |
+| Plan binding | `state/current_plan.json` | forbidden | optional | 预期 required† | L338 |
+| Run state | `state/current_run.json` | forbidden | optional | 预期 required† | L338 |
+
+_授权凭证（证明为什么被授权）_
+
+| surface | 文件/规范 | convention_only | payload_capable | deep_verified | 来源 |
+|---------|----------|-----------------|-----------------|---------------|------|
+| Gate receipt（运行级） | `state/current_gate_receipt.json` | forbidden | optional | 预期 required† | L354, L364 |
+| ExecutionAuthorizationReceipt（协议级） | protocol.md §6 | forbidden | optional | 预期 required† | L351 |
+| Archive receipt | `state/current_archive_receipt.json` | forbidden | optional | optional | L364 |
+
+_交互 checkpoint（AI 暂停等待）_
+
+| surface | 文件 | convention_only | payload_capable | deep_verified | 来源 |
+|---------|------|-----------------|-----------------|---------------|------|
+| Clarification | `state/current_clarification.json` | forbidden | optional | 预期 required† | L338 |
+| Decision | `state/current_decision.json` | forbidden | optional | 预期 required† | L338 |
+
+_长期知识（所有梯度均可消费）_
+
+| surface | 物理对应 | 所有梯度 | 来源 |
+|---------|---------|---------|------|
+| Blueprint / Plan / History | `.sopify-skills/blueprint/`, `plan/`, `history/` | readable | L336, L361 |
+| Protocol | `blueprint/protocol.md` | readable | L350-L353 |
+| Preferences / Feedback | `user/preferences.md`, `user/feedback.jsonl` | readable | L337, L362 |
+
+> † "预期 required"表示按现状判断大概率为 required，但 P4b.5 是审计性质，此结论不替代后续里程碑的最终裁定。
+
+> **convention_only forbidden 理由**：该梯度只承诺消费 protocol + 文件约定，不承诺消费运行态 state 文件或 receipt 实例面。
+
+> **EAR 与 gate_receipt 的关系**：EAR 是 protocol/doc contract（L351），gate_receipt 是一种常见运行态承载（L354），两者不等同。EAR @ convention_only = forbidden 的理由是"该梯度不承诺消费协议级 receipt 实例语义"，不是"无 runtime"。
+
+> **gate_receipt 消费者投影差异**：keep-list 表（L354）将 consumer 写为 `host / external_tool`，persistence red-line 表（L364）写为 `external_tool`。两者不矛盾：keep-list 说明有合法宿主消费场景（如 action_proposal_retry），red-line 表反映常态下的主要消费者。payload_capable 消费 gate_receipt 属于审计增强。
+
+**Opt-in 增强组合（P4b.5 审计）**
+
+payload_capable 是能力带宽，不是单点能力。以下是 canonical 的三组 opt-in 增强：
+
+| 增强组合 | 消费的 contract 面 | 回答的问题 | 依赖 |
+|---------|-------------------|-----------|------|
+| **接续增强** | handoff + plan binding + run state | 上次停哪了？现在该干嘛？handoff 是核心前提，plan binding / run state 是补强接续上下文的常见配套面 | 无硬性前置依赖 |
+| **交互增强** | clarification + decision | 当前是否卡在 clarification / decision checkpoint？即 AI 在等用户补事实或拍板 | 建议先有接续增强（否则缺执行上下文） |
+| **审计增强** | gate_receipt + EAR + archive_receipt | 这次接续有没有授权？有没有证据链？gate_receipt + EAR 是核心授权证据；archive_receipt 是历史归档补强 | 无硬性前置依赖（可独立审计） |
+
+> 三组之间无互斥。交互增强对接续增强有弱依赖（建议而非必须）。
+
+**官方新宿主接入画像（P4b.5 审计）**
+
+> 能力分层（ladder）定义"你属于哪级"，接入画像定义"官方新宿主至少该做到什么程度"。两者是不同的层，ladder 不因画像而改。
+
+| 画像 | 能力层 | 增强要求 | 适用场景 |
+|------|--------|---------|---------|
+| **官方最低接入** | payload_capable + 接续增强 | 接续增强全组（核心：handoff；配套：plan binding + run state） | 所有官方新宿主的底线 |
+| **对话式宿主** | payload_capable + 接续增强 + 交互增强 | 额外消费 clarification/decision checkpoint | 需要处理挂起的"AI 等人回答/拍板"状态的宿主 |
+| **全审计宿主** | payload_capable + 接续增强 + 交互增强 + 审计增强 | 额外消费 gate_receipt/EAR/archive_receipt | 需要证明接续合法性和证据链的宿主 |
+
+> 此画像是 P4b.5 的审计建议，不改 ladder 定义。ladder 上 payload_capable 的准入仍为"payload 安装 + prompt asset 消费"（L414），但官方新宿主在此基础上应至少叠加接续增强。
+
+**新宿主接入路径（P4b.5 审计）**
+
+```
+步骤 1: 读 protocol + 遵守文件约定
+         ↓
+    convention_only ✅ "算接入了"
+    能读 plan、blueprint、protocol
+    但不知道上次做到哪了
+         ↓
+步骤 2: 装 prompt asset / payload
+         ↓
+    payload_capable ✅ "拿到入场券"
+    能装 prompt，消费 prompt asset
+    但仍然不知道上次做到哪了
+         ↓
+步骤 3: 叠加 opt-in 增强（官方新宿主至少到接续增强）
+         ↓
+    + 接续增强：读 current_handoff（核心）+ plan binding + run state（配套）→ 知道上次停哪了、接下来该干嘛
+    + 交互增强：读 clarification/decision → 知道是否卡在等人回答/拍板
+    + 审计增强：读 gate_receipt/EAR（+ archive_receipt）→ 证明这次接续有授权、有证据链
+         ↓
+    新宿主拿到 plan + handoff + 凭证 → 直接接着编码 ✅
+```
+
+> 步骤 3 的每一项增强都是读冻结的 contract 文件（schema 被 P4a keep-list 保护），不是调 runtime API。不需要跑完整 runtime 也能接班。
+
+**Blast Radius 审计（P4b.5 S3）**
+
+> 审计目标：评估 runtime/ 和 installer/ 各功能区在每级梯度的**模块运行必需性**。判定标准是"新宿主是否需要**运行**该模块"，不是"是否消费该模块的持久化产物"。持久化 contract 消费面的评估在 S2 消费矩阵，不在 S3。
+
+> **模块计数口径**：runtime/ 59 个非 `__init__.py` 的 Python 模块（含 `_models/` 下 5 个），另有 `contracts/`、`builtin_skill_packages/` 两个资源目录（不计入模块数）。installer/ 11 个非 `__init__.py` 的 Python 模块（含 `hosts/` 下 3 个宿主适配器）。
+
+| 功能区 | 包含模块 | conv | payload | deep | 备注 |
+|--------|---------|:----:|:-------:|:----:|------|
+| **核心管线** | engine, router, gate, execution\_gate, entry\_guard, gate\_output | ✗ | ✗ | ✓ | 路由/gate 决策循环，deep runtime 核心 |
+| **状态持久化** | state, state\_invariants | ✗ | ✗ | ✓ | 所有 state/ contract 文件的统一落盘层（set\_current\_\* 方法族） |
+| **上下文构建** | context\_snapshot, context\_recovery, context\_builder, context\_v1\_scope | ✗ | ✗ | ✓ | 会话上下文快照与恢复，deep runtime 的执行上下文供应链 |
+| **Plan 编排** | plan\_orchestrator, plan\_registry, plan\_scaffold | ✗ | ✗ | ✓ | plan 生命周期由 runtime 驱动；payload\_capable 读 plan/ 目录（协议层面） |
+| **Handoff / Checkpoint** | handoff, checkpoint\_materializer, checkpoint\_request, checkpoint\_cancel | ✗ | ✗ | ✓ | handoff.py 提供 handoff 语义；实际写盘经 state.py；接续增强消费 JSON 文件 |
+| **Clarification / Decision** | clarification, clarification\_bridge, decision, decision\_bridge, decision\_policy, decision\_tables, decision\_templates | ✗ | ✗ | ✓ | 交互 checkpoint 语义来源；实际写盘经 state.py；交互增强消费 JSON |
+| **Output / Templates** | output, message\_templates | ✗ | ✗ | ✓ | 渲染层，属 forbidden surface F5/F6 |
+| **Skill 系统** | skill\_registry, skill\_resolver, skill\_runner, skill\_schema, builtin\_catalog | ✗ | ✗ | ✓ | deep runtime 技能调度 |
+| **知识层** | kb, knowledge\_layout, knowledge\_sync | ✗ | ✗ | ✓ | KB 管理是 runtime feature |
+| **校验 / Guard** | deterministic\_guard, action\_intent, action\_projection, develop\_callback, develop\_quality | ✗ | ✗ | ✓ | Validator 逻辑在 deep runtime 进程内运行 |
+| **Archive** | archive\_lifecycle | ✗ | ✗ | ✓ | 归档语义来源；实际写盘经 state.py |
+| **基础设施** | config, preferences, manifest, models, \_models/, \_yaml, contracts/, cli, cli\_interactive, resolution\_planner, sidecar\_classifier\_boundary, vnext\_phase\_boundary, failure\_recovery, workspace\_preflight | ✗ | ✗ | ✓ | runtime 内部基础设施；workspace\_preflight 是 deep 的启动检查 |
+| **Installer: payload 安装** | installer/payload, hosts/, distribution, validate, models, outcome\_contract, inspection | ✗ | 工具† | ✓ | payload\_capable 通过 install.sh 调用，不直接依赖 Python API |
+| **Installer: workspace 初始化** | installer/bootstrap\_workspace | ✗ | opt-in‡ | ✓ | workspace bootstrap 是 payload\_capable 的可选增强 |
+| **Installer: runtime 打包** | installer/runtime\_bundle | ✗ | ✗ | ✓ | 只有 deep\_verified 需要完整 runtime bundle |
+
+> ✗ = 不需要运行；✓ = 需要运行；工具† = 通过 CLI 脚本间接调用（install.sh/install.ps1），不是 contract 级依赖；opt-in‡ = payload\_capable 可选增强，不是准入。
+
+**语义来源 → 落盘路径 → contract 文件（S3 核心发现）**
+
+> 所有 state/ contract 文件的磁盘写入都经过 `state.py` 的 `set_current_*` 方法族统一落盘。下表的"语义来源"指提供业务语义和触发写入的模块，不是唯一写入者。
+
+| 语义来源 | 落盘路径 | contract 文件 | S2 对应消费面 |
+|---------|---------|--------------|--------------|
+| handoff.py（+ engine.py 触发） | state.set\_current\_handoff | current\_handoff.json | 接续增强核心 |
+| engine.py / state.py | state.set\_current\_run | current\_run.json | 接续增强配套（run state） |
+| plan\_registry.py / plan\_orchestrator.py | state.set\_current\_plan | current\_plan.json | 接续增强配套（plan binding） |
+| clarification.py（+ clarification\_bridge 触发） | state.set\_current\_clarification | current\_clarification.json | 交互增强 |
+| decision.py（+ decision\_bridge 触发） | state.set\_current\_decision | current\_decision.json | 交互增强 |
+| gate.py | state 直写 | current\_gate\_receipt.json | 审计增强 |
+| archive\_lifecycle.py / engine.py | state.set\_current\_archive\_receipt | current\_archive\_receipt.json | 审计增强 |
+
+> 此映射是"当前事实"，不是"永久绑定"。P4c 及后续里程碑可以改变生产者实现，只要 contract 文件 schema 不变（P4a keep-list 保护）。
+
+**S3 审计结论**
+
+1. **convention\_only 不需要任何 runtime/ 或 installer/ 模块**。全部能力来自读协议文档和遵守文件约定。
+2. **payload\_capable 不需要任何 runtime/ 模块**。其消费的机器真相文件都是冻结 JSON contract，由 P4a keep-list 保护 schema。消费文件 ≠ 依赖生产者模块。
+3. **payload\_capable 对 installer/ 的依赖是工具性的**，不是 contract 性的。宿主通过 install.sh 安装 payload，或按 protocol 手动放置文件。installer 的 Python 内部 API 不在接入契约范围内。
+4. **deep\_verified 对 runtime/ + installer/ 有完整能力覆盖依赖**。不是"每轮运行全部模块"——单次执行路径取决于具体 action/route，但能力层面需要完整 runtime 可用。这是设计预期，不是缺陷。
+5. **生产者 vs 消费者边界明确**：7 个 contract 文件的语义分别来自 ~7 个 runtime 模块，全部经 state.py 统一落盘。payload\_capable 消费产物（文件），不消费生产者（模块）。此边界由 forbidden surface F8 保护。
+
 ### 削减预算表
 
 | 维度 | 当前 | Target | Hard Max | 计算口径 |
