@@ -145,5 +145,73 @@ class TestGateOutputNoRouteExposure(unittest.TestCase):
         self.assertIn("status: error", text)
 
 
+class TestNextHintMapping(unittest.TestCase):
+    """3a.2-regression: Next hint uses handoff_kind, not route_name."""
+
+    def _render_next(self, handoff_kind: str, route_name: str = "plan_only", **handoff_kw: Any) -> str:
+        handoff = RuntimeHandoff(
+            schema_version="1", route_name=route_name, run_id="test",
+            handoff_kind=handoff_kind, **handoff_kw,
+        )
+        result = _minimal_result(route_name=route_name, handoff=handoff)
+        rendered = render_runtime_output(
+            result, brand="test", language="en-US", title_color="none", use_color=False,
+        )
+        for line in rendered.splitlines():
+            if line.startswith("Next:"):
+                return line
+        return ""
+
+    def test_develop_kinds_all_map_to_workflow_hint(self) -> None:
+        for route in ("quick_fix", "resume_active", "exec_plan"):
+            hint = self._render_next("develop", route_name=route)
+            self.assertIn("downstream stages", hint, msg=f"route={route}")
+
+    def test_plan_kind_maps_to_plan_hint(self) -> None:
+        hint = self._render_next("plan")
+        self.assertIn("plan review", hint)
+
+    def test_clarification_kind_maps_to_answer_hint(self) -> None:
+        hint = self._render_next("clarification", route_name="clarification_pending")
+        self.assertIn("missing facts", hint)
+
+    def test_decision_kind_maps_to_decision_hint(self) -> None:
+        hint = self._render_next("decision", route_name="decision_pending")
+        self.assertIn("confirm", hint)
+
+    def test_consult_kind_maps_to_consult_hint(self) -> None:
+        hint = self._render_next("consult", route_name="consult")
+        self.assertIn("discussion", hint)
+
+    def test_reject_kind_maps_to_reject_hint(self) -> None:
+        hint = self._render_next("reject", route_name="proposal_rejected")
+        self.assertIn("rejected", hint)
+
+    def test_archive_completed_maps_to_success_hint(self) -> None:
+        hint = self._render_next(
+            "archive", route_name="archive_lifecycle",
+            artifacts={"archive_receipt_status": "completed"},
+        )
+        self.assertIn("Review", hint)
+
+    def test_archive_incomplete_maps_to_retry_hint(self) -> None:
+        hint = self._render_next("archive", route_name="archive_lifecycle")
+        self.assertIn("retry", hint)
+
+    def test_state_conflict_active_maps_to_conflict_hint(self) -> None:
+        hint = self._render_next(
+            "state_conflict", route_name="state_conflict",
+            required_host_action="resolve_state_conflict",
+        )
+        self.assertIn("cancel", hint)
+
+    def test_state_conflict_cleared_maps_to_continue_hint(self) -> None:
+        hint = self._render_next(
+            "state_conflict", route_name="state_conflict",
+            required_host_action="continue_host_develop",
+        )
+        self.assertIn("downstream stages", hint)
+
+
 if __name__ == "__main__":
     unittest.main()

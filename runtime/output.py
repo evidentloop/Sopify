@@ -95,12 +95,10 @@ _LABELS = {
         "next_answer_questions": "回复补充信息继续规划，或输入 取消 终止本轮设计",
         "next_plan": "在宿主会话中继续评审或执行方案，或直接回复修改意见",
         "next_workflow": "在宿主会话中继续执行后续阶段，或显式使用 ~go plan 只规划",
-        "next_resume": "在宿主会话中继续 develop 阶段",
         "next_exec": "仅在已有活动 plan 或恢复态时使用 ~go exec；普通开发流继续按宿主会话推进",
         "next_cancel": "如需继续，重新发起 ~go plan 或 ~go",
         "next_archive_success": "请验证 blueprint 索引与 history 归档结果",
         "next_archive_retry": "补齐 blueprint 更新或切换到 metadata-managed plan 后重试",
-        "next_quick_fix": "在宿主会话中继续执行快速修复",
         "next_consult": "在宿主会话中继续问答，或改成明确变更请求",
         "next_decision": "回复 1/2（或 ~decide choose <option_id>）确认方案，或输入 取消 终止本轮设计",
         "handoff_answer_questions": "已写入 clarification handoff，宿主应先补齐缺失事实信息",
@@ -159,12 +157,10 @@ _LABELS = {
         "next_answer_questions": "Reply with the missing facts to continue planning, or type cancel to stop this round",
         "next_plan": "Continue plan review or execution in the host session, or reply with feedback",
         "next_workflow": "Continue the downstream stages in the host session, or use ~go plan for planning only",
-        "next_resume": "Continue the develop stage in the host session",
         "next_exec": "Use ~go exec only when an active plan or recovery state already exists; otherwise continue through the host flow",
         "next_cancel": "Start a new ~go plan or ~go flow when ready",
         "next_archive_success": "Review the blueprint index refresh and the history archive",
         "next_archive_retry": "Update the blueprint or switch to a metadata-managed plan and retry",
-        "next_quick_fix": "Continue the quick-fix flow in the host session",
         "next_consult": "Continue the discussion in the host session, or restate it as a change request",
         "next_decision": "Reply with 1/2 (or `~decide choose <option_id>`) to confirm, or type cancel to abort this design round",
         "handoff_answer_questions": "clarification handoff written; the host should gather the missing factual details first",
@@ -416,17 +412,16 @@ def _next_hint(result: RuntimeResult, language: str) -> str:
     labels = _LABELS[language]
     if result.handoff is not None:
         return _handoff_next_hint(result, language)
-    if result.route.route_name == "archive_lifecycle":
+    route_name = result.route.route_name
+    if route_name == "archive_lifecycle":
         return labels["next_archive_success"] if result.plan_artifact is not None else labels["next_archive_retry"]
-    if result.route.route_name == "clarification_pending":
-        return labels["next_answer_questions"]
-    if result.route.route_name == "decision_pending":
-        return labels["next_decision"]
-    if result.route.route_name == "state_conflict":
+    if route_name in _ROUTE_FAMILIES["pending"]:
+        return labels["next_answer_questions"] if route_name == "clarification_pending" else labels["next_decision"]
+    if route_name in _ROUTE_FAMILIES["conflict"]:
         return labels["next_state_conflict"]
-    if result.route.route_name == "exec_plan":
+    if route_name == "exec_plan":
         return labels["next_exec"]
-    if result.route.route_name == "cancel_active":
+    if route_name == "cancel_active":
         return labels["next_cancel"]
     return labels["next_retry"]
 
@@ -505,51 +500,30 @@ def _handoff_label(result: RuntimeResult, language: str) -> str:
     return CURRENT_HANDOFF_RELATIVE_PATH
 
 
+_HANDOFF_KIND_HINT = {
+    "plan": "next_plan",
+    "develop": "next_workflow",
+    "clarification": "next_answer_questions",
+    "decision": "next_decision",
+    "consult": "next_consult",
+    "reject": "next_reject",
+}
+
+
 def _handoff_next_hint(result: RuntimeResult, language: str) -> str:
     labels = _LABELS[language]
     handoff = result.handoff
     if handoff is None:
         return labels["next_retry"]
-    required_host_action = str(handoff.required_host_action or "").strip()
-    if required_host_action == "continue_host_consult":
-        if handoff.handoff_kind == "reject":
-            return labels["next_reject"]
-        if handoff.handoff_kind == "archive":
-            receipt_status = str((handoff.artifacts or {}).get("archive_receipt_status", "")).strip()
-            if receipt_status == "completed":
-                return labels["next_archive_success"]
-            return labels["next_archive_retry"]
-        return labels["next_consult"]
-    if required_host_action == "answer_questions":
-        return labels["next_answer_questions"]
-    if required_host_action == "resolve_state_conflict":
-        return labels["next_state_conflict"]
-    if required_host_action == "continue_host_develop":
-        if result.route.route_name == "plan_only":
-            return labels["next_plan"]
-        if result.route.route_name == "resume_active":
-            return labels["next_resume"]
-        if result.route.route_name == "exec_plan":
-            return labels["next_exec"]
-        if result.route.route_name == "quick_fix":
-            return labels["next_quick_fix"]
-        return labels["next_workflow"]
-    if required_host_action == "confirm_decision":
-        return labels["next_decision"]
-    # Fallback: match by canonical handoff_kind (family)
-    if handoff.handoff_kind == "plan":
-        return labels["next_plan"]
-    if handoff.handoff_kind == "clarification":
-        return labels["next_answer_questions"]
-    if handoff.handoff_kind == "develop":
-        if result.route.route_name == "quick_fix":
-            return labels["next_quick_fix"]
-        return labels["next_resume"] if result.route.route_name == "resume_active" else labels["next_exec"]
-    if handoff.handoff_kind == "decision":
-        return labels["next_decision"]
-    if handoff.handoff_kind == "consult":
-        return labels["next_consult"]
-    return labels["next_retry"]
+    kind = handoff.handoff_kind
+    if kind == "archive":
+        receipt_status = str((handoff.artifacts or {}).get("archive_receipt_status", "")).strip()
+        return labels["next_archive_success"] if receipt_status == "completed" else labels["next_archive_retry"]
+    if kind == "state_conflict":
+        action = str(handoff.required_host_action or "").strip()
+        return labels["next_state_conflict"] if action == "resolve_state_conflict" else labels["next_workflow"]
+    hint_key = _HANDOFF_KIND_HINT.get(kind)
+    return labels[hint_key] if hint_key else labels["next_retry"]
 
 
 def _diagnostic_reason(result: RuntimeResult) -> str:
