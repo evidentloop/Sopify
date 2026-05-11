@@ -6,38 +6,20 @@ Format: Summary → Changed → Plan Packages. File-level details live in `git l
 
 ## [Unreleased]
 
-## [2026-05-10.225736] - 2026-05-10
+## [2026-05-11.202509] - 2026-05-11
 
 ### Summary
 
-- Changes across: Runtime, Tests.
+- P4c Host Consumption Governance delivered: host-facing prompt/runtime surfaces now consume canonical protocol facts instead of exposing route taxonomy, blueprint concepts, or internal helper details.
+- Changes across: Docs, Runtime, Scripts, Skills, Tests.
 
 ### Changed
 
-- **Runtime**: Updated runtime internals (1 files)
-- **Tests**: Updated automated coverage (1 files)
-
-## [2026-05-10.220305] - 2026-05-10
-
-### Summary
-
-- Changes across: Runtime, Tests.
-
-### Changed
-
-- **Runtime**: Updated runtime internals (2 files)
-- **Tests**: Updated automated coverage (1 files)
-
-## [2026-05-10.203618] - 2026-05-10
-
-### Summary
-
-- Updated 1 active plan package(s); Changes across: Scripts, Changed.
-
-### Changed
-
-- **Scripts**: Adjusted maintenance scripts (1 files)
-- **Changed**: Updated project files (3 files)
+- **Docs**: Added protocol §8 as the host-consumption authority and refreshed blueprint/history bookkeeping.
+- **Runtime**: Converged output, gate status fallback, Next hints, and status/doctor text around handoff/protocol facts.
+- **Scripts**: Added enhancement declaration validation for host capability metadata.
+- **Skills**: Reduced Codex/Claude prompt assets to protocol references and user-facing workflow semantics.
+- **Tests**: Added rendering/status/doctor coverage for de-taxonomy and host-facing labels.
 
 ### Plan Packages
 
