@@ -46,7 +46,7 @@
 ## P4c-3b: 首接触与 prompt 收敛层
 
 - [ ] 3b.1 首接触感知收敛：新用户只感知"中断可恢复"+"需要拍板时会停"
-- [ ] 3b.2 doctor/status 不主动呈现 checkpoint taxonomy
+- [x] 3b.2 doctor/status 不主动呈现 checkpoint taxonomy *(scope: _STAGE_LABELS 7 entries + _CHECKPOINT_LABELS 4 entries 映射 raw → human-readable；render_status_text 3 处 + doctor evidence 1 处去 raw code；修复 82886b3 遗留 workspace_preflight_contract 测试断裂)*
 - [ ] 3b.3 ~go 默认入口不前置 blueprint 概念
 - [ ] 3b.4 prompt 不定义机器契约（不定义路由表、不维护 state 写入语义）
 - [x] 3b.5 消除 F5/F6 leak：移除 Entry Guard Reason 等内部守卫码直接暴露；消除 route_name / taxonomy 在 prompt 及默认可见路径中的直接暴露 *(scope: 3b.5-A 删除 dead rendering code commit 6ed2182; 3b.5-B 删除 prompt 中 14 Note + Host Integration Contract + Quick Reference runtime helpers 三大块，替换为 3 条高层义务 + protocol.md §8 引用)*

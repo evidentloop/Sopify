@@ -115,6 +115,7 @@
 ### P4b 后续路线（P4c 后视评估）
 
 - [ ] P4d New Host Pilot：选 1 个非 deep 宿主做试点（convention_only 或 payload_capable），不接完整 runtime。验证 P4b.5/P4c 的分层是否真正降低接入成本。可与 P4c 后期并行启动。
+- [ ] Continuation Entry Convergence：统一宿主级官方入口语义（Inspect Active Work / Continue Active Work / Start New Work），覆盖同宿主跨 session 与跨宿主接续。只消费现有 frozen contract，不新增 machine truth，不绑定 runtime 正则/路由实现。不规定入口语法或关键词，宿主自行选择暴露形式（命令、按钮、菜单等）。有活动工作或 pending checkpoint 时 Start New Work 必须显式仲裁。当前 `~go exec` 是 Continue Active Work 的命令级实现，应被 host-level 入口语义取代。_触发条件：P4c 验收后，结合 P4d 非 deep 宿主试点 formalize_
 - [ ] P5 Contract Surface Shrinkage：在 P4d 验证后，按 evidence 逐项删除或降级 deep runtime 专属的 contract surface（bridge capability / manifest entry / installer bundle 项）。此时已知哪些 contract 是新宿主需要 vs 历史包袱。
 - [ ] P6 Runtime Sunset / Reference Runtime：将 runtime 明确降级为 reference implementation 或 deep host hardening layer。新宿主默认走 Protocol/Convention 模式，runtime 不再承载新增产品能力。可能与 P5 合并。
 
