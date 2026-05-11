@@ -54,7 +54,7 @@
 ## P4c-4: 文档与披露层
 
 - [x] 4.1 protocol.md 唯一合规入口：接入文档统一指向 *(scope: 新增 protocol.md §8 Deep Host 运行时集成协议，含 §8.1 Gate-First / §8.2 Post-Run Handoff / §8.3 宿主行为边界 / §8.4 Runtime Helper 索引 / §8.5 State 文件索引；4 prompt files 全部指向 §8)*
-- [ ] 4.2 文档递进顺序：Layer 0 → 1 → 2 → 3 落地
+- [ ] 4.2 文档披露梯度落地 *(进展: protocol.md 已落解耦声明——文档披露梯度 ≠ KB 知识持久化分层；具体分层方案与映射表暂缓，待命名/章节范围/宿主梯度关系一起收敛)*
 - [ ] 4.3 Builtin skill capability disclosure：AGENTS.md 投影 + builtin_catalog truth source
 - [ ] 4.4 若前述切片稳定，收口时整理 design.md 结构，将 S1-S4 内化为稳定章节（非阻塞）
 

@@ -443,7 +443,7 @@ Deep 层（deep_verified 准入）：
 
 定位：adoption guide / reading order。**不是**第二规范源。本节只定义 quickstart 的交付面边界，不等于 quickstart 本身已实现（实现见 tasks.md 长期项）。
 
-- 提供 protocol.md 面向外部宿主的阅读顺序指引（按 Layer 0→3 披露顺序）
+- 提供 protocol.md 面向外部宿主的阅读顺序指引（按文档披露梯度）
 - 提供 compliance check 的运行入口（指向 Protocol Compliance Suite Phase 1 已有基础）
 - **不新增 normative 内容**：protocol.md 是唯一合规入口
 - **不复述 schema**：只引用、不重新定义

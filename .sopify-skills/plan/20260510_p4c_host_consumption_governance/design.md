@@ -116,7 +116,7 @@ P4c-1 契约投影层
 
 **交付**：
 1. **protocol.md 唯一合规入口**：接入文档统一指向 protocol.md
-2. **文档递进顺序**：Layer 0 Protocol ≤120 行 → Layer 1 Gate → Layer 2 Phase → Layer 3 Reference（不进 prompt）
+2. **文档披露梯度**：protocol.md 建立渐进式披露层级（目标: Protocol → Gate → Phase → Reference，具体分层方案待收敛）
 3. **Builtin skill capability disclosure**：AGENTS.md 只做消费投影，builtin_catalog 为唯一 truth source
 4. **design.md 结构整理**（非阻塞收口项）：若前述切片稳定，将 S1-S4 增量段内化为稳定章节结构
 

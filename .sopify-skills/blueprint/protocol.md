@@ -10,6 +10,8 @@
 | **payload_capable** — 已安装 payload bundle，可消费 manifest | §1–§5 + prompt asset |
 | **deep_verified** — 完整 runtime gate / handoff / checkpoint | §1–§5 + §8 + prompt asset |
 
+> **术语解耦**：本文的章节编号（§1–§8）构成文档披露梯度，描述宿主接入者的逐层阅读顺序。KB SKILL 中的 L0/L1/L2/L3 是知识持久化分层（index → stable → active → archive），描述 AI 运行时的上下文消费顺序，两者不是同一套模型。
+
 **权限边界：**
 
 - 最小合规看本文；runtime/扩展契约以 `design.md` / ADR 为准
