@@ -24,7 +24,7 @@
 - [蓝图背景](./background.md)
 - [蓝图设计](./design.md)
 - [蓝图任务](./tasks.md)
-- [Sopify 最小协议规范 (Protocol v0)](./protocol.md)
+- [Sopify 宿主接入规范 (Protocol v0)](./protocol.md)
 - [Skill 标准对齐蓝图](./skill-standards-refactor.md)
 - [变更历史](../history/index.md)
 - 最近归档：`../history/2026-05/20260510_p4b5_runtime_optionality_audit`

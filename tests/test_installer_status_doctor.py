@@ -714,6 +714,108 @@ class StatusDoctorContractTests(unittest.TestCase):
             self.assertIn("summary", payload)
 
 
+    def test_status_text_renders_human_labels_not_raw_taxonomy(self) -> None:
+        with tempfile.TemporaryDirectory() as home_dir, tempfile.TemporaryDirectory() as workspace_dir:
+            home_root = Path(home_dir)
+            workspace_root = Path(workspace_dir)
+            state_root = workspace_root / ".sopify-skills" / "state"
+            _write_json(
+                state_root / "current_run.json",
+                {"run_id": "run-1", "stage": "clarification_pending", "status": "active", "plan_id": "p", "plan_path": ".sopify-skills/plan/p"},
+            )
+            _write_json(
+                state_root / "current_handoff.json",
+                {"run_id": "run-1", "required_host_action": "answer_questions"},
+            )
+
+            install_host_assets(CODEX_ADAPTER, repo_root=REPO_ROOT, home_root=home_root, language_directory="CN")
+            install_global_payload(CODEX_ADAPTER, repo_root=REPO_ROOT, home_root=home_root)
+
+            status_payload = build_status_payload(home_root=home_root, workspace_root=workspace_root)
+            rendered = render_status_text(status_payload)
+
+            self.assertIn("current_run_stage: awaiting info", rendered)
+            self.assertIn("pending_checkpoint: awaiting supplemental info", rendered)
+            self.assertNotIn("clarification_pending", rendered)
+            self.assertNotIn("answer_questions", rendered)
+
+    def test_status_text_renders_mapped_checkpoint_labels(self) -> None:
+        with tempfile.TemporaryDirectory() as home_dir, tempfile.TemporaryDirectory() as workspace_dir:
+            home_root = Path(home_dir)
+            workspace_root = Path(workspace_dir)
+            _seed_workspace_state(workspace_root)
+
+            install_host_assets(CODEX_ADAPTER, repo_root=REPO_ROOT, home_root=home_root, language_directory="CN")
+            install_global_payload(CODEX_ADAPTER, repo_root=REPO_ROOT, home_root=home_root)
+
+            status_payload = build_status_payload(home_root=home_root, workspace_root=workspace_root)
+            rendered = render_status_text(status_payload)
+
+            self.assertIn("pending_checkpoint: ready to continue", rendered)
+            self.assertNotIn("continue_host_develop", rendered)
+
+    def test_status_text_state_conflict_shows_explanation_not_raw_code(self) -> None:
+        payload: dict[str, object] = {
+            "schema_version": "2",
+            "hosts": [],
+            "state": {"overall_status": "partial"},
+            "workspace_state": {
+                "requested": True,
+                "root": "/tmp/ws",
+                "sopify_skills_present": True,
+                "active_plan": "some_plan",
+                "current_run_stage": "executing",
+                "pending_checkpoint": None,
+                "quarantine_count": 0,
+                "quarantined_items": [],
+                "state_conflicts": [
+                    {
+                        "code": "run_stage_handoff_mismatch",
+                        "path": "state/current_run.json",
+                        "explanation": "The persisted run stage and handoff action disagree about the current checkpoint.",
+                    }
+                ],
+                "runtime_notes": [],
+            },
+        }
+        rendered = render_status_text(payload)
+
+        self.assertIn("state_conflict_count: 1", rendered)
+        self.assertIn("The persisted run stage and handoff action disagree", rendered)
+        self.assertNotIn("run_stage_handoff_mismatch", rendered)
+
+    def test_doctor_text_state_conflict_evidence_shows_explanation_not_raw_code(self) -> None:
+        payload: dict[str, object] = {
+            "schema_version": "2",
+            "hosts": [],
+            "state": {"overall_status": "partial"},
+            "workspace_state": {
+                "requested": True,
+                "root": "/tmp/ws",
+                "sopify_skills_present": True,
+                "active_plan": "some_plan",
+                "current_run_stage": "executing",
+                "pending_checkpoint": None,
+                "quarantine_count": 0,
+                "quarantined_items": [],
+                "state_conflicts": [
+                    {
+                        "code": "run_stage_handoff_mismatch",
+                        "path": "state/current_run.json",
+                        "explanation": "The persisted run stage and handoff action disagree about the current checkpoint.",
+                    }
+                ],
+                "runtime_notes": [],
+            },
+        }
+        from installer.inspection import _runtime_workspace_checks
+        checks = _runtime_workspace_checks(payload["workspace_state"])
+        conflict_check = next(c for c in checks if c.check_id == "workspace_runtime_state_conflict")
+        for evidence_line in conflict_check.evidence:
+            self.assertNotRegex(evidence_line, r"^run_stage_handoff_mismatch")
+            self.assertIn("disagree about the current checkpoint", evidence_line)
+
+
 def _run_script(entrypoint, argv: list[str]) -> str:
     from io import StringIO
     from contextlib import redirect_stdout

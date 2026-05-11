@@ -75,6 +75,23 @@ _STATE_CONFLICT_EXPLANATIONS = {
     "decision_missing_for_pending_handoff": "The handoff expects a decision checkpoint, but no valid decision state was found.",
 }
 
+_STAGE_LABELS: dict[str, str] = {
+    "plan_generated": "plan ready",
+    "ready_for_execution": "awaiting execution",
+    "executing": "executing",
+    "completed": "completed",
+    "clarification_pending": "awaiting info",
+    "decision_pending": "awaiting decision",
+    "develop_pending": "awaiting host development",
+}
+
+_CHECKPOINT_LABELS: dict[str, str] = {
+    "answer_questions": "awaiting supplemental info",
+    "confirm_decision": "awaiting decision confirmation",
+    "continue_host_develop": "ready to continue",
+    "continue_host_consult": "ready to continue",
+}
+
 
 @dataclass(frozen=True)
 class InspectionCheck:
@@ -504,8 +521,8 @@ def render_status_text(payload: dict[str, object]) -> str:
                 f"  root: {workspace_state['root']}",
                 f"  sopify_skills_present: {workspace_state['sopify_skills_present']}",
                 f"  active_plan: {workspace_state['active_plan'] or '(none)'}",
-                f"  current_run_stage: {workspace_state['current_run_stage'] or '(none)'}",
-                f"  pending_checkpoint: {workspace_state['pending_checkpoint'] or '(none)'}",
+                f"  current_run_stage: {_STAGE_LABELS.get(workspace_state['current_run_stage'], workspace_state['current_run_stage']) if workspace_state['current_run_stage'] else '(none)'}",
+                f"  pending_checkpoint: {_CHECKPOINT_LABELS.get(workspace_state['pending_checkpoint'], workspace_state['pending_checkpoint']) if workspace_state['pending_checkpoint'] else '(none)'}",
             ]
         )
         if workspace_state["quarantine_count"]:
@@ -521,9 +538,10 @@ def render_status_text(payload: dict[str, object]) -> str:
         if workspace_state["state_conflicts"]:
             lines.append(f"  state_conflict_count: {len(workspace_state['state_conflicts'])}")
             first_conflict = workspace_state["state_conflicts"][0]
+            conflict_explanation = str(first_conflict.get("explanation") or _describe_state_conflict(str(first_conflict.get("code") or ""))).strip()
             lines.append(
-                "  state_conflict: {code} @ {path}".format(
-                    code=first_conflict.get("code") or "unknown",
+                "  state_conflict: {desc} @ {path}".format(
+                    desc=conflict_explanation or "unknown conflict",
                     path=first_conflict.get("path") or "(unknown)",
                 )
             )
@@ -667,8 +685,7 @@ def _runtime_workspace_checks(workspace_state: dict[str, object]) -> tuple[Inspe
                 status=CHECK_FAIL,
                 reason_code=REASON_RUNTIME_STATE_CONFLICT,
                 evidence=tuple(
-                    "{code} @ {path}: {explanation}".format(
-                        code=item.get("code") or "unknown",
+                    "{explanation} @ {path}".format(
                         path=item.get("path") or "(unknown)",
                         explanation=item.get("explanation") or _describe_state_conflict(str(item.get("code") or "")),
                     )
