@@ -71,7 +71,6 @@ _LABELS = {
         "risk_level": "风险级别",
         "risk": "关键风险",
         "mitigation": "缓解",
-        "entry_guard_reason": "守卫原因码",
         "execution_gate": "门禁",
         "missing_facts": "缺口",
         "missing": "未生成",
@@ -133,7 +132,6 @@ _LABELS = {
         "risk_level": "Risk Level",
         "risk": "Key Risk",
         "mitigation": "Mitigation",
-        "entry_guard_reason": "Entry Guard Reason",
         "execution_gate": "Gate",
         "missing_facts": "Missing Facts",
         "missing": "not generated",
@@ -552,25 +550,6 @@ def _priority_note(result: RuntimeResult) -> str | None:
             return structured
         if note.startswith("优先级:") or note.startswith("Priority:"):
             return note
-    return None
-
-
-def _append_entry_guard_reason_line(lines: list[str], *, result: RuntimeResult, language: str) -> None:
-    reason_code = _entry_guard_reason_code(result)
-    if not reason_code:
-        return
-    labels = _LABELS[language]
-    lines.append(f"{labels['entry_guard_reason']}: {reason_code}")
-
-
-def _entry_guard_reason_code(result: RuntimeResult) -> str | None:
-    handoff = result.handoff
-    if handoff is None:
-        return None
-    value = handoff.artifacts.get("entry_guard_reason_code")
-    if isinstance(value, str):
-        normalized = value.strip()
-        return normalized or None
     return None
 
 
