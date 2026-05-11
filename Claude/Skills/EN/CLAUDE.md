@@ -349,7 +349,7 @@ Next: Please verify the functionality
 | `kb` | Knowledge base operations | Init, update strategies |
 | `templates` | Create documents | All template definitions |
 
-**Loading:** On-demand, loaded when entering corresponding phase.
+**Loading:** The above are all current builtin skills — runtime-managed workflow skills loaded on-demand by the runtime engine. Standalone invocation is not supported. The authoritative skill catalog is `builtin_catalog.generated.json`.
 
 ---
 
