@@ -1,10 +1,17 @@
-# Sopify 最小协议规范 (Protocol v0)
+# Sopify 宿主接入规范 (Protocol v0)
 
-本文定位: 定义不依赖 runtime 也成立的最小可携带协议。这是宿主接入 Sopify 的最低门槛。
+本文定位: 宿主接入 Sopify 的规范入口。Convention 最小合规（§1–§5）+ Runtime 深度集成（§8）均在本文覆盖。
+
+**阅读地图：**
+
+| 宿主能力 | 需要阅读的章节 |
+|---|---|
+| **convention_only** — 只按目录约定读写 blueprint/plan/receipt | §1–§5 |
+| **payload_capable** — 已安装 payload bundle，可消费 manifest | §1–§5 + prompt asset |
+| **deep_verified** — 完整 runtime gate / handoff / checkpoint | §1–§5 + §8 + prompt asset |
 
 **权限边界：**
 
-- 本文是 **宿主接入的最小规范入口文档**
 - 最小合规看本文；runtime/扩展契约以 `design.md` / ADR 为准
 - `design.md` 负责架构分层、削减目标、runtime 参考实现、核心契约细节（含 state 文件、checkpoint、knowledge_sync）
 - `ADR-016` 负责 Protocol-first 决策理据与演进路线
@@ -72,8 +79,8 @@
 | **方案包管理** | 必须。创建/更新 `plan/` 下的方案包 | 必须。runtime 辅助 |
 | **归档** | 必须。完成后归档到 `history/` 并写 receipt | 必须。runtime 辅助 |
 | **knowledge_sync** | 推荐。归档时将稳定结论回写 blueprint | 必须 |
-| **checkpoint 响应** | 推荐。遇到 clarification/decision 时暂停等用户 | 必须。runtime 强制 |
-| **handoff 消费** | 推荐。读取上轮 handoff 恢复上下文 | 必须 |
+| **checkpoint 响应** | 推荐。遇到 clarification/decision 时暂停等用户 | 必须。runtime 强制（详见 §8.2） |
+| **handoff 消费** | 推荐。读取上轮 handoff 恢复上下文 | 必须（详见 §8.2） |
 | **Validator 校验** | 事后校验。最小交互流可不依赖 Validator 实时阻断，但正式合规与 receipt authority 仍由 Validator 事后校验提供 | 写前授权。Validator 是 pre-write authorizer |
 
 **Convention 模式最小合规**：读 blueprint → 写方案包 → 归档。最小交互流不要求 Validator 实时阻断或 runtime state 文件；但要获得正式 receipt authority 和合规校验，仍需调用 Validator（可事后批量）。
@@ -144,9 +151,9 @@
 
 以上全部通过即为 **Convention 模式最小合规**。如需 Runtime 模式，另需满足 Validator 接入（见 design.md 核心管线）。
 
-## 6. Integration Contract（外部能力接入契约）— *informative / draft*
+## 6. Integration Contract（外部能力接入契约）— *informative；Verifier / ExecutionAuthorizationReceipt 为 normative 例外*
 
-> 本节整体是方向性参考，尚未稳定为规范。当前仅 `### Verifier` 子段已升格为 normative（P1.5-D）；其余子段仍为 informative/draft。当前用于说明外部能力如何接入 Sopify 的收敛链。
+> 本节整体 informative。其中 **Verifier**（§6.Verifier）和 **ExecutionAuthorizationReceipt**（§7 内引用）已升格为 normative（P1.5-D）；其余子段仍为 draft。
 
 Sopify 不做生产/验证/知识处理节点本身，但拥有证据规范、授权判定、收据生成这几个控制节点。外部能力通过以下契约接入 Sopify 的收敛链。
 
@@ -351,6 +358,84 @@ ExecutionAuthorizationReceipt 是 execute_existing_plan 授权通过后生成的
 ### 存储位置
 
 审查记录作为 evidence 进入 handoff 或 plan metadata，归档时纳入 receipt 的 verification_evidence。evidence 挂载的 normative 消费规则见 §6 Verifier 消费路径。evidence attachment 的 wire format（字段 schema、路径约定）为 deferred，不属于当前 normative scope。
+
+## 8. Deep Host 运行时集成协议
+
+> 本节是 §3 宿主最小义务中 Runtime 模式的详细展开。Convention 模式宿主不需要消费本节。Prompt asset（AGENTS.md / CLAUDE.md）只保留高层义务摘要，本节是唯一规范入口。
+
+### 8.1 Gate-First 义务
+
+每次进入新的 Sopify LLM 回合前，宿主必须先执行 runtime gate 并消费返回的 JSON contract。
+
+**入口解析**：
+- Repo-local 开发态：`scripts/runtime_gate.py enter --workspace-root <cwd> --request "<raw user request>"`
+- Vendored 模式：工作区 `.sopify-runtime/manifest.json` 只是 thin stub（声明 `bundle_version / locator_mode / ignore_mode`）；宿主结合 `~/.codex/sopify/payload-manifest.json` 解析 selected global bundle，从 bundle contract 或 workspace-preflight contract 消费 `runtime_gate_entry`
+- 若工作区缺少兼容 manifest，宿主先调 `~/.codex/sopify/helpers/bootstrap_workspace.py --workspace-root <cwd>`
+
+**Gate 通过条件**：仅当 `status == ready` ∧ `gate_passed == true` ∧ `evidence.handoff_found == true` ∧ `evidence.strict_runtime_entry == true` 时，宿主才可进入后续阶段。
+
+**`allowed_response_mode` 值域**：
+
+| 值 | 宿主行为 |
+|---|---|
+| `checkpoint_only` | 只允许 checkpoint 响应 |
+| `error_visible_retry` | 只允许短错误摘要 + 重试提示 |
+| `action_proposal_retry` | 必须读 `action_proposal_schema`，生成 ActionProposal JSON，以 `--action-proposal-json` 重试 |
+
+**ActionProposal capability**：首次 gate 调用应声明 `--action-proposal-capability`；提供 `--action-proposal-json` 时隐含声明。不声明的宿主走 legacy fallback。Schema 由 gate 动态返回，不得硬编码。
+
+**Gate 验证时效**：必须在当前消息回合的 tool call 中执行，不得复用上一轮 `current_gate_receipt.json`。
+
+**首次激活 `ROOT_CONFIRM_REQUIRED`**：宿主必须停在 root 选择（推荐当前目录 / 备选仓库根 / 允许手动指定），确认后以 `activation_root` 重试。`allowed_response_mode` 为 `checkpoint_only`。`~go init` 不得绕过此步骤。
+
+### 8.2 Post-Run Handoff 消费
+
+runtime 执行后，若 `.sopify-skills/state/current_handoff.json` 存在，宿主必须优先按其中的 `required_host_action`、`recommended_skill_ids`、`artifacts` 决定下一步。渲染层 `Next:` 行仅为人类摘要，不作为唯一机器依据。
+
+**`required_host_action` 值域**：
+
+| 值 | 宿主行为 |
+|---|---|
+| `answer_questions` | 读 `.sopify-skills/state/current_clarification.json`，向用户展示 `missing_facts` / `questions`，等待补充后重入 default runtime entry。不得自行物化 plan 或跳到 `~go exec` |
+| `confirm_decision` | 优先读 `current_handoff.json.artifacts.decision_checkpoint` + `decision_submission_state`；回退到 `.sopify-skills/state/current_decision.json`。展示 `question` / `options` / `recommended_option_id`，等待用户确认后重入。不得自行生成 plan |
+| `continue_host_develop` | 宿主继续代码修改；若遇用户分叉（需补事实/拍板），必须调 `scripts/develop_callback_runtime.py submit --payload-json ...`（vendored: `.sopify-runtime/scripts/develop_callback_runtime.py`），payload 含 `checkpoint_kind` + `resume_context` |
+| `continue_host_consult` | 在已消费当前回合 gate contract 前提下继续问答；不得自行路由，不得重判 consult / 非 consult |
+
+**execution_gate**：若 `current_handoff.json.artifacts.execution_gate` 存在，结合 `.sopify-skills/state/current_run.json.stage` 判断 plan 状态（已生成 vs `ready_for_execution`）。
+
+**偏好注入**：gate 内部执行 preferences preload（通过 `preferences_preload_entry`）。宿主只消费 gate 暴露的 `preferences` 结果，不得自行拼装。优先级固定为：当前任务明确要求 > `preferences.md` > 默认规则。
+
+### 8.3 宿主行为边界
+
+- 宿主不得在 gate 前自行路由
+- 宿主不得绕过 checkpoint 约束（`clarification_pending` / `decision_pending`）
+- 宿主不得手写 `current_decision.json` / `current_handoff.json` 等 machine truth
+- `~go exec` 仅为高级恢复/调试入口，不得在无活动 plan 时作为默认路径
+- Prompt asset 是 prompt 层指引，不是 vendored runtime 的 machine contract
+
+### 8.4 Runtime Helper 索引
+
+| Helper | 说明 |
+|---|---|
+| `scripts/sopify_runtime.py` | 默认 repo-local raw-input entry |
+| `scripts/runtime_gate.py enter` | runtime gate，宿主第一跳 |
+| `scripts/go_plan_runtime.py` | plan-only 切片 helper |
+| `scripts/develop_callback_runtime.py` | `continue_host_develop` 中用户分叉回调 |
+| `scripts/decision_bridge_runtime.py` | `confirm_decision` host bridge helper |
+| `scripts/preferences_preload_runtime.py` | 长期偏好 preload helper |
+| `~/.codex/sopify/payload-manifest.json` | 全局 payload metadata |
+| `~/.codex/sopify/helpers/bootstrap_workspace.py` | workspace bootstrap helper |
+| `.sopify-runtime/manifest.json` | vendored bundle machine contract |
+
+### 8.5 State 文件索引
+
+| 文件 | 说明 |
+|---|---|
+| `.sopify-skills/state/current_handoff.json` | 运行时交接事实，宿主执行后优先消费 |
+| `.sopify-skills/state/current_run.json` | 活跃 run 状态（stage, execution_gate） |
+| `.sopify-skills/state/current_clarification.json` | 澄清 checkpoint 状态 |
+| `.sopify-skills/state/current_decision.json` | 决策 checkpoint 回退状态 |
+| `.sopify-skills/state/current_gate_receipt.json` | gate receipt（仅当轮有效） |
 
 ## 非目标
 
