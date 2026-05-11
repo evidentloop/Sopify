@@ -71,7 +71,6 @@ _LABELS = {
         "risk_level": "风险级别",
         "risk": "关键风险",
         "mitigation": "缓解",
-        "entry_guard_reason": "守卫原因码",
         "execution_gate": "门禁",
         "missing_facts": "缺口",
         "missing": "未生成",
@@ -95,12 +94,10 @@ _LABELS = {
         "next_answer_questions": "回复补充信息继续规划，或输入 取消 终止本轮设计",
         "next_plan": "在宿主会话中继续评审或执行方案，或直接回复修改意见",
         "next_workflow": "在宿主会话中继续执行后续阶段，或显式使用 ~go plan 只规划",
-        "next_resume": "在宿主会话中继续 develop 阶段",
         "next_exec": "仅在已有活动 plan 或恢复态时使用 ~go exec；普通开发流继续按宿主会话推进",
         "next_cancel": "如需继续，重新发起 ~go plan 或 ~go",
         "next_archive_success": "请验证 blueprint 索引与 history 归档结果",
         "next_archive_retry": "补齐 blueprint 更新或切换到 metadata-managed plan 后重试",
-        "next_quick_fix": "在宿主会话中继续执行快速修复",
         "next_consult": "在宿主会话中继续问答，或改成明确变更请求",
         "next_decision": "回复 1/2（或 ~decide choose <option_id>）确认方案，或输入 取消 终止本轮设计",
         "handoff_answer_questions": "已写入 clarification handoff，宿主应先补齐缺失事实信息",
@@ -135,7 +132,6 @@ _LABELS = {
         "risk_level": "Risk Level",
         "risk": "Key Risk",
         "mitigation": "Mitigation",
-        "entry_guard_reason": "Entry Guard Reason",
         "execution_gate": "Gate",
         "missing_facts": "Missing Facts",
         "missing": "not generated",
@@ -159,12 +155,10 @@ _LABELS = {
         "next_answer_questions": "Reply with the missing facts to continue planning, or type cancel to stop this round",
         "next_plan": "Continue plan review or execution in the host session, or reply with feedback",
         "next_workflow": "Continue the downstream stages in the host session, or use ~go plan for planning only",
-        "next_resume": "Continue the develop stage in the host session",
         "next_exec": "Use ~go exec only when an active plan or recovery state already exists; otherwise continue through the host flow",
         "next_cancel": "Start a new ~go plan or ~go flow when ready",
         "next_archive_success": "Review the blueprint index refresh and the history archive",
         "next_archive_retry": "Update the blueprint or switch to a metadata-managed plan and retry",
-        "next_quick_fix": "Continue the quick-fix flow in the host session",
         "next_consult": "Continue the discussion in the host session, or restate it as a change request",
         "next_decision": "Reply with 1/2 (or `~decide choose <option_id>`) to confirm, or type cancel to abort this design round",
         "handoff_answer_questions": "clarification handoff written; the host should gather the missing factual details first",
@@ -179,6 +173,33 @@ _LABELS = {
         "state_conflict_remaining": "Conflict cleanup completed, but another conflict still requires inspection",
         "next_state_conflict": "Reply with cancel / force cancel to abandon the current negotiation and recover",
     },
+}
+
+_ROUTE_FAMILIES = {
+    "completion": frozenset({"plan_only", "archive_lifecycle", "cancel_active"}),
+    "pending": frozenset({"clarification_pending", "decision_pending"}),
+    "action": frozenset({"workflow", "light_iterate", "quick_fix", "consult", "resume_active", "exec_plan"}),
+    "conflict": frozenset({"state_conflict"}),
+    "rejection": frozenset({"proposal_rejected"}),
+}
+
+# Canonical family → symbol mapping (P4c-3a.1).
+# Hosts can predict the status symbol from the route family alone.
+_FAMILY_SYMBOL: dict[str, str] = {
+    "completion": "✓",
+    "pending": "?",
+    "action": "!",
+    "conflict": "!",
+    "rejection": "!",
+}
+
+_ROUTE_TO_FAMILY: dict[str, str] = {
+    route: family for family, routes in _ROUTE_FAMILIES.items() for route in routes
+}
+
+_GATE_STATUS_DISPLAY = {
+    "zh-CN": {"ready": "就绪", "blocked": "阻断", "decision_required": "待决策"},
+    "en-US": {"ready": "Ready", "blocked": "Blocked", "decision_required": "Decision Required"},
 }
 
 _TITLE_COLORS = {
@@ -208,8 +229,13 @@ def render_runtime_output(
     body = _core_lines(result, locale)
     next_hint = _next_hint(result, locale)
 
+    context_files = _collect_context_files(result)
+
     lines = [title, ""]
     lines.extend(body)
+    if context_files:
+        lines.extend(["", f"Context: {len(context_files)} files"])
+        lines.extend(f"  - {path}" for path in context_files)
     lines.extend(["", "---", f"Changes: {len(changes)} files"])
     if changes:
         lines.extend(f"  - {path}" for path in changes)
@@ -280,7 +306,6 @@ def _core_lines(result: RuntimeResult, language: str) -> list[str]:
             f"{labels['missing_facts']}: {missing_facts}",
             f"{labels['questions']}: {question_text or labels['missing']}",
         ]
-        _append_entry_guard_reason_line(lines, result=result, language=language)
         return lines
 
     if route_name == "decision_pending" and result.recovered_context.current_decision is not None:
@@ -295,7 +320,6 @@ def _core_lines(result: RuntimeResult, language: str) -> list[str]:
             f"{labels['options']}: {option_text or labels['missing']}",
             f"{labels['status']}: {_decision_pending_status(language, recommended)}",
         ]
-        _append_entry_guard_reason_line(lines, result=result, language=language)
         return lines
 
     if route_name == "state_conflict":
@@ -312,7 +336,6 @@ def _core_lines(result: RuntimeResult, language: str) -> list[str]:
                 ]
             )
         lines.append(f"{labels['quarantined']}: {len(quarantined_items)}")
-        _append_entry_guard_reason_line(lines, result=result, language=language)
         return lines
 
     if route_name == "archive_lifecycle":
@@ -323,7 +346,6 @@ def _core_lines(result: RuntimeResult, language: str) -> list[str]:
                 f"{labels['status']}: {labels['archive_success']}",
             ]
         return [
-            f"{labels['route']}: {route_name}",
             f"{labels['status']}: {labels['archive_blocked']}",
             f"{labels['reason']}: {_diagnostic_reason(result)}",
         ]
@@ -358,11 +380,9 @@ def _core_lines(result: RuntimeResult, language: str) -> list[str]:
     if route_name == "cancel_active":
         return [
             f"{labels['status']}: {labels['cleared']}",
-            f"{labels['route']}: {route_name}",
         ]
 
     return [
-        f"{labels['route']}: {route_name}",
         f"{labels['status']}: {_status_message(result, language)}",
         f"{labels['reason']}: {_diagnostic_reason(result)}",
     ]
@@ -376,10 +396,6 @@ def _collect_changes(result: RuntimeResult) -> list[str]:
             seen.add(path)
             ordered.append(path)
     for path in result.plan_artifact.files if result.plan_artifact is not None else ():
-        if path not in seen:
-            seen.add(path)
-            ordered.append(path)
-    for path in result.recovered_context.loaded_files:
         if path not in seen:
             seen.add(path)
             ordered.append(path)
@@ -399,48 +415,43 @@ def _collect_changes(result: RuntimeResult) -> list[str]:
     return ordered
 
 
+def _collect_context_files(result: RuntimeResult) -> list[str]:
+    """Return loaded context files that are not part of generated changes."""
+    return list(result.recovered_context.loaded_files)
+
+
 def _next_hint(result: RuntimeResult, language: str) -> str:
     labels = _LABELS[language]
     if result.handoff is not None:
         return _handoff_next_hint(result, language)
-    if result.route.route_name == "archive_lifecycle":
+    route_name = result.route.route_name
+    if route_name == "archive_lifecycle":
         return labels["next_archive_success"] if result.plan_artifact is not None else labels["next_archive_retry"]
-    if result.route.route_name == "clarification_pending":
-        return labels["next_answer_questions"]
-    if result.route.route_name == "decision_pending":
-        return labels["next_decision"]
-    if result.route.route_name == "state_conflict":
+    if route_name in _ROUTE_FAMILIES["pending"]:
+        return labels["next_answer_questions"] if route_name == "clarification_pending" else labels["next_decision"]
+    if route_name in _ROUTE_FAMILIES["conflict"]:
         return labels["next_state_conflict"]
-    if result.route.route_name == "exec_plan":
+    if route_name == "exec_plan":
         return labels["next_exec"]
-    if result.route.route_name == "cancel_active":
+    if route_name == "cancel_active":
         return labels["next_cancel"]
     return labels["next_retry"]
 
 
 def _status_symbol(result: RuntimeResult) -> str:
     route_name = result.route.route_name
-    if route_name == "plan_only":
-        return "✓" if result.plan_artifact is not None else "!"
-    if route_name == "archive_lifecycle":
-        return "✓" if result.plan_artifact is not None else "!"
-    if route_name in {"clarification_pending"}:
-        return "?"
-    if route_name == "decision_pending":
-        return "?"
-    if route_name == "state_conflict":
-        if result.route.active_run_action == "abort_conflict" and not _state_conflict_payload(result):
+    family = _ROUTE_TO_FAMILY.get(route_name)
+    if family is not None:
+        symbol = _FAMILY_SYMBOL[family]
+        # Completion: missing expected artifact downgrades to warning
+        if family == "completion" and route_name in {"plan_only", "archive_lifecycle"} and result.plan_artifact is None:
+            return "!"
+        # Conflict: fully resolved upgrades to success
+        if family == "conflict" and result.route.active_run_action == "abort_conflict" and not _state_conflict_payload(result):
             return "✓"
-        return "!"
-    if route_name == "cancel_active":
-        return "✓"
-    if route_name == "proposal_rejected":
-        return "!"
-    if route_name in {"workflow", "light_iterate", "quick_fix", "consult", "resume_active", "exec_plan"}:
-        return "!"
-    if result.notes:
-        return "!"
-    return "✓"
+        return symbol
+    # Unclassified route: warning if notes, else success
+    return "!" if result.notes else "✓"
 
 
 def _status_message(result: RuntimeResult, language: str) -> str:
@@ -491,51 +502,30 @@ def _handoff_label(result: RuntimeResult, language: str) -> str:
     return CURRENT_HANDOFF_RELATIVE_PATH
 
 
+_HANDOFF_KIND_HINT = {
+    "plan": "next_plan",
+    "develop": "next_workflow",
+    "clarification": "next_answer_questions",
+    "decision": "next_decision",
+    "consult": "next_consult",
+    "reject": "next_reject",
+}
+
+
 def _handoff_next_hint(result: RuntimeResult, language: str) -> str:
     labels = _LABELS[language]
     handoff = result.handoff
     if handoff is None:
         return labels["next_retry"]
-    required_host_action = str(handoff.required_host_action or "").strip()
-    if required_host_action == "continue_host_consult":
-        if handoff.handoff_kind == "reject":
-            return labels["next_reject"]
-        if handoff.handoff_kind == "archive":
-            receipt_status = str((handoff.artifacts or {}).get("archive_receipt_status", "")).strip()
-            if receipt_status == "completed":
-                return labels["next_archive_success"]
-            return labels["next_archive_retry"]
-        return labels["next_consult"]
-    if required_host_action == "answer_questions":
-        return labels["next_answer_questions"]
-    if required_host_action == "resolve_state_conflict":
-        return labels["next_state_conflict"]
-    if required_host_action == "continue_host_develop":
-        if result.route.route_name == "plan_only":
-            return labels["next_plan"]
-        if result.route.route_name == "resume_active":
-            return labels["next_resume"]
-        if result.route.route_name == "exec_plan":
-            return labels["next_exec"]
-        if result.route.route_name == "quick_fix":
-            return labels["next_quick_fix"]
-        return labels["next_workflow"]
-    if required_host_action == "confirm_decision":
-        return labels["next_decision"]
-    # Fallback: match by canonical handoff_kind (family)
-    if handoff.handoff_kind == "plan":
-        return labels["next_plan"]
-    if handoff.handoff_kind == "clarification":
-        return labels["next_answer_questions"]
-    if handoff.handoff_kind == "develop":
-        if result.route.route_name == "quick_fix":
-            return labels["next_quick_fix"]
-        return labels["next_resume"] if result.route.route_name == "resume_active" else labels["next_exec"]
-    if handoff.handoff_kind == "decision":
-        return labels["next_decision"]
-    if handoff.handoff_kind == "consult":
-        return labels["next_consult"]
-    return labels["next_retry"]
+    kind = handoff.handoff_kind
+    if kind == "archive":
+        receipt_status = str((handoff.artifacts or {}).get("archive_receipt_status", "")).strip()
+        return labels["next_archive_success"] if receipt_status == "completed" else labels["next_archive_retry"]
+    if kind == "state_conflict":
+        action = str(handoff.required_host_action or "").strip()
+        return labels["next_state_conflict"] if action == "resolve_state_conflict" else labels["next_workflow"]
+    hint_key = _HANDOFF_KIND_HINT.get(kind)
+    return labels[hint_key] if hint_key else labels["next_retry"]
 
 
 def _diagnostic_reason(result: RuntimeResult) -> str:
@@ -543,21 +533,14 @@ def _diagnostic_reason(result: RuntimeResult) -> str:
         return result.notes[0]
     if result.route.reason:
         return result.route.reason
-    return result.route.route_name
+    return "—"
 
 
 def _execution_gate(result: RuntimeResult):
-    # Output only renders resolved runtime result facts. It may fall back from
-    # recovered context to persisted handoff artifacts, but it never re-opens
-    # checkpoint state from disk on its own.
-    current_run = result.recovered_context.current_run
-    if current_run is not None and current_run.execution_gate is not None:
-        return current_run.execution_gate
-    if result.handoff is not None:
-        execution_gate = result.handoff.artifacts.get("execution_gate")
-        if isinstance(execution_gate, dict):
-            return execution_gate
-    return None
+    if result.handoff is None:
+        return None
+    execution_gate = result.handoff.artifacts.get("execution_gate")
+    return execution_gate if isinstance(execution_gate, dict) else None
 
 
 def _priority_note(result: RuntimeResult) -> str | None:
@@ -570,25 +553,6 @@ def _priority_note(result: RuntimeResult) -> str | None:
     return None
 
 
-def _append_entry_guard_reason_line(lines: list[str], *, result: RuntimeResult, language: str) -> None:
-    reason_code = _entry_guard_reason_code(result)
-    if not reason_code:
-        return
-    labels = _LABELS[language]
-    lines.append(f"{labels['entry_guard_reason']}: {reason_code}")
-
-
-def _entry_guard_reason_code(result: RuntimeResult) -> str | None:
-    handoff = result.handoff
-    if handoff is None:
-        return None
-    value = handoff.artifacts.get("entry_guard_reason_code")
-    if isinstance(value, str):
-        normalized = value.strip()
-        return normalized or None
-    return None
-
-
 def _execution_gate_line(result: RuntimeResult, language: str) -> str:
     labels = _LABELS[language]
     current_gate = _execution_gate(result)
@@ -596,13 +560,11 @@ def _execution_gate_line(result: RuntimeResult, language: str) -> str:
         return f"{labels['execution_gate']}: {labels['missing']}"
     if hasattr(current_gate, "gate_status"):
         gate_status = current_gate.gate_status
-        blocking_reason = current_gate.blocking_reason
-        plan_completion = current_gate.plan_completion
     else:
         gate_status = str(current_gate.get("gate_status") or "blocked")
-        blocking_reason = str(current_gate.get("blocking_reason") or "none")
-        plan_completion = str(current_gate.get("plan_completion") or "incomplete")
-    return f"{labels['execution_gate']}: {gate_status} / {blocking_reason} / {plan_completion}"
+    display_map = _GATE_STATUS_DISPLAY.get(language, _GATE_STATUS_DISPLAY["en-US"])
+    display = display_map.get(gate_status, display_map["blocked"])
+    return f"{labels['execution_gate']}: {display}"
 
 
 def _decision_pending_status(language: str, recommended_option_id: str) -> str:
@@ -626,10 +588,6 @@ def _phase_label(result: RuntimeResult, language: str) -> str:
 
 
 def _state_conflict_payload(result: RuntimeResult) -> dict[str, object]:
-    if result.recovered_context.state_conflict:
-        return dict(result.recovered_context.state_conflict)
-    if result.route.route_name == "state_conflict" and result.route.active_run_action == "abort_conflict":
-        return {}
     if result.handoff is not None:
         payload = result.handoff.artifacts.get("state_conflict")
         if isinstance(payload, dict):
@@ -638,8 +596,6 @@ def _state_conflict_payload(result: RuntimeResult) -> dict[str, object]:
 
 
 def _quarantined_items(result: RuntimeResult) -> list[dict[str, object]]:
-    if result.recovered_context.quarantined_items:
-        return [dict(item) for item in result.recovered_context.quarantined_items]
     if result.handoff is not None:
         payload = result.handoff.artifacts.get("quarantined_items")
         if isinstance(payload, list):

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from installer.models import EntryMode, FeatureId, HostCapability, SupportTier
+from installer.models import EntryMode, EnhancementGroup, FeatureId, HostCapability, SupportTier
 
 from .base import HostAdapter, HostRegistration
 
@@ -35,6 +35,11 @@ CODEX_CAPABILITY = HostCapability(
         FeatureId.HANDOFF_FIRST,
         FeatureId.HOST_BRIDGE,
         FeatureId.SMOKE_VERIFIED,
+    ),
+    declared_enhancements=(
+        EnhancementGroup.CONTINUATION,
+        EnhancementGroup.INTERACTION,
+        EnhancementGroup.AUDIT,
     ),
     entry_modes=(EntryMode.PROMPT_ONLY,),
     doctor_checks=(

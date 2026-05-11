@@ -23,7 +23,7 @@
 | P4a | external_surface_freeze | P3b | 已完成。薄切片：冻结不可删外部消费面 keep-list |
 | P4b | runtime_surface_consolidation | P4a | 已完成。prove-kept-or-delete 证明 <20K 不可达，实删 15 LOC |
 | P4b.5 | runtime_optionality_audit | P4b | 已完成。设计/审计型：宿主接入层级矩阵 + 消费矩阵 + blast radius + 综合裁定 |
-| P4c | host_consumption_governance | P4b.5 | 宿主只消费 contract，不定义 truth |
+| P4c | host_consumption_governance | P4b.5 | 已完成。宿主只消费 contract，不定义 truth |
 
 ### P0: Blueprint Rebaseline（已完成）
 
@@ -61,60 +61,16 @@
 
 ✅ 已完成。设计/审计型，不改代码。交付物：S1 Forbidden Surface（F1-F8）、S2 消费矩阵 + opt-in 增强组合 + 官方接入画像、S3 Blast Radius 审计（15 功能区 + 语义来源→落盘→contract 映射）、S4 综合裁定 + P4c 前提声明。归档：`history/2026-05/20260510_p4b5_runtime_optionality_audit/`
 
-### P4c: Host Consumption Governance
+### P4c: Host Consumption Governance（已完成）
 
-宿主只消费稳定 contract，不再定义 machine truth。P4b.5 宿主接入层级矩阵就绪后执行。
-
-- prompt 不定义机器契约、不维护路由表
-- doctor/status 输出只渲染 machine truth，不作为 truth source
-- handoff rendering 只消费结构化字段，不做语义推断
-- 接入文档以 protocol.md 为唯一合规入口
-- **宿主消费边界**：宿主只允许消费"主链机器真相"层（current_run/current_plan/current_handoff/current_clarification/current_decision）和"可审计凭证"层（gate_receipt/archive_receipt）；不得消费 state/sessions/* 内部细节、last_route 等 runtime-only/derived 面（参照 design.md "Persistence Surface 分层"表）
-- **验收 (a) 文档递进顺序**：渐进式披露 Layer 0 Protocol ≤120 行 → Layer 1 Gate → Layer 2 Phase → Layer 3 Reference（不进 prompt）
-- **验收 (b) 运行时首接触感知**：新用户首次使用时，只感知到"中断可恢复"和"需要拍板时会停"两个语义；blueprint / checkpoint taxonomy / runtime state 等内部概念不在默认运行时路径中主动暴露。doctor/status 不主动呈现 checkpoint 分类体系，~go 入口不前置 blueprint 概念
-- **Output contract convergence**：基于 P4a 审计分类，收敛 `runtime/output.py` 渲染层——① 状态符语义：定义 canonical route family → 符号映射（当前 consult=`!` 无明确约束）；② Next 降级：明确为 human hint，不再混合 `required_host_action` + `route_name` 推导，宿主消费 handoff 不依赖 Next；③ Changes 重定义：`loaded_files`（恢复上下文）从 Changed（实际写入）中拆出，或重命名为 Touched/Files；④ Gate 行简化：默认输出不暴露 `gate_status`/`blocking_reason`/`plan_completion` 三元组，详细诊断留给 doctor/status
-- **Builtin skill capability disclosure**：宿主文案稳定表达 builtin skill 的当前能力边界与可消费方式；AGENTS.md 只做消费投影，builtin_catalog 为唯一 truth source。当前 analyze/design/develop 是 phase-bound workflow skill（entry_kind=null, triggers=[]），不宣称 standalone invocation。若后续要支持 builtin skill 显式单独调用，必须先 formalize 独立的 invocation metadata contract / invocation syntax；在该 contract 明确前，本项只做披露，不预设其进入 P2 或单列里程碑。边界：只覆盖 builtin skill，不扩展到外部 skill discovery/routing/distribution（background.md 明确排除）
-
-**P4c 前提声明（来自 P4b.5 S4 审计）**
-
-> 以下三部分基于 P4b.5 S1-S3 审计结论提取。P4c 开包时消费此声明，不重新证明已审计项。
-
-**P4c 可以假设的 invariant**
-
-1. **Forbidden surface 已定义**（design.md F1-F8）：state/sessions/\*、last\_route、route taxonomy、Next:/输出文案、渲染层实现、runtime 内部模块边界均为 forbidden surface，适用所有三级梯度。P4c 的任何实施项不得引入对这些面的新宿主依赖。
-2. **消费矩阵已裁定**（design.md S2 四子表）：convention\_only 和 payload\_capable 的每项 contract 文件归位（required/optional/forbidden）已确定。deep\_verified 列部分项标为"预期 required†"，待 P4c 最终裁定。P4c 直接消费此矩阵，不重新审计层级归位。
-3. **三级 ladder 不变**（design.md L409-419）：convention\_only / payload\_capable / deep\_verified 的准入定义不因 P4c 改变。payload\_capable 准入仍为"payload 安装 + prompt asset 消费"。
-4. **payload\_capable 对 runtime/ 的 blast radius 为零**（design.md S3 结论 2）：payload\_capable 不需要运行任何 runtime/ 模块。消费冻结 contract 文件不等于依赖生产者模块。
-5. **生产者 vs 消费者边界明确**（design.md S3 语义来源表）：7 个 contract 文件的语义来源已映射，全部经 state.py 统一落盘。P4c 可以改变生产者实现，不能改变 contract 文件 schema（P4a keep-list 保护）。
-6. **官方接入画像已定义**（design.md S2）：官方最低接入 = payload\_capable + 接续增强全组；对话式/全审计宿主在此基础上叠加。此画像是独立于 ladder 的接入策略层。
-7. **EAR @ convention\_only = forbidden 已闭合**（design.md S2 消费矩阵）：convention\_only 不承诺消费协议级 receipt 实例语义。此裁定不在 P4c 重新开放。
-
-**P4c 需做的实施项（由 P4b.5 推导）**
-
-1. **机器可检查投影矩阵**：将消费矩阵中的层级归位翻译为可执行的 FeatureId → 梯度映射规则（design.md L419 已预告此项属 P4c）。
-2. **增强检测机制**：P4c 需定义宿主如何声明/检测已激活的 opt-in 增强组合（接续/交互/审计）。当前无此机制，ladder 只定义准入面。
-3. **Output 渲染层收敛**：消除 forbidden surface F5（Next: 输出文案推导逻辑）和 F6（渲染层实现细节）中被新宿主事实上依赖的泄露。对应 P4c 已有的 Output contract convergence 项。
-4. **deep\_verified "预期 required†" 最终裁定**：消费矩阵中 deep\_verified 列的"预期 required†"项需在 P4c 做最终 required/optional 裁定。P4b.5 只做审计判断，不替代最终裁定。
-5. **Forbidden surface 执行保障**：P4c 需确保 F1-F8 中的每一项在实现层有对应的防泄露措施（如移除 prompt 中的 route\_name 直接暴露、收敛 Next: 推导逻辑等）。
-
-**P4c 不能做的事（红线）**
-
-1. **不改 ladder 定义**：不修改三级梯度的准入条件，不新增/删除梯度。
-2. **不新增 machine truth**：不新增 state 文件、不新增 checkpoint 类型、不新增 contract 文件。若确需新增，须走 ADR 路径并对照削减预算表。
-3. **不改 P4a keep-list schema**：contract 文件的 schema 由 P4a 冻结面保护。P4c 可以改变生产者实现，不能改变 contract 文件结构。
-4. **不让 payload\_capable 依赖 runtime/ 模块**：这是 S3 的核心审计结论。任何 P4c 实施项如果引入 payload\_capable 对 runtime 模块的运行依赖，视为违反 P4b.5 审计边界。
-5. **不消费 forbidden surface**：P4c 实施项不得引入对 F1-F8 中任何面的新宿主依赖。消除已有泄露是 P4c 的目标，不是引入新泄露。
-6. **不解决 P4d/P5/P6 范围**：P4c 不预设新宿主试点（P4d）、不预执行 contract surface 删减（P5）、不预判 runtime 降级路径（P6）。
-
-**P4c 收口附带：design.md 结构整理**
-
-> P4c 收口时，将 design.md Host Capability Governance 节中 P4b.5 的增量段（S1-S4）内化为稳定章节结构（Forbidden Surface / Consumption Matrix / Official Onboarding Profile / Blast Radius / Comprehensive Verdict）。此整理不改变观点，只优化文档结构，避免后续里程碑继续无限追加 S 段。
+✅ 已完成（P4c-5 Prompt Asset 结构收口显式跳过）。P4b.5 审计结论转化为可执行治理：宿主只消费稳定 contract，不再定义 machine truth。交付物：P4c-1 契约投影矩阵（deep_verified † 全部消除）、P4c-2 增强声明/检测协议、P4c-3a output/doctor/handoff 渲染收敛、P4c-3b 首接触/prompt 收敛（-140 行 route taxonomy 删除，protocol.md §8 引用替代）、P4c-4 protocol.md §8 唯一入口 + 文档披露梯度 + builtin skill 披露 + design.md 结构整理。跨切片 invariant 5/5 PASS，红线 6/6 无违反。归档：`history/2026-05/20260510_p4c_host_consumption_governance/`
 
 ## 未完成长期项
 
 ### P4b 后续路线（P4c 后视评估）
 
 - [ ] P4d New Host Pilot：选 1 个非 deep 宿主做试点（convention_only 或 payload_capable），不接完整 runtime。验证 P4b.5/P4c 的分层是否真正降低接入成本。可与 P4c 后期并行启动。
+- [ ] Continuation Entry Convergence：统一宿主级官方入口语义（Inspect Active Work / Continue Active Work / Start New Work），覆盖同宿主跨 session 与跨宿主接续。只消费现有 frozen contract，不新增 machine truth，不绑定 runtime 正则/路由实现。不规定入口语法或关键词，宿主自行选择暴露形式（命令、按钮、菜单等）。有活动工作或 pending checkpoint 时 Start New Work 必须显式仲裁。当前 `~go exec` 是 Continue Active Work 的命令级实现，应被 host-level 入口语义取代。_触发条件：P4c 验收后，结合 P4d 非 deep 宿主试点 formalize_
 - [ ] P5 Contract Surface Shrinkage：在 P4d 验证后，按 evidence 逐项删除或降级 deep runtime 专属的 contract surface（bridge capability / manifest entry / installer bundle 项）。此时已知哪些 contract 是新宿主需要 vs 历史包袱。
 - [ ] P6 Runtime Sunset / Reference Runtime：将 runtime 明确降级为 reference implementation 或 deep host hardening layer。新宿主默认走 Protocol/Convention 模式，runtime 不再承载新增产品能力。可能与 P5 合并。
 
