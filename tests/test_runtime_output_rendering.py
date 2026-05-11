@@ -15,7 +15,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from runtime._models.handoff import RecoveredContext, RuntimeHandoff, RuntimeResult
 from runtime._models.core import RouteDecision
-from runtime.output import render_runtime_output, _execution_gate_line, _GATE_STATUS_DISPLAY
+from runtime.output import render_runtime_output, _execution_gate_line, _GATE_STATUS_DISPLAY, _status_symbol
 from runtime.gate_output import render_gate_text
 
 
@@ -211,6 +211,76 @@ class TestNextHintMapping(unittest.TestCase):
             required_host_action="continue_host_develop",
         )
         self.assertIn("downstream stages", hint)
+
+
+class TestStatusSymbolMapping(unittest.TestCase):
+    """3a.1-regression: _status_symbol uses _FAMILY_SYMBOL table with edge overrides."""
+
+    def test_completion_with_artifact_returns_check(self) -> None:
+        from runtime._models.artifacts import PlanArtifact
+        artifact = PlanArtifact(
+            plan_id="p1", title="t", summary="s", level="light",
+            path="plan.md", files=(), created_at="2026-01-01",
+        )
+        result = _minimal_result("plan_only", plan_artifact=artifact)
+        self.assertEqual(_status_symbol(result), "✓")
+
+    def test_completion_without_artifact_returns_warning(self) -> None:
+        result = _minimal_result("plan_only")
+        self.assertEqual(_status_symbol(result), "!")
+
+    def test_archive_without_artifact_returns_warning(self) -> None:
+        result = _minimal_result("archive_lifecycle")
+        self.assertEqual(_status_symbol(result), "!")
+
+    def test_conflict_abort_no_payload_returns_check(self) -> None:
+        handoff = RuntimeHandoff(
+            schema_version="1", route_name="state_conflict", run_id="test",
+            handoff_kind="state_conflict", artifacts={},
+        )
+        result = _minimal_result("state_conflict", active_run_action="abort_conflict", handoff=handoff)
+        self.assertEqual(_status_symbol(result), "✓")
+
+    def test_conflict_with_payload_returns_warning(self) -> None:
+        handoff = RuntimeHandoff(
+            schema_version="1", route_name="state_conflict", run_id="test",
+            handoff_kind="state_conflict",
+            artifacts={"state_conflict": {"code": "c1", "message": "m"}},
+        )
+        result = _minimal_result("state_conflict", handoff=handoff)
+        self.assertEqual(_status_symbol(result), "!")
+
+    def test_pending_returns_question(self) -> None:
+        result = _minimal_result("clarification_pending")
+        self.assertEqual(_status_symbol(result), "?")
+
+    def test_action_returns_warning(self) -> None:
+        result = _minimal_result("workflow")
+        self.assertEqual(_status_symbol(result), "!")
+
+
+class TestExecutionGateHandoffOnly(unittest.TestCase):
+    """3a.6-regression: _execution_gate reads only handoff artifacts."""
+
+    def test_no_handoff_returns_missing(self) -> None:
+        result = _minimal_result("plan_only")
+        line = _execution_gate_line(result, "en-US")
+        self.assertIn("not generated", line)
+
+    def test_handoff_with_gate_renders_status(self) -> None:
+        handoff = _handoff_with_gate("ready")
+        result = _minimal_result("plan_only", handoff=handoff)
+        line = _execution_gate_line(result, "en-US")
+        self.assertIn("Ready", line)
+
+    def test_handoff_without_gate_returns_missing(self) -> None:
+        handoff = RuntimeHandoff(
+            schema_version="1", route_name="plan_only", run_id="test",
+            artifacts={},
+        )
+        result = _minimal_result("plan_only", handoff=handoff)
+        line = _execution_gate_line(result, "en-US")
+        self.assertIn("not generated", line)
 
 
 if __name__ == "__main__":

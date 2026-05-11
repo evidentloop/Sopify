@@ -31,7 +31,7 @@ from installer.validate import (
 )
 from runtime.config import ConfigError, load_runtime_config
 from runtime.context_snapshot import resolve_context_snapshot
-from runtime.state import SESSIONS_DIRNAME, StateStore
+from runtime.state import StateStore
 
 STATUS_SCHEMA_VERSION = "2"
 DOCTOR_SCHEMA_VERSION = "1"
@@ -586,6 +586,7 @@ def _render_structured_evidence_lines(evidence: object) -> tuple[str, ...]:
 
 
 def _inspect_runtime_workspace_state(workspace_root: Path) -> dict[str, object]:
+    """Thin projection of current global machine truth for doctor/status."""
     fallback_state_root = workspace_root / ".sopify-skills" / "state"
     fallback_run = _read_json(fallback_state_root / "current_run.json")
     fallback_handoff = _read_json(fallback_state_root / "current_handoff.json")
@@ -605,50 +606,22 @@ def _inspect_runtime_workspace_state(workspace_root: Path) -> dict[str, object]:
         return fallback_payload
 
     global_store = StateStore(config)
-    snapshots = [
-        resolve_context_snapshot(
-            config=config,
-            review_store=global_store,
-            global_store=global_store,
-        )
-    ]
-    sessions_root = config.state_dir / SESSIONS_DIRNAME
-    if sessions_root.is_dir():
-        for session_dir in sorted(sessions_root.iterdir(), key=lambda item: item.name):
-            if not session_dir.is_dir():
-                continue
-            try:
-                session_store = StateStore(config, session_id=session_dir.name)
-            except ValueError:
-                continue
-            snapshots.append(
-                resolve_context_snapshot(
-                    config=config,
-                    review_store=session_store,
-                    global_store=global_store,
-                )
-            )
+    snapshot = resolve_context_snapshot(
+        config=config,
+        review_store=global_store,
+        global_store=global_store,
+    )
 
-    primary_snapshot = snapshots[0]
-    quarantined_items: dict[tuple[str, str, str, str, str], dict[str, object]] = {}
-    state_conflicts: dict[tuple[str, str, str, str], dict[str, object]] = {}
-    runtime_notes: list[str] = []
-    for snapshot in snapshots:
-        for item in snapshot.quarantined_items:
-            key = (item.state_kind, item.path, item.reason, item.provenance_status, item.state_scope)
-            quarantined_items.setdefault(key, item.to_dict())
-        for item in snapshot.conflict_items:
-            key = (item.code, item.message, item.path, item.state_scope)
-            payload = item.to_dict()
-            payload["explanation"] = _describe_state_conflict(item.code)
-            state_conflicts.setdefault(key, payload)
-        for note in snapshot.notes:
-            if note not in runtime_notes:
-                runtime_notes.append(note)
+    quarantined_items = [item.to_dict() for item in snapshot.quarantined_items]
+    state_conflicts = []
+    for item in snapshot.conflict_items:
+        payload = item.to_dict()
+        payload["explanation"] = _describe_state_conflict(item.code)
+        state_conflicts.append(payload)
 
-    current_run = primary_snapshot.current_run
-    current_plan = primary_snapshot.current_plan
-    current_handoff = primary_snapshot.current_handoff
+    current_run = snapshot.current_run
+    current_plan = snapshot.current_plan
+    current_handoff = snapshot.current_handoff
     active_plan = None
     if current_run is not None:
         active_plan = str(current_run.plan_path or current_run.plan_id or "") or None
@@ -660,9 +633,9 @@ def _inspect_runtime_workspace_state(workspace_root: Path) -> dict[str, object]:
         "current_run_stage": current_run.stage if current_run is not None else None,
         "pending_checkpoint": current_handoff.required_host_action if current_handoff is not None else None,
         "quarantine_count": len(quarantined_items),
-        "quarantined_items": list(quarantined_items.values()),
-        "state_conflicts": list(state_conflicts.values()),
-        "runtime_notes": runtime_notes,
+        "quarantined_items": quarantined_items,
+        "state_conflicts": state_conflicts,
+        "runtime_notes": list(snapshot.notes),
     }
 
 

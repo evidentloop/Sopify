@@ -185,6 +185,20 @@ _ROUTE_FAMILIES = {
     "rejection": frozenset({"proposal_rejected"}),
 }
 
+# Canonical family → symbol mapping (P4c-3a.1).
+# Hosts can predict the status symbol from the route family alone.
+_FAMILY_SYMBOL: dict[str, str] = {
+    "completion": "✓",
+    "pending": "?",
+    "action": "!",
+    "conflict": "!",
+    "rejection": "!",
+}
+
+_ROUTE_TO_FAMILY: dict[str, str] = {
+    route: family for family, routes in _ROUTE_FAMILIES.items() for route in routes
+}
+
 _GATE_STATUS_DISPLAY = {
     "zh-CN": {"ready": "就绪", "blocked": "阻断", "decision_required": "待决策"},
     "en-US": {"ready": "Ready", "blocked": "Blocked", "decision_required": "Decision Required"},
@@ -428,28 +442,18 @@ def _next_hint(result: RuntimeResult, language: str) -> str:
 
 def _status_symbol(result: RuntimeResult) -> str:
     route_name = result.route.route_name
-    # Completion family: success unless missing expected artifact
-    if route_name in _ROUTE_FAMILIES["completion"]:
-        if route_name in {"plan_only", "archive_lifecycle"}:
-            return "✓" if result.plan_artifact is not None else "!"
-        return "✓"
-    # Pending family: waiting for user input
-    if route_name in _ROUTE_FAMILIES["pending"]:
-        return "?"
-    # Conflict family: context-dependent
-    if route_name in _ROUTE_FAMILIES["conflict"]:
-        if result.route.active_run_action == "abort_conflict" and not _state_conflict_payload(result):
+    family = _ROUTE_TO_FAMILY.get(route_name)
+    if family is not None:
+        symbol = _FAMILY_SYMBOL[family]
+        # Completion: missing expected artifact downgrades to warning
+        if family == "completion" and route_name in {"plan_only", "archive_lifecycle"} and result.plan_artifact is None:
+            return "!"
+        # Conflict: fully resolved upgrades to success
+        if family == "conflict" and result.route.active_run_action == "abort_conflict" and not _state_conflict_payload(result):
             return "✓"
-        return "!"
-    # Rejection family
-    if route_name in _ROUTE_FAMILIES["rejection"]:
-        return "!"
-    # Action family: handoff to host
-    if route_name in _ROUTE_FAMILIES["action"]:
-        return "!"
-    if result.notes:
-        return "!"
-    return "✓"
+        return symbol
+    # Unclassified route: warning if notes, else success
+    return "!" if result.notes else "✓"
 
 
 def _status_message(result: RuntimeResult, language: str) -> str:
@@ -535,17 +539,10 @@ def _diagnostic_reason(result: RuntimeResult) -> str:
 
 
 def _execution_gate(result: RuntimeResult):
-    # Output only renders resolved runtime result facts. It may fall back from
-    # recovered context to persisted handoff artifacts, but it never re-opens
-    # checkpoint state from disk on its own.
-    current_run = result.recovered_context.current_run
-    if current_run is not None and current_run.execution_gate is not None:
-        return current_run.execution_gate
-    if result.handoff is not None:
-        execution_gate = result.handoff.artifacts.get("execution_gate")
-        if isinstance(execution_gate, dict):
-            return execution_gate
-    return None
+    if result.handoff is None:
+        return None
+    execution_gate = result.handoff.artifacts.get("execution_gate")
+    return execution_gate if isinstance(execution_gate, dict) else None
 
 
 def _priority_note(result: RuntimeResult) -> str | None:
@@ -612,10 +609,6 @@ def _phase_label(result: RuntimeResult, language: str) -> str:
 
 
 def _state_conflict_payload(result: RuntimeResult) -> dict[str, object]:
-    if result.recovered_context.state_conflict:
-        return dict(result.recovered_context.state_conflict)
-    if result.route.route_name == "state_conflict" and result.route.active_run_action == "abort_conflict":
-        return {}
     if result.handoff is not None:
         payload = result.handoff.artifacts.get("state_conflict")
         if isinstance(payload, dict):
@@ -624,8 +617,6 @@ def _state_conflict_payload(result: RuntimeResult) -> dict[str, object]:
 
 
 def _quarantined_items(result: RuntimeResult) -> list[dict[str, object]]:
-    if result.recovered_context.quarantined_items:
-        return [dict(item) for item in result.recovered_context.quarantined_items]
     if result.handoff is not None:
         payload = result.handoff.artifacts.get("quarantined_items")
         if isinstance(payload, list):

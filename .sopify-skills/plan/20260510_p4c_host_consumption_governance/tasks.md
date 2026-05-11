@@ -36,12 +36,12 @@
 
 ## P4c-3a: 渲染与 truth-source 收敛层
 
-- [ ] 3a.1 状态符语义：canonical route family → 符号映射
-- [ ] 3a.2 Next 降级：明确为 human hint，移除对 required_host_action + route_name 的机器依赖
-- [ ] 3a.3 Changes 重定义：loaded_files 从 Changed 拆出，或重命名为 Touched/Files
-- [ ] 3a.4 Gate 行简化：默认输出不暴露 gate_status/blocking_reason/plan_completion 三元组
-- [ ] 3a.5 doctor/status 只渲染 machine truth，不作为 truth source
-- [ ] 3a.6 handoff rendering 只消费 current_handoff.json 结构化字段，不做语义推断
+- [x] 3a.1 状态符语义：canonical route family → 符号映射
+- [x] 3a.2 Next 降级：明确为 human hint，移除对 required_host_action + route_name 的机器依赖
+- [x] 3a.3 Changes 重定义：loaded_files 从 Changed 拆出，或重命名为 Touched/Files
+- [x] 3a.4 Gate 行简化：默认输出不暴露 gate_status/blocking_reason/plan_completion 三元组
+- [x] 3a.5 doctor/status 只渲染 machine truth，不作为 truth source（删除跨 session 聚合，退回单一 global snapshot）
+- [x] 3a.6 handoff rendering 只消费 current_handoff.json 结构化字段，不做语义推断（删除 _execution_gate/_state_conflict_payload/_quarantined_items 的 recovered_context fallback；_core_lines/_status_message 的 route_name 分支渲染未改动）
 
 ## P4c-3b: 首接触与 prompt 收敛层
 
