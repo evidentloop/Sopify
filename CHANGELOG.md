@@ -41,7 +41,7 @@ Format: Summary → Changed → Plan Packages. File-level details live in `git l
 
 ### Plan Packages
 
-- `20260510_p4c_host_consumption_governance` (active)
+- `20260510_p4c_host_consumption_governance` (archived)
 
 ## [2026-05-09.175537] - 2026-05-09
 

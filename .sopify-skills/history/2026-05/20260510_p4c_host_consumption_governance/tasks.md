@@ -89,4 +89,4 @@ plan_status: completed
 - [x] 6.1 自检：跨切片 invariant 全部通过 — 0.1-0.5 全部验证 PASS
 - [x] 6.2 自检：P4c 前提声明红线无违反 — 6/6 红线无违反
 - [x] 6.3 自检：P4c-1/2/3a/3b/4/5 的依赖顺序未被打破 — P4c-5 显式跳过
-- [ ] 6.4 提交方案包 — frontmatter 已补充，待归档
+- [x] 6.4 提交方案包 — 已归档至 history/2026-05/20260510_p4c_host_consumption_governance/
