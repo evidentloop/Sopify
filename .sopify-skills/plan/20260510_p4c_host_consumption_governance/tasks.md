@@ -45,7 +45,7 @@
 
 ## P4c-3b: 首接触与 prompt 收敛层
 
-- [ ] 3b.1 首接触感知收敛：新用户只感知"中断可恢复"+"需要拍板时会停"
+- [x] 3b.1 首接触感知收敛：新用户只感知"中断可恢复"+"需要拍板时会停" *(scope: 4 prompt files 核心理念/Core Philosophy 前插 2 条用户感知——中断可恢复 + 决策前停车；不含 KB 输出面重设计)*
 - [x] 3b.2 doctor/status 不主动呈现 checkpoint taxonomy *(scope: _STAGE_LABELS 7 entries + _CHECKPOINT_LABELS 4 entries 映射 raw → human-readable；render_status_text 3 处 + doctor evidence 1 处去 raw code；修复 82886b3 遗留 workspace_preflight_contract 测试断裂)*
 - [x] 3b.3 ~go 默认入口不前置 blueprint 概念 *(scope: Quick Reference 删除 Blueprint 路径行；A6 生命周期保留原文——文件路径引用非概念暴露)*
 - [x] 3b.4 prompt 不定义机器契约（不定义路由表、不维护 state 写入语义） *(scope: 删除 Routing Decision 整段——Entry Point Flow 路由树 + Route Types 路由类型表；宿主接入约定 ref 移到 C3 Notes 后；4 prompt files 净 -140 行)*
