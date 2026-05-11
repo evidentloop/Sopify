@@ -1,3 +1,17 @@
+---
+plan_id: 20260510_p4c_host_consumption_governance
+feature_key: p4c_host_consumption_governance
+level: standard
+lifecycle_state: archived
+knowledge_sync:
+  project: skip
+  background: skip
+  design: update
+  tasks: update
+archive_ready: true
+plan_status: completed
+---
+
 # 任务: P4c Host Consumption Governance
 
 总方向：Protocol-first / Validator-centered / Runtime-optional（tasks.md:9）
@@ -7,11 +21,11 @@
 
 ## 跨切片 invariant（每个切片必须遵守）
 
-- [ ] 0.1 任何改动不得引入对 F1-F8 forbidden surface 的新宿主依赖（design.md S1）
-- [ ] 0.2 不改 ladder 定义（三级梯度准入条件不变）
-- [ ] 0.3 不新增 machine truth（state 文件 / checkpoint 类型 / contract 文件）
-- [ ] 0.4 不改 P4a keep-list schema
-- [ ] 0.5 不让 payload_capable 依赖 runtime/ 模块
+- [x] 0.1 任何改动不得引入对 F1-F8 forbidden surface 的新宿主依赖（design.md S1）— 验证通过：4 prompt files 已收敛到 protocol.md §8 引用，无 forbidden surface 新依赖
+- [x] 0.2 不改 ladder 定义（三级梯度准入条件不变）— 验证通过：blueprint/design.md:431-433 仍为 3 级
+- [x] 0.3 不新增 machine truth（state 文件 / checkpoint 类型 / contract 文件）— 验证通过：无新增
+- [x] 0.4 不改 P4a keep-list schema — 验证通过：blueprint/design.md:363-379 仍为 15 项
+- [x] 0.5 不让 payload_capable 依赖 runtime/ 模块 — 验证通过：blueprint/design.md:681 明确
 
 ---
 
@@ -63,14 +77,16 @@
 > **Optional Gate**: 仅当 P4c-1~4 完成且主链已满足验收时，才进入 5.1-5.4。
 > **非阻塞**: P4c 主链验收不以 5.x 完成为前提。若时间预算不足，可延期至后续里程碑。
 
-- [ ] 5.1 AGENTS.md / CLAUDE.md 重复段落抽取，压缩长段说明
-- [ ] 5.2 "硬契约 / 宿主行为 / 参考说明" 分层重排
-- [ ] 5.3 CN / EN 镜像结构对齐
-- [ ] 5.4 验证零语义漂移：重排前后语义完全一致
+> **跳过判定**：P4c-3b/4 完成后 prompt 文件已 ~373 行、分层清晰（C→A→X→P→Skill→QuickRef）、CN/EN 已对齐，无显著重复段落。进一步结构重排的收益低于语义漂移风险。若未来有 prompt asset 对外发布或 First-Use Adoption Proof 需要，可顺带执行。
+
+- [-] 5.1 AGENTS.md / CLAUDE.md 重复段落抽取，压缩长段说明 — 跳过：P4c-3b 已删 ~140 行，当前无显著重复
+- [-] 5.2 "硬契约 / 宿主行为 / 参考说明" 分层重排 — 跳过：已分层（C/A/X/P + protocol.md §8 引用）
+- [-] 5.3 CN / EN 镜像结构对齐 — 跳过：已对齐
+- [-] 5.4 验证零语义漂移：重排前后语义完全一致 — 跳过：无实质改动
 
 ## 收尾
 
-- [ ] 6.1 自检：跨切片 invariant 全部通过
-- [ ] 6.2 自检：P4c 前提声明红线无违反
-- [ ] 6.3 自检：P4c-1/2/3a/3b/4/5 的依赖顺序未被打破
-- [ ] 6.4 提交方案包
+- [x] 6.1 自检：跨切片 invariant 全部通过 — 0.1-0.5 全部验证 PASS
+- [x] 6.2 自检：P4c 前提声明红线无违反 — 6/6 红线无违反
+- [x] 6.3 自检：P4c-1/2/3a/3b/4/5 的依赖顺序未被打破 — P4c-5 显式跳过
+- [ ] 6.4 提交方案包 — frontmatter 已补充，待归档
