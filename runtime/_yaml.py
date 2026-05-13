@@ -97,7 +97,14 @@ def _parse_mapping(lines: Sequence[_Line], index: int, indent: int) -> Tuple[dic
         if line.content.startswith("- "):
             break
         key, remainder = _split_key_value(line)
-        if remainder == "":
+        if _is_block_scalar_marker(remainder):
+            value, index = _parse_block_scalar(
+                lines,
+                index + 1,
+                parent_indent=indent,
+                style=remainder,
+            )
+        elif remainder == "":
             index += 1
             if index < len(lines) and lines[index].indent > indent:
                 value, index = _parse_block(lines, index, lines[index].indent)
@@ -136,7 +143,15 @@ def _parse_list(lines: Sequence[_Line], index: int, indent: int) -> Tuple[list[A
         if _looks_like_mapping_entry(item_text):
             key, remainder = _split_key_value(_Line(indent=indent + 2, content=item_text, line_number=line.line_number))
             item: dict[str, Any] = {}
-            if remainder == "":
+            if _is_block_scalar_marker(remainder):
+                value, index = _parse_block_scalar(
+                    lines,
+                    index,
+                    parent_indent=indent,
+                    style=remainder,
+                )
+                item[key] = value
+            elif remainder == "":
                 if has_child:
                     value, index = _parse_block(lines, index, lines[index].indent)
                 else:
@@ -197,3 +212,53 @@ def _parse_scalar(value: str) -> Any:
         inner = value[1:-1]
         return inner.replace(r"\'", "'").replace(r'\"', '"')
     return value
+
+
+def _is_block_scalar_marker(value: str) -> bool:
+    return value in {"|", "|-", ">", ">-"}
+
+
+def _parse_block_scalar(
+    lines: Sequence[_Line],
+    index: int,
+    *,
+    parent_indent: int,
+    style: str,
+) -> Tuple[str, int]:
+    if index >= len(lines) or lines[index].indent <= parent_indent:
+        return "", index
+
+    block_indent = lines[index].indent
+    chunks: list[str] = []
+    while index < len(lines):
+        line = lines[index]
+        if line.indent < block_indent:
+            break
+        if line.indent == parent_indent:
+            break
+        if line.indent < block_indent:
+            raise YamlParseError(f"Unexpected indentation at line {line.line_number}")
+        relative_indent = line.indent - block_indent
+        chunks.append((" " * relative_indent) + line.content)
+        index += 1
+
+    if style.startswith("|"):
+        text = "\n".join(chunks)
+    else:
+        paragraphs: list[str] = []
+        current: list[str] = []
+        for chunk in chunks:
+            if chunk == "":
+                if current:
+                    paragraphs.append(" ".join(current))
+                    current = []
+                paragraphs.append("")
+            else:
+                current.append(chunk)
+        if current:
+            paragraphs.append(" ".join(current))
+        text = "\n".join(paragraphs)
+
+    if not style.endswith("-"):
+        text += "\n"
+    return text, index

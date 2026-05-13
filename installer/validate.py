@@ -127,6 +127,11 @@ def _build_bundle_smoke_env(*, payload_manifest_path: Path | None) -> dict[str, 
     env = dict(os.environ)
     if payload_manifest_path is not None:
         env["SOPIFY_PAYLOAD_MANIFEST"] = str(payload_manifest_path)
+    # Keep bundle smoke focused on bundle/runtime assets instead of inheriting
+    # arbitrary user-level skills from the current machine.
+    isolated_home = Path(env.get("TMPDIR") or "/tmp") / "sopify-bundle-smoke-home"
+    isolated_home.mkdir(parents=True, exist_ok=True)
+    env["HOME"] = str(isolated_home)
     return env
 
 

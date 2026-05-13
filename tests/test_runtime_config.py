@@ -51,3 +51,21 @@ class YamlLoaderTests(unittest.TestCase):
     def test_quoted_list_item_with_colon_is_parsed_as_string(self) -> None:
         payload = load_yaml('triggers:\n  - "~go"\n  - "status:"\n')
         self.assertEqual(payload["triggers"], ["~go", "status:"])
+
+    def test_folded_block_scalar_is_supported(self) -> None:
+        payload = load_yaml(
+            "name: sample\n"
+            "description: >-\n"
+            "  first line\n"
+            "  second line\n"
+        )
+        self.assertEqual(payload["description"], "first line second line")
+
+    def test_literal_block_scalar_is_supported(self) -> None:
+        payload = load_yaml(
+            "name: sample\n"
+            "notes: |\n"
+            "  first line\n"
+            "  second line\n"
+        )
+        self.assertEqual(payload["notes"], "first line\nsecond line\n")

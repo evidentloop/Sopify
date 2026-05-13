@@ -8,7 +8,7 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 [![Docs](https://img.shields.io/badge/docs-CC%20BY%204.0-green.svg)](./LICENSE-docs)
-[![Version](https://img.shields.io/badge/version-2026--05--11.202509-orange.svg)](#version-history)
+[![Version](https://img.shields.io/badge/version-2026--05--13.111757-orange.svg)](#version-history)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
 English · [简体中文](./README.zh-CN.md) · [Quick Start](#quick-start) · [Contributors](./CONTRIBUTORS.md)
@@ -49,6 +49,14 @@ Sopify uses project-level conventions to make critical steps visible. The basic 
 | No independent quality gate | An isolated, independent review pass before execution |
 | Decisions are invisible and non-auditable | Plan changes force re-confirmation — the AI cannot silently proceed |
 | Each session's learning is disposable | Plans, decisions, and reviews persist as reusable project assets |
+
+## Architecture
+
+<div align="center">
+<img src="./assets/sopify-architecture.svg" width="800" alt="Sopify Architecture — Evidence & Authorization Layer" />
+</div>
+
+User input flows through a host adapter (Codex, Claude, etc.) into the Core Protocol, where every action is proposed, validated, gated, and receipted. The Validator is the sole authorizer — the host LLM is only a proposal source. Knowledge layers (blueprint, plan, history) persist across sessions and hosts.
 
 ## Installation
 

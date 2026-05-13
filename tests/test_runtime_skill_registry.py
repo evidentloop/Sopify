@@ -323,3 +323,58 @@ class SkillRegistryTests(unittest.TestCase):
             self.assertEqual(user_skill.source, "user")
             self.assertEqual(claude_skill.description, "claude-only")
             self.assertEqual(claude_skill.source, "user")
+
+    def test_skill_registry_tolerates_external_front_matter_block_scalars(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            user_home = workspace / "home"
+            skill_dir = user_home / ".claude" / "skills" / "block-scalar-skill"
+            skill_dir.mkdir(parents=True)
+            (skill_dir / "SKILL.md").write_text(
+                "---\n"
+                "name: block-scalar-skill\n"
+                "description: >-\n"
+                "  first line\n"
+                "  second line\n"
+                "---\n\n"
+                "# block-scalar-skill\n",
+                encoding="utf-8",
+            )
+            (skill_dir / "skill.yaml").write_text(
+                "id: block-scalar-skill\nmode: advisory\n",
+                encoding="utf-8",
+            )
+
+            config = load_runtime_config(workspace)
+            skills = SkillRegistry(config, user_home=user_home).discover()
+            skill = next(item for item in skills if item.skill_id == "block-scalar-skill")
+
+            self.assertEqual(skill.description, "first line second line")
+            self.assertEqual(skill.source, "user")
+
+    def test_skill_registry_ignores_invalid_external_front_matter_when_manifest_is_valid(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            user_home = workspace / "home"
+            skill_dir = user_home / ".claude" / "skills" / "invalid-front-matter"
+            skill_dir.mkdir(parents=True)
+            (skill_dir / "SKILL.md").write_text(
+                "---\n"
+                "name: invalid-front-matter\n"
+                "description:\n"
+                "  broken\n"
+                "---\n\n"
+                "# invalid-front-matter\n",
+                encoding="utf-8",
+            )
+            (skill_dir / "skill.yaml").write_text(
+                "id: invalid-front-matter\nmode: advisory\n",
+                encoding="utf-8",
+            )
+
+            config = load_runtime_config(workspace)
+            skills = SkillRegistry(config, user_home=user_home).discover()
+            skill = next(item for item in skills if item.skill_id == "invalid-front-matter")
+
+            self.assertEqual(skill.name, "invalid-front-matter")
+            self.assertEqual(skill.description, "")

@@ -39,6 +39,8 @@ class BundleSmokeFailureDetailsTests(unittest.TestCase):
             self.assertEqual(output, "ok")
             env = mock_run.call_args.kwargs.get("env") or {}
             self.assertEqual(env.get("SOPIFY_PAYLOAD_MANIFEST"), str(payload_manifest))
+            self.assertIn("HOME", env)
+            self.assertTrue(env["HOME"].endswith("sopify-bundle-smoke-home"))
 
     def test_failure_details_always_include_exit_status_and_command(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Dict, Iterable, Mapping, Optional, Sequence
 import re
 
-from ._yaml import load_yaml
+from ._yaml import YamlParseError, load_yaml
 from .builtin_catalog import load_builtin_skills
 from .models import RuntimeConfig, SkillMeta
 from .skill_schema import SkillManifestError, normalize_skill_manifest
@@ -77,7 +77,7 @@ class SkillRegistry:
 
     def _read_skill(self, skill_file: Path, source: str) -> Optional[SkillMeta]:
         text = skill_file.read_text(encoding="utf-8")
-        front_matter = _parse_front_matter(text)
+        front_matter = _parse_front_matter(text, fail_closed=(source == "builtin"))
         skill_dir = skill_file.parent
         raw_manifest = _load_manifest(skill_dir / "skill.yaml")
         try:
@@ -131,11 +131,16 @@ class SkillRegistry:
         )
 
 
-def _parse_front_matter(text: str) -> dict[str, object]:
+def _parse_front_matter(text: str, *, fail_closed: bool = False) -> dict[str, object]:
     match = _FRONT_MATTER_RE.match(text)
     if not match:
         return {}
-    data = load_yaml(match.group(1))
+    try:
+        data = load_yaml(match.group(1))
+    except YamlParseError:
+        if fail_closed:
+            raise
+        return {}
     return data if isinstance(data, dict) else {}
 
 
