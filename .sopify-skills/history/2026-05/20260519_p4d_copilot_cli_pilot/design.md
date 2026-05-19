@@ -4,7 +4,7 @@
 
 ### 总体策略
 
-在不引入 runtime 的前提下，通过 prompt 资产 + installer adapter 让 Copilot CLI 成为一个"智能消费者"：能读取 deep host 产生的全部 contract 文件，理解语义，并据此接续工作。同时以 shadow experiment 方式验证轻量 handoff writer 的可行性。
+在不引入 runtime 的前提下，通过 repo-local prompt 资产让 Copilot CLI 成为一个"智能消费者"：能读取 deep host 产生的全部 contract 文件，理解语义，并据此接续工作。同时以 shadow experiment 方式验证轻量 handoff writer 的可行性。Copilot 不接入 installer mainline（见 S2 DEFERRED），用手工 repo-local 资产验证。
 
 ### S1: Prompt 资产设计
 
@@ -35,22 +35,16 @@
 - ❌ Gate 三元组直渲（F4 forbidden）
 - ❌ Output 渲染文案措辞（F7 forbidden）
 
-**交付格式**：`.github/copilot-instructions.md`（Copilot CLI 原生 repo-level prompt 注入路径）+ `Copilot/Skills/CN/` 目录（对齐现有 host 资产结构）。仅中文版，EN 按社区需求快速扩展。
+**交付格式**：`Copilot/Skills/CN/` 目录（对齐现有 host 资产结构）。不创建 `.github/copilot-instructions.md`——该文件是 repo 通用配置，Sopify 无独占权，与 AGENTS.md/CLAUDE.md 宿主专属文件性质不同。用户如需接入可手动引用。仅中文版，EN 按社区需求快速扩展。
 
-### S2: Installer Adapter 设计
+### S2: Installer Adapter ⏸️ DEFERRED
 
-```python
-# installer/hosts/copilot.py
-class CopilotHost:
-    name = "copilot"
-    support_tier = SupportTier.payload_capable
-    declared_enhancements = [
-        EnhancementGroup.CONTINUATION,
-        # INTERACTION / AUDIT 待 S3 验证通过后按结果追加
-    ]
-    prompt_target = ".github/copilot-instructions.md"
-    payload_targets = ["Copilot/Skills/CN/"]
-```
+> **决策**：P4d 不创建 installer adapter。原因见 tasks.md D3。
+>
+> Copilot 用 repo-local `Copilot/Skills/CN/COPILOT.md` 直接验证 S3。
+> 现有 `HostAdapter` 抽象（header + destination_root + skills/sopify 三层）与 Copilot 的 repo-local payload-only 模型不匹配。
+> `SupportTier` 枚举（`models.py:19`）无 `payload_capable` 值。
+> 强行适配 = 假 adapter 或 scope 膨胀。P5 根据 P4d 结论评估是否扩展 HostAdapter 抽象。
 
 ### S3: Continuation Smoke 设计
 
@@ -125,8 +119,7 @@ class CopilotHost:
 ## 验收标准
 
 **P4d 通过条件（= S3 通过）**：
-- Copilot/Skills/CN/ 资产存在且可被 installer 安装
-- Installer `copilot` adapter 注册，声明 `payload_capable + CONTINUATION`
+- `Copilot/Skills/CN/COPILOT.md` 资产存在
 - Continuation smoke S3 场景 1 通过：Copilot 正确消费 `current_handoff.json` 的 `required_host_action` + `artifacts`，结合 plan/run 上下文完成接续复述
 
 **补强证据（加分项，不卡 P4d 通过判定）**：

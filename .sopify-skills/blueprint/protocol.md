@@ -374,7 +374,11 @@ ExecutionAuthorizationReceipt 是 execute_existing_plan 授权通过后生成的
 
 ## 8. Deep Host 运行时集成协议
 
-> 本节是 §3 宿主最小义务中 Runtime 模式的详细展开。Convention 模式宿主不需要消费本节。Prompt asset（AGENTS.md / CLAUDE.md）只保留高层义务摘要，本节是唯一规范入口。
+> 本节是 §3 宿主最小义务中 Runtime 模式的详细展开，适用于 `deep_verified` 宿主。`payload_capable` 和 `convention_only` 宿主按 §3 义务表操作，不承担本节定义的 deep runtime 宿主义务。
+>
+> `payload_capable` 宿主可在 §3 最小义务之上叠加 P4c 定义的增强消费面（如 continuation / interaction / audit），但这不等同于进入本节的 deep runtime 集成路径。
+>
+> Prompt asset（AGENTS.md / CLAUDE.md）只保留高层义务摘要，本节是 deep runtime 集成的唯一规范入口。
 
 ### 8.1 Gate-First 义务
 
