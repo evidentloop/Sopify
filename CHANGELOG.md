@@ -6,6 +6,36 @@ Format: Summary → Changed → Plan Packages. File-level details live in `git l
 
 ## [Unreleased]
 
+## [2026-05-20.143147] - 2026-05-20
+
+### Summary
+
+- Archived 1 plan package(s); Changes across: Docs, Runtime, Skills.
+
+### Changed
+
+- **Docs**: Refined public documentation (2 files)
+- **Runtime**: Updated runtime internals (1 files)
+- **Skills**: Synced prompt-layer skills (4 files)
+
+### Plan Packages
+
+- `20260520_p5_contract_surface_shrinkage` (archived)
+
+## [2026-05-20.142600] - 2026-05-20
+
+### Summary
+
+- Archived 1 plan package(s); Changes across: Runtime.
+
+### Changed
+
+- **Runtime**: Updated runtime internals (1 files)
+
+### Plan Packages
+
+- `20260520_p5_contract_surface_shrinkage` (archived)
+
 ## [2026-05-19.183358] - 2026-05-19
 
 ### Summary

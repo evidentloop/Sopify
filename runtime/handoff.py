@@ -7,7 +7,7 @@ from hashlib import sha1
 import json
 from pathlib import Path
 import re
-from tempfile import NamedTemporaryFile
+
 from typing import Any, Mapping, Sequence
 
 from .checkpoint_request import (
@@ -193,16 +193,6 @@ def read_runtime_handoff(path: Path) -> RuntimeHandoff | None:
     if not isinstance(payload, dict):
         return None
     return RuntimeHandoff.from_dict(payload)
-
-
-def write_runtime_handoff(path: Path, handoff: RuntimeHandoff) -> None:
-    """Persist a handoff file atomically."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with NamedTemporaryFile("w", delete=False, dir=path.parent, encoding="utf-8") as handle:
-        json.dump(handoff.to_dict(), handle, ensure_ascii=False, indent=2, sort_keys=True)
-        handle.write("\n")
-        temp_path = Path(handle.name)
-    temp_path.replace(path)
 
 
 def _required_host_action(

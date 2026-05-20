@@ -2,7 +2,9 @@
 plan_id: 20260520_p5_contract_surface_shrinkage
 feature_key: p5_contract_surface_shrinkage
 level: standard
-lifecycle_state: active
+lifecycle_state: completed
+archive_ready: true
+plan_status: completed
 ---
 
 # 任务清单
@@ -37,22 +39,25 @@ lifecycle_state: active
 - [x] 消费 S2.1 Shadow Writer 结论 B，升级为 final 裁定表
 - [x] 确定最小必留面清单：candidate-kernel = 1 面 ~210 LOC (StateStore)
 - [x] 用户确认 final 裁定表
-- [ ] Onboarding Proof 就绪后更新 3 个 pending-onboarding 面（不挡 S4 主线）
+- [ ] Onboarding Proof 就绪后更新 3 个 pending-onboarding 面（待证据，不阻塞 P5 完成）
 
-## S4: 执行裁定
+## S4: 执行裁定 ✅
 
-- [ ] 低风险项执行（明确 deep-only 的标记/降级/删除）
-- [ ] 高风险项执行（需 shadow writer 结论支撑的面）
-- [ ] 执行后测试套件回归验证
-- [ ] design.md / protocol.md 同步更新（如有 contract 面变更）
+- [x] 死代码删除：`write_runtime_handoff` 8 LOC + unused import — 721 tests passed
+- [x] delete 候选验证：S1 估 ~137 LOC → 实际可删 ~8 LOC（循环导入导致的故意重复不是 delete，已修正裁定表 §4）
+- [x] cross-tier contract 文档覆盖确认：10/10 面均有 docstring + blueprint/design.md 覆盖
+- [x] candidate-kernel 记录为 P6 输入：StateStore ~210 LOC（裁定表 §2.1）
+- [x] 执行后测试套件回归验证：721 passed, 49 subtests passed
+- [x] deep-only scope 标记：裁定表 §3a-§3h 即 scope 文档，46 面明确标注 keep-deep-only
+- [ ] ~~design.md / protocol.md 同步更新~~ — 无 contract 面变更，无需更新
 
-## S5: 结论报告
+## S5: 结论报告 ✅
 
-- [ ] 标准 receipt 格式
-- [ ] 裁定表执行结果
-- [ ] 最小必留面清单（P6 输入）
-- [ ] LOC 变化量统计
-- [ ] 归档至 history/
+- [x] 标准 receipt 格式 → `receipt.md`
+- [x] 裁定表执行结果：1 面删除 (8 LOC)，46 keep-deep-only，10 keep-cross-tier，1 keep-candidate-kernel
+- [x] 最小必留面清单（P6 输入）：StateStore ~210 LOC + Validator ~1K-1.2K LOC
+- [x] LOC 变化量统计：-9 LOC（死代码 + unused import）
+- [x] 归档至 history/（待 merge 后执行）
 
 ## 决策记录
 

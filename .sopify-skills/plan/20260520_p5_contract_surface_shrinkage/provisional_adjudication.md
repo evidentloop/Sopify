@@ -172,17 +172,27 @@
 
 ---
 
-## 4. Delete Candidates (delete)
+## 4. Delete Candidates — 执行结果
 
-> 低风险删除候选。P5 S4 执行前需确认无其他引用。
+> S1 原估 ~137 LOC 可删除。S4 验证后实际可安全删除 **~8 LOC**。
+> 差异原因：多数"工具函数"要么有外部调用方，要么是故意重复（避免循环导入）。
 
-| # | surface | current_consumer | evidence_status | provisional_disposition | execution_risk | notes |
-|---|---------|-----------------|----------------|------------------------|---------------|-------|
-| 4.1 | `handoff.py` — 工具函数 (重复辅助) | internal | ready | **delete** (low-risk) | low | ~60 LOC。需确认无其他调用点 |
-| 4.2 | `state.py` — 工具函数 (重复辅助) | internal | ready | **delete** (low-risk) | low | ~50 LOC。同上 |
-| 4.3 | `_models/` — 工具函数 | internal | ready | **delete** (low-risk) | low | ~27 LOC |
+### 已删除
 
-**Delete 小计**: ~137 LOC
+| # | surface | LOC | 状态 | 说明 |
+|---|---------|-----|------|------|
+| 4.1 | `handoff.py` — `write_runtime_handoff` | 8 | ✅ 已删除 | 死代码。全仓库无调用方。721 tests passed |
+
+### 不可删除（验证后修正）
+
+| 原编号 | surface | 原因 | 修正裁定 |
+|--------|---------|------|---------|
+| 4.1 | `handoff.py` — `_iso_now`, `_stable_request_sha1`, `_summarize_request_text` | 故意重复：state.py→handoff.py 存在循环导入（state imports handoff.read_runtime_handoff），无法合并 | keep-deep-only（重构到 `_utils.py` 属 P6 清理） |
+| 4.2 | `state.py` — `iso_now`, `stable_request_sha1`, `summarize_request_text` | 有外部调用方：engine.py, gate.py, tests/ | keep-deep-only |
+| 4.3 | `_models/` — `_json_value`, `_json_mapping`, `_normalize_keyword` | 有外部调用方：decision.py, handoff.py, proposal.py, checkpoint_request.py, develop_quality.py | keep-deep-only |
+| — | `clarification.py:iso_now`, `decision.py:iso_now` | 故意重复（同上循环导入） | keep-deep-only |
+
+**实际删除**: 8 LOC（非 S1 估计的 137 LOC）
 
 ---
 
@@ -192,8 +202,8 @@
 |-------------|-----------|-----|------|--------------|
 | **keep-cross-tier** | 10 | ~2,500 | ~10% | 全部 ready |
 | **keep-candidate-kernel** | 1 | ~210 | ~0.8% | resolved-shadow-writer |
-| **keep-deep-only** | 44 | ~21,270 | ~84% | 41 ready + 3 pending-onboarding |
-| **delete** | 3 | ~137 | ~0.5% | 全部 ready |
+| **keep-deep-only** | 46 | ~21,400 | ~84.5% | 43 ready + 3 pending-onboarding |
+| **deleted** | 1 | ~8 | <0.1% | ✅ 已执行 |
 | **validator-bearing (分析标注)** | — | ~1,000-1,200 | ~4-5% | ready | 
 | **总计** | 58 | ~25,300 | — | — |
 

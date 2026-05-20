@@ -718,7 +718,41 @@ _治理期望表_
 
 - **P4c**：负责把本次审计结论投影到实现层和 host adapter / installer / validator 消费面。详见 tasks.md P4c 段"P4c 前提声明"。
 - **P4d**：负责选非 deep 宿主做试点，验证 payload\_capable + 接续增强是否足以支撑真实接班。
-- **P5/P6**：再依据试点 evidence 逐步收缩 deep-runtime-only surface，并推动 runtime 向 reference implementation 退位。
+- **P5/P6**：P5 继续收证据；P6 直接切到 canonical writer 新栈。runtime 退为 legacy reference implementation / 行为规格，不再承担新增产品能力。
+
+
+### Runtime 退场路线（P5 evidence → Canonical Writer Cutover）
+
+> 来源：P5 Contract Surface Shrinkage — S2.1 Shadow Writer Gap Analysis + S3 Final Adjudication。
+> **前提：当前无线上用户，零迁移负担。可直接面向目标态设计，不做渐进迁移。**
+
+**核心发现**：runtime ~25K LOC 中，真正可迁移的 canonical writer 只有 **StateStore ~210 LOC**（state.py 的 get/set/clear 方法族 + 不变量校验）。其余 builder 逻辑（build_runtime_handoff, build_decision_state 等 ~470 LOC）深度耦合 engine 内部产物（route resolution, policy matching, 10+ 子系统 artifact 收集），无法脱离 engine 独立运行。
+
+**三层分离定位**：
+
+| 层 | 定位 | 方向 |
+|----|------|------|
+| **payload_capable** | 消费层：读 state，接续 plan，消费 contract 文件 | 不变。不获得 canonical 写权 |
+| **lightweight canonical writer** | 生产层：StateStore IO + writer_input 契约 + 不变量校验 | P6 直接切出的目标层。新宿主直接适配此层 |
+| **runtime** | legacy 参考实现：完整 engine + builder + 策略 + 编排 | 仅保留为 legacy reference implementation / 行为规格 |
+
+**执行路线**：
+
+```
+P5 (已完成): 识别形状。candidate-kernel = StateStore ~210 LOC
+P6:          直接切 canonical writer 新栈 + 定义 writer_input 契约
+             新宿主直接适配 canonical writer（读 + 写）
+             runtime 仅保留为 legacy reference implementation
+             builder 留在 engine 侧，writer_input 契约独立定义
+后续:        老宿主 (Codex/Claude) 也迁移至 canonical writer
+             runtime 无消费者后下线
+```
+
+**约束**：
+1. payload_capable 只负责消费，不负责 canonical 写 — 蓝图既有语义不变
+2. 轻量 canonical writer 是新分支，不是 payload_capable 的附属品
+3. writer_input 契约需独立定义 — builder 提供输入，writer 负责落盘 + 不变量
+4. 无用户 = 不需要渐进迁移，可直接面向目标态设计和适配
 
 
 ## 轻量化产品指标

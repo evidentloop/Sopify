@@ -48,16 +48,16 @@ P0→P4c 主航道已全部完成。后续执行遵循以下原则：
 在 P4d 验证后，按 evidence 逐项删除或降级 deep runtime 专属的 contract surface（bridge capability / manifest entry / installer bundle 项）。此时已知哪些 contract 是新宿主需要 vs 历史包袱。
 
 - 前置：P4d ✅
-- 状态：活跃 — 方案包 `plan/20260520_p5_contract_surface_shrinkage/`
+- 状态：✅ 已完成 — 方案包 `plan/20260520_p5_contract_surface_shrinkage/`（待归档）
 - 升级判断：P4d 试点产出 keep / delete / downgrade 裁定表，覆盖所有 deep-only contract 面
 
-### P6: Runtime Sunset / Reference Runtime
+### P6: Canonical Writer Cutover / Runtime Retirement
 
-将 runtime 明确降级为 reference implementation 或 deep host hardening layer。新宿主默认走 Protocol/Convention 模式，runtime 不再承载新增产品能力。可能与 P5 合并。
+直接切出 lightweight canonical writer，新宿主默认走 Protocol/Convention + canonical writer 组合；runtime 降为 legacy reference implementation / 行为规格，不再承载新增产品能力。
 
-- 前置：P5
-- 状态：待 P5 结论
-- 升级判断：P5 裁定表执行完毕，deep-only surface 削减到可维护水位
+- 前置：P5 ✅
+- 状态：下一主线候选
+- 升级判断：writer_input 契约定义完成，StateStore 成功切出，新宿主可直接获得 canonical 写能力
 
 ## 证据型候选（为下一主线提供升级证据，不占 P 编号）
 
