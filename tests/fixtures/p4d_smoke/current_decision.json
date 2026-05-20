@@ -1,0 +1,43 @@
+{
+  "schema_version": "1",
+  "decision_id": "d-shadow-writer-scope",
+  "feature_key": "p4d_copilot_cli_pilot",
+  "phase": "design",
+  "status": "pending",
+  "decision_type": "architecture",
+  "question": "Shadow writer 指令应以什么方式暴露在 Copilot prompt 资产中？",
+  "summary": "S1 prompt 资产已完成主体裁剪。Shadow writer 是 S3.5 实验项，需决定其在 COPILOT.md 中的可见性边界。",
+  "options": [
+    {
+      "id": "opt-default-on",
+      "title": "默认启用",
+      "summary": "Shadow writer 指令作为 COPILOT.md 的标准段落，每次会话自动生效",
+      "tradeoffs": ["降低用户操作门槛", "可能在非实验场景产生意外 shadow 文件"],
+      "recommended": false
+    },
+    {
+      "id": "opt-explicit-optin",
+      "title": "显式 opt-in（推荐）",
+      "summary": "Shadow writer 指令作为独立 optional experiment 段落，需用户显式启用",
+      "tradeoffs": ["隔离实验风险", "用户需额外操作才能触发"],
+      "recommended": true
+    },
+    {
+      "id": "opt-separate-file",
+      "title": "独立文件",
+      "summary": "Shadow writer 指令放在单独的 COPILOT-EXPERIMENT.md 中，不进主 prompt",
+      "tradeoffs": ["完全隔离", "增加文件数量，用户可能忽略"],
+      "recommended": false
+    }
+  ],
+  "recommended_option_id": "opt-explicit-optin",
+  "context_files": [
+    "Copilot/Skills/CN/COPILOT.md",
+    ".sopify-skills/plan/20260519_p4d_copilot_cli_pilot/design.md"
+  ],
+  "resume_route": "design",
+  "policy_id": "shadow-experiment-isolation",
+  "trigger_reason": "S1 prompt 资产裁剪完成，shadow writer 边界需明确后才能继续 S2/S3",
+  "created_at": "2026-05-19T14:28:00+08:00",
+  "updated_at": "2026-05-19T14:28:00+08:00"
+}

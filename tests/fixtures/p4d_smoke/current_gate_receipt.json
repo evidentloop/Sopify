@@ -1,0 +1,48 @@
+{
+  "schema_version": "3",
+  "status": "ready",
+  "gate_passed": true,
+  "workspace_root": "/Users/weixin.li/Desktop/Sopify/sopify-skills",
+  "session_id": "session-p4d-s1-001",
+  "preflight": {
+    "action": "skipped",
+    "action_level": "continue",
+    "activation_root": "/Users/weixin.li/Desktop/Sopify/sopify-skills"
+  },
+  "preferences": {
+    "status": "loaded",
+    "injected": true
+  },
+  "runtime": {
+    "route_name": "design",
+    "run_id": "run-p4d-s1-001"
+  },
+  "handoff": {
+    "required_host_action": "confirm_decision",
+    "handoff_kind": "decision_checkpoint"
+  },
+  "state": {
+    "current_run": "active",
+    "current_plan": "20260519_p4d_copilot_cli_pilot",
+    "decision_pending": true
+  },
+  "trigger_evidence": {
+    "source": "user_request",
+    "request_excerpt": "创建 Copilot CLI 的 Sopify prompt 资产"
+  },
+  "observability": {
+    "ingress_mode": "runtime_gate_enter",
+    "written_at": "2026-05-19T14:30:00+08:00",
+    "request_sha1": "abc123def456",
+    "gate_duration_ms": 342
+  },
+  "allowed_response_mode": "checkpoint_only",
+  "evidence": {
+    "manifest_found": true,
+    "handoff_found": true,
+    "strict_runtime_entry": true,
+    "handoff_source_kind": "runtime_produced",
+    "current_request_produced_handoff": true,
+    "persisted_handoff_matches_current_request": true
+  }
+}

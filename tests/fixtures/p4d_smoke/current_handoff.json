@@ -1,0 +1,39 @@
+{
+  "schema_version": "1",
+  "route_name": "design",
+  "run_id": "run-p4d-s1-001",
+  "plan_id": "20260519_p4d_copilot_cli_pilot",
+  "plan_path": ".sopify-skills/plan/20260519_p4d_copilot_cli_pilot",
+  "handoff_kind": "decision_checkpoint",
+  "required_host_action": "confirm_decision",
+  "recommended_skill_ids": ["analyze"],
+  "artifacts": {
+    "decision_checkpoint": {
+      "decision_id": "d-shadow-writer-scope",
+      "title": "Shadow Writer 默认行为边界",
+      "summary": "P4d S1 prompt 资产已创建，需确认 shadow writer 指令在 Copilot prompt 中的暴露方式",
+      "question": "Shadow writer 指令应以什么方式暴露在 Copilot prompt 资产中？",
+      "options": [
+        {"id": "opt-default-on", "title": "默认启用", "recommended": false},
+        {"id": "opt-explicit-optin", "title": "显式 opt-in", "recommended": true},
+        {"id": "opt-separate-file", "title": "独立文件", "recommended": false}
+      ],
+      "recommended_option_id": "opt-explicit-optin"
+    },
+    "execution_gate": {
+      "stage": "design",
+      "status": "decision_pending"
+    }
+  },
+  "notes": [
+    "S1 prompt 资产 Copilot/Skills/CN/COPILOT.md 已创建（252 行）",
+    "从 Codex/Skills/CN/AGENTS.md 裁剪 runtime 依赖，保留 Convention 层 + 接续增强消费",
+    "Shadow writer 指令定位待确认：默认启用 vs 显式 opt-in"
+  ],
+  "observability": {
+    "ingress_mode": "runtime_gate_enter",
+    "written_at": "2026-05-19T14:30:00+08:00",
+    "request_sha1": "abc123def456"
+  },
+  "resolution_id": ""
+}

@@ -13,8 +13,8 @@
 ## 当前焦点
 
 <!-- sopify:auto:focus:start -->
-- 当前活动 plan：暂无。
-- history 归档：已可用；最近归档为 `../history/2026-05/20260510_p4c_host_consumption_governance`。
+- 当前活动 plan：`plan/20260520_p5_contract_surface_shrinkage/`（P5 Contract Surface Shrinkage）
+- history 归档：已可用；最近归档为 `../history/2026-05/20260519_p4d_copilot_cli_pilot`。
 <!-- sopify:auto:focus:end -->
 
 ## 深入阅读入口
@@ -27,5 +27,5 @@
 - [Sopify 宿主接入规范 (Protocol v0)](./protocol.md)
 - [Skill 标准对齐蓝图](./skill-standards-refactor.md)
 - [变更历史](../history/index.md)
-- 最近归档：`../history/2026-05/20260510_p4c_host_consumption_governance`
+- 最近归档：`../history/2026-05/20260519_p4d_copilot_cli_pilot`
 <!-- sopify:auto:read-next:end -->

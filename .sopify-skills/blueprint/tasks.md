@@ -40,15 +40,15 @@ P0→P4c 主航道已全部完成。后续执行遵循以下原则：
 统一宿主级官方入口语义（Inspect Active Work / Continue Active Work / Start New Work），覆盖同宿主跨 session 与跨宿主接续。只消费现有 frozen contract，不新增 machine truth，不绑定 runtime 正则/路由实现。不规定入口语法或关键词，宿主自行选择暴露形式。有活动工作或 pending checkpoint 时 Start New Work 必须显式仲裁。当前 `~go exec` 是 Continue Active Work 的命令级实现，应被 host-level 入口语义取代。结合 P4d 非 deep 宿主试点 formalize。
 
 - 前置：P4c ✅
-- 状态：待启动
+- 状态：✅ 已完成 — 归档于 `history/2026-05/20260519_p4d_copilot_cli_pilot/`
 - 升级判断：试点宿主走通 payload_capable + 接续增强的最小接续链路（至少 handoff 消费，常见配套为 plan binding + run state），且接续入口语义验证可行，即可声明 P4d 结论足够，评估 P5 启动
 
 ### P5: Contract Surface Shrinkage
 
 在 P4d 验证后，按 evidence 逐项删除或降级 deep runtime 专属的 contract surface（bridge capability / manifest entry / installer bundle 项）。此时已知哪些 contract 是新宿主需要 vs 历史包袱。
 
-- 前置：P4d
-- 状态：待 P4d 结论
+- 前置：P4d ✅
+- 状态：活跃 — 方案包 `plan/20260520_p5_contract_surface_shrinkage/`
 - 升级判断：P4d 试点产出 keep / delete / downgrade 裁定表，覆盖所有 deep-only contract 面
 
 ### P6: Runtime Sunset / Reference Runtime
