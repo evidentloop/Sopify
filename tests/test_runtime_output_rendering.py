@@ -13,8 +13,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from runtime._models.handoff import RecoveredContext, RuntimeHandoff, RuntimeResult
-from runtime._models.core import RouteDecision
+from sopify_contracts.handoff import RecoveredContext, RuntimeHandoff, RuntimeResult
+from sopify_contracts.core import RouteDecision
 from runtime.output import render_runtime_output, _execution_gate_line, _GATE_STATUS_DISPLAY, _status_symbol
 from runtime.gate_output import render_gate_text
 
@@ -217,7 +217,7 @@ class TestStatusSymbolMapping(unittest.TestCase):
     """3a.1-regression: _status_symbol uses _FAMILY_SYMBOL table with edge overrides."""
 
     def test_completion_with_artifact_returns_check(self) -> None:
-        from runtime._models.artifacts import PlanArtifact
+        from sopify_contracts.artifacts import PlanArtifact
         artifact = PlanArtifact(
             plan_id="p1", title="t", summary="s", level="light",
             path="plan.md", files=(), created_at="2026-01-01",

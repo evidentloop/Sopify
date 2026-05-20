@@ -6,6 +6,23 @@ Format: Summary → Changed → Plan Packages. File-level details live in `git l
 
 ## [Unreleased]
 
+## [2026-05-20.191545] - 2026-05-20
+
+### Summary
+
+- Updated 1 active plan package(s); Changes across: Runtime, Scripts, Tests, Changed.
+
+### Changed
+
+- **Runtime**: Updated runtime internals (7 files)
+- **Scripts**: Adjusted maintenance scripts (2 files)
+- **Tests**: Updated automated coverage (4 files)
+- **Changed**: Updated project files (10 files)
+
+### Plan Packages
+
+- `20260520_p6_canonical_writer_cutover` (active)
+
 ## [2026-05-20.143728] - 2026-05-20
 
 ### Summary

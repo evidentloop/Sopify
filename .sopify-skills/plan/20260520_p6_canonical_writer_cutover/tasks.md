@@ -37,14 +37,17 @@ lifecycle_state: active
 
 ## S2: 物理提取（两步）
 
-### S2.1: sopify_contracts/ 共享契约层
+### S2.1: sopify_contracts/ 共享契约层 ✅
 
-- [ ] `git mv runtime/_models/ sopify_contracts/`（保留 git history）
-- [ ] 创建 `sopify_contracts/__init__.py`：re-export 全部 23 个公开类型
-- [ ] 修内部 import（如有必要）
-- [ ] `runtime/models.py` 改为 `from sopify_contracts import *`（deprecated bridge）
-- [ ] 全量 `from runtime._models.xxx import` → `from sopify_contracts.xxx import`（tests 等直接引用 _models 的）
-- [ ] import 审计：确认 sopify_contracts/ 无 runtime.* 依赖
+- [x] `git mv runtime/_models/ sopify_contracts/`（保留 git history）
+- [x] 创建 `sopify_contracts/__init__.py`：re-export 全部 23 个公开类型
+- [x] 修内部 import（无需修改，相对导入自动适配）
+- [x] `runtime/models.py` 改为 `from sopify_contracts import *`（deprecated bridge）
+- [x] 全量 `from runtime._models.xxx import` → `from sopify_contracts.xxx import`（tests 等直接引用 _models 的）
+- [x] import 审计：确认 sopify_contracts/ 无 runtime.* 依赖
+- [x] bundle 基础设施更新（sync-runtime-assets.sh, validate.py, runtime_bundle.py, bootstrap_workspace.py, inspection.py）
+- [x] 测试 copytree/rmtree 模式修复（test_installer_status_doctor.py ×3, test_runtime_gate.py ×1, check-install-payload-bundle-smoke.py ×1）
+- [x] 全量测试通过：721 passed
 
 ### S2.2: canonical_writer/ 写层
 

@@ -2611,7 +2611,7 @@ class RunStateReceiptPersistenceTests(unittest.TestCase):
     """T5-C (partial): RunState receipt serialization roundtrip."""
 
     def test_runstate_receipt_roundtrip(self):
-        from runtime._models.core import RunState
+        from sopify_contracts.core import RunState
         receipt_dict = ExecutionAuthorizationReceipt.create(
             plan_path=".sopify-skills/plan/p1",
             plan_revision_digest="a" * 64,
@@ -2635,7 +2635,7 @@ class RunStateReceiptPersistenceTests(unittest.TestCase):
         self.assertEqual(restored.execution_authorization_receipt, receipt_dict)
 
     def test_runstate_no_receipt_roundtrip(self):
-        from runtime._models.core import RunState
+        from sopify_contracts.core import RunState
         run = RunState(
             run_id="test-002",
             status="active",
