@@ -31,7 +31,7 @@ from installer.validate import (
 )
 from runtime.config import ConfigError, load_runtime_config
 from runtime.context_snapshot import resolve_context_snapshot
-from runtime.state import StateStore
+from canonical_writer import StateStore
 
 STATUS_SCHEMA_VERSION = "2"
 DOCTOR_SCHEMA_VERSION = "1"

@@ -8,7 +8,7 @@ from runtime.context_snapshot import (
     _provenance_status_for_reason,
     resolve_context_snapshot,
 )
-from runtime.state_invariants import validate_phase
+from canonical_writer.invariants import validate_phase
 
 
 class StateStoreInvariantTests(unittest.TestCase):

@@ -65,18 +65,18 @@ lifecycle_state: active
 - [x] 测试 copytree/rmtree 模式修复 ×6
 - [x] 全量测试通过：721 passed
 
-## S3: 消费者重接线
+## S3: 消费者重接线 ✅
 
-非 runtime 生产消费者切换到新路径（直接 import canonical_writer / sopify_contracts）：
+非 runtime 生产消费者已切换到新路径（直接 import canonical_writer / sopify_contracts）：
 
-- [ ] installer/payload.py — `from runtime.state import iso_now` → `from canonical_writer import iso_now`
-- [ ] installer/inspection.py — `from runtime.state import StateStore` → `from canonical_writer import StateStore`
-- [ ] scripts/sopify_runtime.py — `from runtime.state import iso_now, ...`
-- [ ] scripts/check-skill-eval-gate.py — `from runtime.state import StateStore`
-- [ ] tests/runtime_test_support.py — StateStore, iso_now, InvariantViolationError 等
-- [ ] tests/test_runtime_state.py — `from runtime.state_invariants import validate_phase`
-- [ ] tests/test_runtime_gate.py — `from runtime.state import StateStore, iso_now, ...`
-- [ ] runtime 核心文件（engine, gate, bridges 等）import 路径切换（可选，桥仍可用）
+- [x] installer/payload.py — `from canonical_writer import iso_now`
+- [x] installer/inspection.py — `from canonical_writer import StateStore`
+- [x] scripts/sopify_runtime.py — iso_now 从 canonical_writer，stable_request_sha1/summarize 留 runtime.state
+- [x] scripts/check-skill-eval-gate.py — `from canonical_writer import StateStore`
+- [x] tests/runtime_test_support.py — StateStore/iso_now 从 canonical_writer，invariants 从 canonical_writer.invariants，local_day_now 留 runtime.state
+- [x] tests/test_runtime_state.py — `from canonical_writer.invariants import validate_phase`
+- [x] tests/test_runtime_gate.py — StateStore/iso_now 从 canonical_writer，stable_request_sha1 留 runtime.state
+- [x] 全量测试通过：721 passed
 
 ## S4: 验证 + 清理
 

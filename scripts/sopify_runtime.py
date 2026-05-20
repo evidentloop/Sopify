@@ -18,7 +18,8 @@ from runtime.entry_guard import DIRECT_EDIT_BLOCKED_RUNTIME_REQUIRED_REASON_CODE
 from runtime.gate import CURRENT_GATE_RECEIPT_FILENAME, ERROR_VISIBLE_RETRY, GATE_SCHEMA_VERSION, write_gate_receipt
 from runtime.output import render_runtime_error
 from runtime.router import match_runtime_first_guard
-from runtime.state import iso_now, stable_request_sha1, summarize_request_text
+from canonical_writer import iso_now
+from runtime.state import stable_request_sha1, summarize_request_text
 
 DIRECT_ENTRY_BLOCKED_ERROR_CODE = "runtime_gate_required"
 _FINALIZE_ALIAS_RE = re.compile(r"^~go\s+finalize(?:\s+.+)?$", re.IGNORECASE)
