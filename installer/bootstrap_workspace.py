@@ -98,6 +98,7 @@ PAYLOAD_MANIFEST_FILENAME = "payload-manifest.json"
 _REQUIRED_BUNDLE_FILES = (
     Path("manifest.json"),
     Path("sopify_contracts") / "__init__.py",
+    Path("canonical_writer") / "__init__.py",
     Path("runtime") / "__init__.py",
     Path("runtime") / "clarification_bridge.py",
     Path("runtime") / "cli_interactive.py",

@@ -49,43 +49,53 @@ lifecycle_state: active
 - [x] 测试 copytree/rmtree 模式修复（test_installer_status_doctor.py ×3, test_runtime_gate.py ×1, check-install-payload-bundle-smoke.py ×1）
 - [x] 全量测试通过：721 passed
 
-### S2.2: canonical_writer/ 写层
+### S2.2: canonical_writer/ 写层 ✅
 
-- [ ] 创建 `canonical_writer/` 目录 + `__init__.py`
-- [ ] 从 state.py 提取 StateStore 类 → `canonical_writer/store.py`
-- [ ] 从 state.py 提取 IO helpers（_read_json, _write_json）→ `canonical_writer/io.py`
-- [ ] 从 handoff.py 提取 read_runtime_handoff → `canonical_writer/io.py`
-- [ ] 迁移 state_invariants.py → `canonical_writer/invariants.py`
-- [ ] 提取 iso_now → `canonical_writer/_time.py`（4 处重复的统一源）
-- [ ] 提取 normalize_session_id, _stamp_provenance, _validate_resume → `canonical_writer/store.py` / `_resume.py`
-- [ ] 从 checkpoint_request.py 提取 CheckpointRequestError + validate_develop_resume_context + 常量 (~63 LOC) → `canonical_writer/_resume.py`
-- [ ] import 审计：确认 canonical_writer/ 仅依赖 sopify_contracts + 标准库
+- [x] 创建 `canonical_writer/` 目录 + `__init__.py`
+- [x] 从 state.py 提取 StateStore 类 → `canonical_writer/store.py`
+- [x] 从 state.py 提取 IO helpers（_read_json, _write_json）→ `canonical_writer/io.py`（standalone 函数）
+- [x] 从 handoff.py 提取 read_runtime_handoff → `canonical_writer/io.py`
+- [x] 迁移 state_invariants.py → `canonical_writer/invariants.py`
+- [x] 提取 iso_now → `canonical_writer/_time.py`
+- [x] 提取 normalize_session_id, _stamp_provenance, _validate_resume → `canonical_writer/store.py`
+- [x] 从 checkpoint_request.py 提取 CheckpointRequestError + validate_develop_resume_context + develop_resume_context_issue + 常量 → `canonical_writer/_resume.py`
+- [x] import 审计：canonical_writer/ 仅依赖 sopify_contracts + 标准库 ✓
+- [x] 兼容桥建立：runtime/state.py, runtime/state_invariants.py, runtime/checkpoint_request.py, runtime/handoff.py
+- [x] bundle 基础设施更新（sync-runtime-assets.sh, validate.py, runtime_bundle.py, bootstrap_workspace.py, inspection.py）
+- [x] 测试 copytree/rmtree 模式修复 ×6
+- [x] 全量测试通过：721 passed
 
 ## S3: 消费者重接线
 
-- [ ] runtime 核心文件（engine, gate, bridges 等 ~10 文件）import 路径切换
-- [ ] installer/inspection.py import 路径切换
-- [ ] scripts/ import 路径切换
-- [ ] tests/ import 路径切换
-- [ ] 临时兼容桥（仅过渡用）：
-  - [ ] runtime/models.py → `from sopify_contracts import *`（deprecated，全量 re-export）
-  - [ ] runtime/state.py → re-export StateStore（deprecated）
-  - [ ] runtime/state_invariants.py → re-export invariants（deprecated）
+非 runtime 生产消费者切换到新路径（直接 import canonical_writer / sopify_contracts）：
+
+- [ ] installer/payload.py — `from runtime.state import iso_now` → `from canonical_writer import iso_now`
+- [ ] installer/inspection.py — `from runtime.state import StateStore` → `from canonical_writer import StateStore`
+- [ ] scripts/sopify_runtime.py — `from runtime.state import iso_now, ...`
+- [ ] scripts/check-skill-eval-gate.py — `from runtime.state import StateStore`
+- [ ] tests/runtime_test_support.py — StateStore, iso_now, InvariantViolationError 等
+- [ ] tests/test_runtime_state.py — `from runtime.state_invariants import validate_phase`
+- [ ] tests/test_runtime_gate.py — `from runtime.state import StateStore, iso_now, ...`
+- [ ] runtime 核心文件（engine, gate, bridges 等）import 路径切换（可选，桥仍可用）
 
 ## S4: 验证 + 清理
 
-- [ ] 全量测试回归：721+ tests 全过
-- [ ] iso_now 重复清理：4 处定义统一为从 `_time.py` 导入
+- [ ] iso_now 重复清理：3 处 runtime 内重复定义统一为从 canonical_writer._time 导入
   - `runtime/handoff.py:_iso_now` (line 168)
-  - `runtime/decision.py:iso_now` (line 609)
-  - `runtime/clarification.py:iso_now` (line 389)
-  - `runtime/state.py:iso_now` (line 317) → 迁入 canonical_writer/_time.py
-- [ ] 移除临时兼容桥：确认无旧路径引用后删除所有 re-export
-- [ ] 删除 `runtime/_models/`（已迁出到 sopify_contracts/）
+  - `runtime/decision.py:iso_now` (if present)
+  - `runtime/clarification.py:iso_now` (if present)
+- [ ] 移除临时兼容桥（确认无旧路径引用后删除所有 re-export）：
+  - runtime/models.py（sopify_contracts bridge，S2.1 建立）
+  - runtime/state.py StateStore/iso_now/normalize_session_id re-exports
+  - runtime/state_invariants.py 全量 re-export bridge
+  - runtime/checkpoint_request.py canonical_writer._resume re-imports
+  - runtime/handoff.py read_runtime_handoff bridge
+- [ ] 删除 `runtime/_models/`（已迁出到 sopify_contracts/，S2.1 已完成）
 - [ ] canonical_writer/ import 审计：仅依赖 sopify_contracts + 标准库
 - [ ] sopify_contracts/ import 审计：仅依赖标准库
 - [ ] state.py / state_invariants.py 瘦身确认
-- [ ] 蓝图同步：design.md 三层分离表 canonical writer 列标"已提取"
+- [ ] 全量测试回归：721+ tests 全过
+- [ ] 蓝图同步：design.md 三层分离表标"已提取"
 
 ## S5: 结论报告
 

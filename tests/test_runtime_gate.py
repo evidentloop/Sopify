@@ -793,7 +793,7 @@ class RuntimeGateTests(unittest.TestCase):
             workspace_manifest = json.loads(workspace_manifest_path.read_text(encoding="utf-8"))
             workspace_manifest["legacy_fallback"] = True
             workspace_manifest_path.write_text(json.dumps(workspace_manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-            for name in ("sopify_contracts", "runtime", "scripts", "tests"):
+            for name in ("sopify_contracts", "canonical_writer", "runtime", "scripts", "tests"):
                 shutil.copytree(selected_bundle_root / name, bundle_root / name)
 
             shutil.rmtree(selected_bundle_root)

@@ -1127,7 +1127,7 @@ def _workspace_bundle_recommendation(host_id: str, workspace_root: Path, reason_
 
 
 def _looks_like_stub_only_workspace(bundle_root: Path) -> bool:
-    return all(not (bundle_root / name).exists() for name in ("sopify_contracts", "runtime", "scripts", "tests"))
+    return all(not (bundle_root / name).exists() for name in ("sopify_contracts", "canonical_writer", "runtime", "scripts", "tests"))
 
 
 def _workspace_bundle_evidence(

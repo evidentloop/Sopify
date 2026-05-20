@@ -17,6 +17,7 @@ from .checkpoint_request import (
     normalize_checkpoint_request,
 )
 from .action_projection import ActionProjectionError, build_action_projection, supports_action_projection
+from canonical_writer.io import read_runtime_handoff  # noqa: F401 — re-exported for backward compat
 from .clarification import CURRENT_CLARIFICATION_RELATIVE_PATH, build_scope_clarification_form, clarification_submission_state_payload
 from .deterministic_guard import (
     evaluate_deterministic_guard,
@@ -184,15 +185,6 @@ def _summarize_request_text(text: str, *, limit: int = 120) -> str:
         return compact[:limit]
     return compact[: limit - 3].rstrip() + "..."
 
-
-def read_runtime_handoff(path: Path) -> RuntimeHandoff | None:
-    """Read a handoff file if it exists."""
-    if not path.exists():
-        return None
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(payload, dict):
-        return None
-    return RuntimeHandoff.from_dict(payload)
 
 
 def _required_host_action(

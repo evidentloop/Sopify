@@ -331,7 +331,7 @@ class StatusDoctorContractTests(unittest.TestCase):
             run_workspace_bootstrap(CODEX_ADAPTER.payload_root(home_root), workspace_root)
 
             bundle_root = workspace_root / ".sopify-runtime"
-            for name in ("sopify_contracts", "runtime", "scripts", "tests"):
+            for name in ("sopify_contracts", "canonical_writer", "runtime", "scripts", "tests"):
                 target = bundle_root / name
                 if target.exists():
                     import shutil
@@ -406,7 +406,7 @@ class StatusDoctorContractTests(unittest.TestCase):
             workspace_manifest = json.loads(workspace_manifest_path.read_text(encoding="utf-8"))
             workspace_manifest["legacy_fallback"] = True
             workspace_manifest_path.write_text(json.dumps(workspace_manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-            for name in ("sopify_contracts", "runtime", "scripts", "tests"):
+            for name in ("sopify_contracts", "canonical_writer", "runtime", "scripts", "tests"):
                 shutil.copytree(selected_bundle_root / name, bundle_root / name)
 
             shutil.rmtree(selected_bundle_root)
@@ -472,7 +472,7 @@ class StatusDoctorContractTests(unittest.TestCase):
             payload_manifest = json.loads((payload_root / "payload-manifest.json").read_text(encoding="utf-8"))
             active_version = payload_manifest["active_version"]
             bundle_root = workspace_root / ".sopify-runtime"
-            for name in ("sopify_contracts", "runtime", "scripts", "tests"):
+            for name in ("sopify_contracts", "canonical_writer", "runtime", "scripts", "tests"):
                 shutil.copytree(payload_root / "bundles" / active_version / name, bundle_root / name)
             (bundle_root / "scripts" / "runtime_gate.py").unlink()
 
