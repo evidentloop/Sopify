@@ -12,7 +12,7 @@ from .decision import has_submitted_decision, parse_decision_response
 from .entry_guard import DIRECT_EDIT_BLOCKED_RUNTIME_REQUIRED_REASON_CODE
 from .models import ClarificationState, DecisionState, RouteDecision, RuntimeConfig, SkillMeta
 from .skill_resolver import resolve_route_candidate_skills, resolve_runtime_skill_id
-from .state import StateStore
+from canonical_writer import StateStore
 
 _COMMAND_PATTERNS = (
     (re.compile(r"^~go\s+plan(?:\s+(?P<body>.+))?$", re.IGNORECASE), "~go plan"),

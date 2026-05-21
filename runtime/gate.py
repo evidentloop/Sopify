@@ -25,7 +25,8 @@ from .action_intent import (
     resolve_action_proposal,
 )
 from .preferences import PreferencesPreloadResult, preload_preferences
-from .state import StateStore, cleanup_expired_session_state, iso_now, normalize_session_id, stable_request_sha1, summarize_request_text
+from canonical_writer import StateStore, iso_now, normalize_session_id
+from .state import cleanup_expired_session_state, stable_request_sha1, summarize_request_text
 from .workspace_preflight import WorkspacePreflightError, preflight_workspace_runtime
 
 GATE_SCHEMA_VERSION = "1"
@@ -888,7 +889,7 @@ def _build_action_proposal_retry_contract(
     """Build the gate retry response for a new host that omitted the proposal."""
     # Use config-aware state paths when config is available.
     if config is not None:
-        from .state import StateStore
+        from canonical_writer import StateStore
         store = StateStore(config, session_id=session_id)
         store.ensure()
         state_contract = _build_state_contract(store=store)

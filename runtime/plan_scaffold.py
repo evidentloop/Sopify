@@ -13,7 +13,7 @@ from .decision import option_by_id
 from .knowledge_sync import render_knowledge_sync_front_matter
 from .models import DecisionState, PlanArtifact, RuntimeConfig
 from .plan_registry import PlanRegistryError, upsert_plan_entry
-from .state import iso_now
+from canonical_writer import iso_now
 
 _FRONT_MATTER_RE = re.compile(r"\A---\n(?P<front>.*?)\n---\n(?P<body>.*)\Z", re.DOTALL)
 _PLAN_REFERENCE_RE = re.compile(r"(?P<plan_id>\d{8}_[a-z0-9][a-z0-9_.-]*)", re.IGNORECASE)

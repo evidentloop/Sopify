@@ -17,10 +17,12 @@ if str(REPO_ROOT) not in sys.path:
 from runtime.config import ConfigError, load_runtime_config
 from runtime._yaml import load_yaml
 from runtime.checkpoint_materializer import materialize_checkpoint_request
-from runtime.checkpoint_request import (
-    CHECKPOINT_REASON_MISSING_BUT_TRADEOFF_DETECTED,
+from canonical_writer._resume import (
     CheckpointRequestError,
     DEVELOP_RESUME_CONTEXT_REQUIRED_FIELDS,
+)
+from runtime.checkpoint_request import (
+    CHECKPOINT_REASON_MISSING_BUT_TRADEOFF_DETECTED,
     checkpoint_request_from_clarification_state,
     checkpoint_request_from_decision_state,
 )
@@ -72,8 +74,9 @@ from runtime.preferences import preload_preferences, preload_preferences_for_wor
 from runtime.router import Router
 from runtime.skill_registry import SkillRegistry
 from runtime.skill_runner import SkillExecutionError, run_runtime_skill
-from runtime.state import StateStore, iso_now, local_day_now
-from runtime.state_invariants import HOST_FACING_TRUTH_WRITE_KINDS, InvariantViolationError
+from canonical_writer import StateStore, iso_now
+from canonical_writer.invariants import HOST_FACING_TRUTH_WRITE_KINDS, InvariantViolationError
+from runtime.state import local_day_now
 from runtime.models import (
     ClarificationState,
     DecisionCheckpoint,

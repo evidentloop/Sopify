@@ -14,7 +14,7 @@ from installer.hosts.base import HostAdapter, read_sopify_version
 from installer.models import BootstrapResult, InstallError, InstallPhaseResult
 from installer.runtime_bundle import sync_runtime_bundle
 from installer.validate import _normalize_payload_bundle_version, resolve_payload_bundle_root, validate_payload_install
-from runtime.state import iso_now
+from canonical_writer import iso_now
 
 PAYLOAD_MANIFEST_FILENAME = "payload-manifest.json"
 PAYLOAD_DIRNAME = "sopify"

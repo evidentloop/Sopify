@@ -12,13 +12,15 @@ from hashlib import sha1
 from typing import Any, Mapping
 
 from .checkpoint_materializer import CheckpointMaterialization, materialize_checkpoint_request
+from canonical_writer._resume import (
+    DEVELOP_RESUME_AFTER_ACTIONS,
+    DEVELOP_RESUME_CONTEXT_REQUIRED_FIELDS,
+    CheckpointRequestError,
+)
 from .checkpoint_request import (
     CHECKPOINT_REASON_MISSING_BUT_TRADEOFF_DETECTED,
     CHECKPOINT_REQUEST_SCHEMA_VERSION,
-    DEVELOP_RESUME_AFTER_ACTIONS,
-    DEVELOP_RESUME_CONTEXT_REQUIRED_FIELDS,
     CheckpointRequest,
-    CheckpointRequestError,
     normalize_checkpoint_request,
 )
 from .develop_quality import (
@@ -36,7 +38,7 @@ from .decision_policy import has_tradeoff_checkpoint_signal
 from .handoff import build_runtime_handoff
 from .context_snapshot import resolve_context_snapshot
 from .models import PlanArtifact, RecoveredContext, RouteDecision, RunState, RuntimeConfig, RuntimeHandoff
-from .state import StateStore, iso_now
+from canonical_writer import StateStore, iso_now
 
 _HOST_FACING_TRUTH_KIND_DEVELOP_CALLBACK = "develop_callback"
 

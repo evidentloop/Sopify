@@ -117,7 +117,7 @@ def _has_active_plan(*, config: RuntimeConfig, current_plan: PlanArtifact | None
 def _effective_current_plan(*, config: RuntimeConfig, current_plan: PlanArtifact | None) -> PlanArtifact | None:
     if current_plan is not None:
         return current_plan
-    from .state import StateStore
+    from canonical_writer import StateStore
 
     return StateStore(config).get_current_plan()
 

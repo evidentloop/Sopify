@@ -36,7 +36,7 @@ from .models import (
     RuntimeConfig,
     RuntimeHandoff,
 )
-from .state import StateStore, iso_now
+from canonical_writer import StateStore, iso_now
 
 BRIDGE_SCHEMA_VERSION = "1"
 DECISION_BRIDGE_ENTRY = ENTRY_GUARD_DECISION_BRIDGE_ENTRY

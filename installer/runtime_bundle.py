@@ -29,6 +29,8 @@ def sync_runtime_bundle(repo_root: Path, workspace_root: Path, *, bundle_dirname
     bundle_root = workspace_root / bundle_dirname
     required_paths = (
         bundle_root / "manifest.json",
+        bundle_root / "sopify_contracts" / "__init__.py",
+        bundle_root / "canonical_writer" / "__init__.py",
         bundle_root / "runtime" / "__init__.py",
         bundle_root / "runtime" / "clarification_bridge.py",
         bundle_root / "runtime" / "cli_interactive.py",

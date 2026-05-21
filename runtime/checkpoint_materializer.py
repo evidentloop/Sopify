@@ -17,7 +17,7 @@ from .models import (
     ExecutionSummary,
     RuntimeConfig,
 )
-from .state import iso_now
+from canonical_writer import iso_now
 from .checkpoint_request import CheckpointRequest, normalize_checkpoint_request
 
 

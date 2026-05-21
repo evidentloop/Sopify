@@ -28,6 +28,9 @@ P0→P4c 主航道已全部完成。后续执行遵循以下原则：
 | P4b | Runtime Surface Consolidation | prove-kept-or-delete 全量扫描，24,334 LOC，15 LOC 实删 | `history/2026-05/20260509_p4b_runtime_surface_consolidation/` |
 | P4b.5 | Runtime Optionality Audit | 3 级梯度 + 消费矩阵 + blast radius + 综合裁定（纯审计） | `history/2026-05/20260510_p4b5_runtime_optionality_audit/` |
 | P4c | Host Consumption Governance | 契约投影 + 增强声明 + 渲染收敛 + prompt -140 行 + protocol.md §8 唯一入口 | `history/2026-05/20260510_p4c_host_consumption_governance/` |
+| P4d | Copilot CLI Pilot | payload_capable + 接续增强的最小新宿主画像验证 | `history/2026-05/20260519_p4d_copilot_cli_pilot/` |
+| P5 | Contract Surface Shrinkage | 58 面逐项裁定，candidate-kernel 680→210 LOC，dead code -8 LOC | `history/2026-05/20260520_p5_contract_surface_shrinkage/` |
+| P6 | Canonical Writer Cutover | 三层物理分离：sopify_contracts 1,227 + canonical_writer 605 LOC，依赖单向，新宿主可直接写 | `history/2026-05/20260520_p6_canonical_writer_cutover/` |
 
 ## 主线里程碑
 
@@ -56,7 +59,7 @@ P0→P4c 主航道已全部完成。后续执行遵循以下原则：
 直接切出 lightweight canonical writer，新宿主默认走 Protocol/Convention + canonical writer 组合；runtime 降为 legacy reference implementation / 行为规格，不再承载新增产品能力。
 
 - 前置：P5 ✅
-- 状态：下一主线候选
+- 状态：✅ 已完成 — 归档于 `history/2026-05/20260520_p6_canonical_writer_cutover/`
 - 升级判断：writer_input 契约定义完成，StateStore 成功切出，新宿主可直接获得 canonical 写能力
 
 ## 证据型候选（为下一主线提供升级证据，不占 P 编号）

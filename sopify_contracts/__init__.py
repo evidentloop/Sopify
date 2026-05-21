@@ -1,14 +1,12 @@
-"""Public runtime model facade.
+"""Shared contract types for the Sopify runtime ecosystem.
 
-DEPRECATED: Import directly from sopify_contracts instead.
-This module exists only as a temporary compatibility bridge.
+Migrated from runtime/_models/ as a top-level shared package.
+All runtime and canonical_writer modules import types from here.
 """
 
-from __future__ import annotations
-
-from sopify_contracts.artifacts import KbArtifact, PlanArtifact
-from sopify_contracts.core import ExecutionGate, ExecutionSummary, RouteDecision, RunState, RuntimeConfig, SkillMeta
-from sopify_contracts.decision import (
+from .artifacts import KbArtifact, PlanArtifact
+from .core import ExecutionGate, ExecutionSummary, RouteDecision, RunState, RuntimeConfig, SkillMeta
+from .decision import (
     ClarificationState,
     DecisionCheckpoint,
     DecisionCondition,
@@ -20,8 +18,8 @@ from sopify_contracts.decision import (
     DecisionSubmission,
     DecisionValidation,
 )
-from sopify_contracts.handoff import RecoveredContext, RuntimeHandoff, RuntimeResult, SkillActivation
-from sopify_contracts.proposal import PlanProposalState
+from .handoff import RecoveredContext, RuntimeHandoff, RuntimeResult, SkillActivation
+from .proposal import PlanProposalState
 
 __all__ = [
     "ClarificationState",

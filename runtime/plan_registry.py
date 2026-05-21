@@ -12,7 +12,7 @@ from typing import Any, Mapping, Sequence
 
 from ._yaml import YamlParseError, load_yaml
 from .models import PlanArtifact, RuntimeConfig
-from .state import StateStore, iso_now
+from canonical_writer import StateStore, iso_now
 
 REGISTRY_FILENAME = "_registry.yaml"
 REGISTRY_VERSION = 1

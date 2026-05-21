@@ -161,6 +161,8 @@ def expected_bundle_paths(bundle_root: Path) -> tuple[Path, ...]:
     """Return the stable set of files every Sopify bundle must contain."""
     return (
         bundle_root / "manifest.json",
+        bundle_root / "sopify_contracts" / "__init__.py",
+        bundle_root / "canonical_writer" / "__init__.py",
         bundle_root / "runtime" / "__init__.py",
         bundle_root / "runtime" / "clarification_bridge.py",
         bundle_root / "runtime" / "cli_interactive.py",

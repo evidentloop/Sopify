@@ -17,7 +17,7 @@ if str(REPO_ROOT) not in sys.path:
 from runtime.config import load_runtime_config
 from runtime.router import Router
 from runtime.skill_registry import SkillRegistry
-from runtime.state import StateStore
+from canonical_writer import StateStore
 
 
 def _load_json(path: Path) -> dict[str, Any]:

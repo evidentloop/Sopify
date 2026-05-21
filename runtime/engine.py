@@ -68,9 +68,8 @@ from .action_intent import (
 )
 from .skill_registry import SkillRegistry
 from .skill_runner import SkillExecutionError, run_runtime_skill
+from canonical_writer import StateStore, iso_now
 from .state import (
-    StateStore,
-    iso_now,
     local_day_now,
     local_display_now,
     local_iso_now,
@@ -78,7 +77,7 @@ from .state import (
     stable_request_sha1,
     summarize_request_text,
 )
-from .state_invariants import stamp_handoff_resolution_id
+from canonical_writer.invariants import stamp_handoff_resolution_id
 
 _CURRENT_PLAN_ANCHOR_PATTERNS = (
     re.compile(r"(当前|这个|该)\s*(plan|方案)", re.IGNORECASE),

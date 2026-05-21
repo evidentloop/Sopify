@@ -9,7 +9,7 @@ from types import MappingProxyType
 from typing import Any, Mapping
 from uuid import uuid4
 
-from .checkpoint_request import develop_resume_context_issue
+from canonical_writer._resume import develop_resume_context_issue
 from .models import (
     ClarificationState,
     DecisionState,
@@ -19,8 +19,8 @@ from .models import (
     RuntimeConfig,
     RuntimeHandoff,
 )
-from .state import StateStore
-from .state_invariants import is_supported_phase
+from canonical_writer import StateStore
+from canonical_writer.invariants import is_supported_phase
 
 _NEGOTIATION_RUN_STAGE_ACTIONS = {
     "clarification_pending": "answer_questions",

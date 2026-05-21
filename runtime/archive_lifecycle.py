@@ -15,7 +15,7 @@ from .knowledge_layout import resolve_path
 from .knowledge_sync import KNOWLEDGE_SYNC_KEYS, knowledge_sync_targets, parse_knowledge_sync
 from .models import KbArtifact, PlanArtifact, RuntimeConfig
 from .plan_registry import PlanRegistryError, remove_plan_entry
-from .state import StateStore, iso_now
+from canonical_writer import StateStore, iso_now
 
 ARCHIVE_STATUS_COMPLETED = "completed"
 ARCHIVE_STATUS_BLOCKED = "blocked"

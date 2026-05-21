@@ -10,7 +10,7 @@ from tempfile import NamedTemporaryFile
 from typing import Any, Mapping
 
 from .builtin_catalog import load_builtin_skills
-from .checkpoint_request import DEVELOP_RESUME_AFTER_ACTIONS, DEVELOP_RESUME_CONTEXT_REQUIRED_FIELDS
+from canonical_writer._resume import DEVELOP_RESUME_AFTER_ACTIONS, DEVELOP_RESUME_CONTEXT_REQUIRED_FIELDS
 from .entry_guard import (
     DEFAULT_RUNTIME_ENTRY as ENTRY_GUARD_DEFAULT_ENTRY,
     ENTRY_GUARD_BYPASS_BLOCKED_COMMANDS,
@@ -25,7 +25,7 @@ from .handoff import CURRENT_HANDOFF_RELATIVE_PATH
 from .knowledge_layout import CONTEXT_PROFILES, KB_LAYOUT_VERSION, KNOWLEDGE_PATHS
 from .preferences import PREFERENCES_PRELOAD_STATUSES
 from .router import SUPPORTED_ROUTE_NAMES, build_runtime_first_hints
-from .state import iso_now
+from canonical_writer import iso_now
 
 MANIFEST_SCHEMA_VERSION = "1"
 DEFAULT_MANIFEST_FILENAME = "manifest.json"

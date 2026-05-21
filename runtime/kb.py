@@ -8,7 +8,7 @@ import re
 from .knowledge_layout import materialization_stage
 from .models import KbArtifact, RuntimeConfig
 from .preferences import preferences_have_confirmed_entries, resolve_feedback_path, resolve_preferences_path
-from .state import iso_now
+from canonical_writer import iso_now
 
 _STANDARD_BLUEPRINT_FILENAMES = frozenset({"README.md", "background.md", "design.md", "tasks.md"})
 

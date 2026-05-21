@@ -31,7 +31,7 @@ from .entry_guard import (
     DEFAULT_RUNTIME_ENTRY as ENTRY_GUARD_DEFAULT_RUNTIME_ENTRY,
 )
 from .models import ClarificationState, RuntimeConfig, RuntimeHandoff
-from .state import StateStore
+from canonical_writer import StateStore
 
 BRIDGE_SCHEMA_VERSION = "1"
 DEFAULT_RUNTIME_ENTRY = ENTRY_GUARD_DEFAULT_RUNTIME_ENTRY

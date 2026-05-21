@@ -36,7 +36,8 @@ from installer.outcome_contract import annotate_outcome_payload, render_outcome_
 from installer.payload import install_global_payload
 from runtime.models import ClarificationState, DecisionOption, DecisionState, PlanArtifact, RouteDecision, RunState, RuntimeHandoff
 from runtime.plan_scaffold import create_plan_scaffold
-from runtime.state import StateStore, iso_now, stable_request_sha1
+from canonical_writer import StateStore, iso_now
+from runtime.state import stable_request_sha1
 from runtime.workspace_preflight import _drop_cli_arg_pairs
 from runtime.workspace_preflight import preflight_workspace_runtime
 
@@ -793,7 +794,7 @@ class RuntimeGateTests(unittest.TestCase):
             workspace_manifest = json.loads(workspace_manifest_path.read_text(encoding="utf-8"))
             workspace_manifest["legacy_fallback"] = True
             workspace_manifest_path.write_text(json.dumps(workspace_manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-            for name in ("runtime", "scripts", "tests"):
+            for name in ("sopify_contracts", "canonical_writer", "runtime", "scripts", "tests"):
                 shutil.copytree(selected_bundle_root / name, bundle_root / name)
 
             shutil.rmtree(selected_bundle_root)

@@ -260,7 +260,7 @@ def _exercise_legacy_fallback_visibility(
         json.dumps(workspace_manifest, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
-    for name in ("runtime", "scripts", "tests"):
+    for name in ("sopify_contracts", "canonical_writer", "runtime", "scripts", "tests"):
         shutil.copytree(selected_bundle_root / name, legacy_bundle_root / name)
 
     hidden_bundle_root = selected_bundle_root.with_name(f"{selected_bundle_root.name}.missing")

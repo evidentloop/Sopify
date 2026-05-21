@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from .models import RunState, RuntimeHandoff
+from sopify_contracts import RunState, RuntimeHandoff
 
 # Keep this whitelist explicit so paired-write scope cannot quietly spread.
 HOST_FACING_TRUTH_WRITE_KINDS = (

@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from hashlib import sha1
 import re
 from typing import Any, Mapping, Optional
 
+from canonical_writer._time import iso_now
 from .knowledge_layout import resolve_context_profile
 from .models import ClarificationState, RouteDecision, RuntimeConfig
 
@@ -384,8 +384,3 @@ def _clarification_id(request_text: str) -> str:
 def _feature_key(request_text: str) -> str:
     digest = sha1(request_text.encode("utf-8")).hexdigest()[:8]
     return f"clarification-{digest}"
-
-
-def iso_now() -> str:
-    """Return a stable UTC timestamp without importing the state module."""
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()

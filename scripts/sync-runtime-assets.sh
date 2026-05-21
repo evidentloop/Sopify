@@ -47,11 +47,15 @@ else
 fi
 
 RUNTIME_SRC="$ROOT_DIR/runtime"
+CONTRACTS_SRC="$ROOT_DIR/sopify_contracts"
+CANONICAL_WRITER_SRC="$ROOT_DIR/canonical_writer"
 SCRIPTS_SRC="$ROOT_DIR/scripts"
 TESTS_SRC="$ROOT_DIR/tests"
 
 required_paths=(
   "$RUNTIME_SRC"
+  "$CONTRACTS_SRC"
+  "$CANONICAL_WRITER_SRC"
   "$SCRIPTS_SRC/sopify_runtime.py"
   "$SCRIPTS_SRC/runtime_gate.py"
   "$SCRIPTS_SRC/go_plan_runtime.py"
@@ -75,6 +79,8 @@ done
 mkdir -p "$BUNDLE_DIR"
 
 rsync -a --delete --exclude '__pycache__/' --exclude '*.pyc' "$RUNTIME_SRC/" "$BUNDLE_DIR/runtime/"
+rsync -a --delete --exclude '__pycache__/' --exclude '*.pyc' "$CONTRACTS_SRC/" "$BUNDLE_DIR/sopify_contracts/"
+rsync -a --delete --exclude '__pycache__/' --exclude '*.pyc' "$CANONICAL_WRITER_SRC/" "$BUNDLE_DIR/canonical_writer/"
 
 mkdir -p "$BUNDLE_DIR/scripts"
 rsync -a --delete --prune-empty-dirs \
