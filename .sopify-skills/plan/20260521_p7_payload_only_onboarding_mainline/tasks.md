@@ -13,12 +13,12 @@ lifecycle_state: active
 
 ## S1: 接入路径分析 + 版本锚点归宿决策
 
-- [ ] 当前 bootstrap 路径全链路走读：installer 入口 → payload manifest → `.sopify-runtime/` 落地逻辑
-- [ ] `.sopify-runtime/manifest.json` thin stub 字段清单 + 各字段的消费者清单
-- [ ] 版本锚点迁移方案评估：`.sopify-skills/sopify.json` vs `.sopify-skills/manifest.json` vs 保留 stub
-- [ ] prompt asset 分发方案：AGENTS.md / CLAUDE.md 的位置 + 不碰 `.github/copilot-instructions.md` 的机制
-- [ ] 外部 repo 最小结构定义（接入后 `.sopify-skills/` 里应该有什么）
-- [ ] 决策记录填充
+- [x] 当前 bootstrap 路径全链路走读：installer 入口 → payload manifest → `.sopify-runtime/` 落地逻辑
+- [x] `.sopify-runtime/manifest.json` thin stub 字段清单 + 各字段的消费者清单（6 个生产消费者已列出）
+- [x] 版本锚点迁移方案评估：A（.sopify-skills/sopify.json 推荐）/ B（root 单文件）/ C（不迁移）
+- [x] prompt asset 分发方案：A（.sopify-skills/prompts/ 推荐）/ B（root AGENTS.md）
+- [x] 外部 repo 最小结构定义（目标态已出）
+- [ ] 决策拍板（等用户确认 DR-1/2/3 方案选择）
 
 ## S2: 接入路径实现
 
