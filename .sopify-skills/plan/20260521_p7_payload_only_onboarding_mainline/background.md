@@ -2,7 +2,7 @@
 
 ## 一句话
 
-全局发动机已经就位；P7 把 repo 内的旧激活物（`.sopify-runtime/manifest.json` thin stub）替换为新的两文件模型（`.sopify-skills/sopify.json` + 轻量 host header pointer），让任何外部 repo 都能最小代价接入。
+全局发动机已经就位；P7 把 repo 内的旧激活物（`.sopify-runtime/manifest.json` thin stub）替换为统一 workspace marker（`.sopify-skills/sopify.json`），repo-local pointer 按宿主需要决定是否追加，让任何外部 repo 都能最小代价接入。
 
 ## 动机
 
@@ -17,12 +17,12 @@
 
 P7 完成后：
 
-1. repo 内只有 `.sopify-skills/` 一个 Sopify 目录 + host header pointer（Copilot 首实现 = `AGENTS.md`）
+1. repo 内只有 `.sopify-skills/` 一个 Sopify 目录；repo-local pointer 仅在宿主需要 repo-local discovery 时才追加（Codex/Claude 默认不写）
 2. `.sopify-runtime/manifest.json` legacy stub 不再需要，激活物统一为 `.sopify-skills/sopify.json`
-3. 完整 prompt asset 留在全局安装位置（`~/<host_dir>/<header_file>`，Copilot 首实现 = `~/.codex/AGENTS.md`），不落入 repo
+3. 完整 prompt asset 留在全局安装位置（`~/<host_dir>/<header_file>`），不落入 repo
 4. 首次进入工作流有明确的 bootstrap 命令（`python3 -m sopify_bootstrap init`）+ diagnostics 反馈
 5. 接续链路可走通（handoff 消费 + state 写入 via canonical_writer）
-6. 架构层宿主无关，验收层 Copilot-first
+6. 统一的只有 sopify.json；repo-local pointer 是宿主适配策略，不是统一文件模型
 
 ## 不在范围
 

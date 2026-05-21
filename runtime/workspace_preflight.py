@@ -399,10 +399,11 @@ def preflight_workspace_runtime(
             )
         activation_root_path = explicit_activation_root.resolve()
     repo_root = Path(__file__).resolve().parents[1]
-    bundle_root = resolved_workspace_root / ".sopify-runtime"
+    bundle_root = resolved_workspace_root / ".sopify-skills"
+    legacy_bundle_root = resolved_workspace_root / ".sopify-runtime"
     requested_root_path = Path(requested_root).expanduser().resolve() if requested_root is not None else resolved_workspace_root
     root_resolution_source = "cwd"
-    if repo_root == bundle_root:
+    if repo_root in (bundle_root, legacy_bundle_root):
         return annotate_outcome_payload({
             "action": "skipped",
             "reason_code": "RUNNING_FROM_WORKSPACE_BUNDLE",
@@ -440,7 +441,7 @@ def preflight_workspace_runtime(
     helper_entry = str(payload_manifest.get("helper_entry") or "").strip()
     if not helper_entry:
         raise WorkspacePreflightError(f"Payload manifest is missing helper_entry: {payload_manifest_file}")
-    preflight_bundle_version = _workspace_selected_bundle_version(bundle_root)
+    preflight_bundle_version = _workspace_selected_bundle_version(bundle_root) or _workspace_selected_bundle_version(legacy_bundle_root)
     try:
         resolve_payload_bundle_manifest_path(payload_root, payload_manifest, bundle_version=preflight_bundle_version)
     except InstallError as exc:
@@ -491,15 +492,16 @@ def preflight_workspace_runtime(
         payload_root=payload_root,
         payload_manifest=payload_manifest,
         workspace_bundle_root=bundle_root,
+        legacy_workspace_bundle_root=legacy_bundle_root,
     )
     if selected_bundle_manifest_path is not None:
         payload.setdefault("bundle_manifest_path", str(selected_bundle_manifest_path))
         payload.setdefault("global_bundle_root", str(selected_bundle_manifest_path.parent))
         if str(payload.get("reason_code") or "").strip() == "LEGACY_FALLBACK_SELECTED":
-            runtime_gate_entry = _legacy_workspace_entry(bundle_root, _LEGACY_WORKSPACE_RUNTIME_GATE_ENTRY)
+            runtime_gate_entry = _legacy_workspace_entry(legacy_bundle_root, _LEGACY_WORKSPACE_RUNTIME_GATE_ENTRY)
             if runtime_gate_entry is not None:
                 payload.setdefault("runtime_gate_entry", runtime_gate_entry)
-            preferences_preload_entry = _legacy_workspace_entry(bundle_root, _LEGACY_WORKSPACE_PREFERENCES_PRELOAD_ENTRY)
+            preferences_preload_entry = _legacy_workspace_entry(legacy_bundle_root, _LEGACY_WORKSPACE_PREFERENCES_PRELOAD_ENTRY)
             if preferences_preload_entry is not None:
                 payload.setdefault("preferences_preload_entry", preferences_preload_entry)
         else:
@@ -824,8 +826,11 @@ def _selected_bundle_manifest_path(
     payload_root: Path,
     payload_manifest: Mapping[str, Any],
     workspace_bundle_root: Path,
+    legacy_workspace_bundle_root: Path | None = None,
 ) -> Path | None:
     selected_bundle_version = _workspace_selected_bundle_version(workspace_bundle_root)
+    if selected_bundle_version is None and legacy_workspace_bundle_root is not None:
+        selected_bundle_version = _workspace_selected_bundle_version(legacy_workspace_bundle_root)
     try:
         return resolve_payload_bundle_manifest_path(
             payload_root,

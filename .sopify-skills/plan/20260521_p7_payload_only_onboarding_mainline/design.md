@@ -2,13 +2,13 @@
 
 ## 范围边界
 
-**定性：** P7 不是从 0 到 1 的全局化。全局发动机（`~/<host_dir>/sopify/` 的 payload manifest + versioned bundles + bootstrap helper）已在 P4d 和 installer 主线中就位。P7 的工程目标是：把 repo 内的 legacy 激活物 `.sopify-runtime/manifest.json`（8 字段 thin stub）替换为新的两文件模型（`.sopify-skills/sopify.json` + 轻量 host header pointer）。
+**定性：** P7 不是从 0 到 1 的全局化。全局发动机（`~/<host_dir>/sopify/` 的 payload manifest + versioned bundles + bootstrap helper）已在 P4d 和 installer 主线中就位。P7 的工程目标是：把 repo 内的 legacy 激活物 `.sopify-runtime/manifest.json`（8 字段 thin stub）替换为统一 workspace marker（`.sopify-skills/sopify.json`），repo-local pointer 按宿主需要决定是否追加。
 
 **架构层：** 宿主无关。凡是靠 repo 内发现文件起作用的宿主都适用。
 **验收层：** Copilot-first。首个落地和验收样板用 Copilot（Codex），但不排他。
 
 **在范围内**：
-- repo 激活物迁移：`.sopify-runtime/manifest.json` → `.sopify-skills/sopify.json` + root AGENTS.md pointer
+- repo 激活物迁移：`.sopify-runtime/manifest.json` → `.sopify-skills/sopify.json`（统一 workspace marker）
 - 6 个生产消费者的检测路径迁移（gate, preflight, inspection, bootstrap, validate, smoke）
 - workspace detection 锚点切换（祖先扫描标记从 `.sopify-runtime/manifest.json` → `sopify.json`）
 - 外部 repo bootstrap 命令 + diagnostics
@@ -114,43 +114,35 @@ _resolve_activation_root():
 
 </details>
 
-### DR-2: Prompt Asset 分发 — ✅ 修订方案 APPROVED
+### DR-2: Repo-local 激活载体 — ✅ 修订方案 APPROVED
 
-**决策：Prompt asset 全局化 + repo 留轻量 host header pointer**
+**决策：repo-local pointer 不是统一文件模型，而是按宿主发现机制决定的适配策略**
 
-完整 prompt asset 留在全局安装位置（宿主目录下的 header file），不落入 repo。Repo 只放一个极轻的激活 pointer，注入到对应宿主的 header file 中。
+完整 prompt asset 留在全局安装位置，不落入 repo。Repo-local pointer **仅在宿主需要 repo-local discovery 时**，写入宿主原生 instruction 文件。
 
-> 架构层宿主无关：pointer 机制对任何宿主通用。Header filename 由 host adapter 决定（`HostAdapter.header_filename`）。
-> Copilot-first 验收：首实现使用 `AGENTS.md`。
+> 统一的只有 workspace marker（sopify.json）。repo-local pointer 是宿主适配层，不是所有宿主都默认产出。
 
-| 层 | 位置 | 内容 | 谁写 |
-|----|------|------|------|
-| 全局 | `~/<host_dir>/<header_file>` | 完整 prompt asset（Sopify 操作合同、skill 定义、workflow 指导） | `sopify install` |
-| repo | `<header_file>`（由 host adapter 决定，Codex = `AGENTS.md`，Claude = `CLAUDE.md`） | 最小激活头 pointer block | `sopify init` |
+| 宿主类型 | repo-local 策略 | 原因 |
+|---------|----------------|------|
+| 全局 prompt 型（Codex/Claude） | 默认不写 repo-local header | 已有 `~/<host_dir>/<header>`，repo 只需 sopify.json |
+| 本地 inst 文件型（Copilot 等） | managed block upsert 到宿主原生 repo-local instruction 文件 | 宿主靠 repo 内文件发现 |
+| 临时注入型（未来宿主） | 会话态注入，不持久化到 repo 文件 | 以后碰到再定 |
 
 **约束：**
 - repo 内 pointer 不含绝对路径
 - 版本真值只在 `sopify.json`，pointer 不重复
 - pointer 是宿主发现入口，不是操作指南
-- **写入策略：managed block upsert**（同 `.gitignore` 的 `_write_managed_ignore_block` 模式）
+- **写入策略（仅本地 inst 型宿主）：** managed block upsert（同 `.gitignore` 的 `_write_managed_ignore_block` 模式）
+- S1 只定"写入宿主原生 repo-local instruction 文件"策略，具体文件名/路径到实现切片再落
 
-**repo-local 写入规则：**（header filename 由 host adapter 提供）
+**managed block upsert 规则（仅本地 inst 型宿主适用）：**
 
 | 场景 | 行为 |
 |------|------|
-| host header file 不存在 | 创建新文件，仅含 pointer block |
-| host header file 已存在，无 SOPIFY 标记 | 在文件末尾追加 pointer block |
-| host header file 已存在，有 SOPIFY 标记 | 原地替换 BEGIN/END 之间的内容 |
+| 宿主原生 inst 文件不存在 | 创建新文件，仅含 pointer block |
+| 已存在，无 SOPIFY 标记 | 在文件末尾追加 pointer block |
+| 已存在，有 SOPIFY 标记 | 原地替换 BEGIN/END 之间的内容 |
 | 卸载 / 清理 | 删除 BEGIN/END block，保留用户其他内容 |
-
-Pointer block 形态：
-```markdown
-<!-- BEGIN SOPIFY POINTER -->
-This repository is Sopify-enabled.
-If Sopify is not installed globally, run: `python3 -m sopify_bootstrap install`
-Configuration: `.sopify-skills/sopify.json`
-<!-- END SOPIFY POINTER -->
-```
 
 实现参考：`installer/bootstrap_workspace.py:1117-1132`（`_write_managed_ignore_block`）
 
@@ -161,6 +153,14 @@ Configuration: `.sopify-skills/sopify.json`
 原方案 B（root AGENTS.md 完整版）— 否决：不应把全量 prompt 放 repo root。
 
 </details>
+
+**Copilot 具体分发方案（S3 落地）：**
+
+Copilot 属于"本地 inst 文件型"宿主，使用 GitHub 官方支持的 instruction 文件：
+- 轻入口：`.github/copilot-instructions.md`（managed block upsert）
+- 重说明：`.github/instructions/sopify.instructions.md`（官方 path-specific instructions）
+- 内容来源：从 `Copilot/Skills/CN/COPILOT.md`（P4d seed）提炼，bootstrap 托管写入
+- 待验证：目标 Copilot 运行面是否支持 path-specific instructions；如不支持，重说明内联到轻入口
 
 ### DR-3: Bootstrap 入口 — ✅ 方案 APPROVED
 
@@ -179,12 +179,12 @@ curl -fsSL https://github.com/evidentloop/sopify/releases/latest/download/bootst
 workspace/
 ├── .sopify-skills/
 │   └── sopify.json          ← 版本锚点 + 能力声明（~5 字段）
-├── <host_header>             ← host header pointer（managed block upsert）
 └── .gitignore                ← managed ignore block 追加（.sopify-skills/state/ 等）
 ```
 
 > `state/` 目录由 canonical_writer 在首次写入时懒创建，init 不落盘。
 > `project.md`、`blueprint/` 等 protocol 骨架不在 init 范围 — 那是使用者按需创建的，不是激活物。
+> repo-local pointer（宿主原生 inst 文件）**不是默认产物**，仅在宿主需要 repo-local discovery 时按需追加。
 
 ---
 
@@ -196,7 +196,7 @@ workspace/
 |---|---|---|
 | **全局** `~/<host_dir>/sopify/` | payload-manifest.json + bundles/ + helpers/ | **不动** |
 | **全局** `~/<host_dir>/<header>` | 完整 prompt asset | **不动** |
-| **repo** 激活物 | `.sopify-runtime/manifest.json`（8 字段 thin stub） | → `.sopify-skills/sopify.json`（~5 字段）+ `<host_header>` pointer |
+| **repo** 激活物 | `.sopify-runtime/manifest.json`（8 字段 thin stub） | → `.sopify-skills/sopify.json`（~5 字段，统一 marker）；repo-local pointer 按宿主需要决定 |
 
 ### Repo 目标结构（init 最小产出）
 
@@ -204,12 +204,12 @@ workspace/
 workspace/                        （任意外部 repo）
 ├── .sopify-skills/
 │   └── sopify.json               ← 新门牌：版本锚点 + 能力声明
-├── <host_header>                  ← host header pointer（宿主发现入口）
 ├── .gitignore                     ← managed ignore block
 └── (NO .sopify-runtime/)
 ```
 
 > `state/`、`project.md`、`blueprint/`、`plan/`、`history/` 由使用者按需创建，不在 init 产出范围。
+> repo-local pointer（宿主原生 inst 文件）不在默认产出范围，仅在宿主需要 repo-local discovery 时按需追加。
 
 ### 依赖链
 

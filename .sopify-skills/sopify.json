@@ -1,0 +1,10 @@
+{
+  "bundle_version": "2026-05-03.203432",
+  "capabilities": [
+    "runtime_gate",
+    "preferences_preload"
+  ],
+  "locator_mode": "global_first",
+  "schema_version": "1",
+  "workspace_kind": "deep"
+}

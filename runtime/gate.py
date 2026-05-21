@@ -9,6 +9,13 @@ from tempfile import NamedTemporaryFile
 from typing import Any, Mapping
 from uuid import uuid4
 
+
+def _workspace_manifest_found(workspace: Path) -> bool:
+    """Check for workspace activation marker (sopify.json or legacy manifest)."""
+    if (workspace / ".sopify-skills" / "sopify.json").is_file():
+        return True
+    return (workspace / ".sopify-runtime" / "manifest.json").is_file()
+
 from .config import ConfigError, load_runtime_config
 from .engine import run_runtime
 from .entry_guard import ENTRY_GUARD_PENDING_ACTIONS
@@ -138,10 +145,7 @@ def enter_runtime_gate(
             )
             contract["state"] = _fallback_state_contract(workspace=workspace, session_id=resolved_session_id)
             contract["evidence"] = {
-                "manifest_found": (workspace / ".sopify-runtime" / "manifest.json").is_file(),
-                "handoff_found": False,
-                "strict_runtime_entry": False,
-                "handoff_source_kind": "preflight_blocked",
+                "manifest_found": _workspace_manifest_found(workspace),
                 "current_request_produced_handoff": False,
                 "persisted_handoff_matches_current_request": False,
             }
@@ -230,7 +234,7 @@ def enter_runtime_gate(
         contract["handoff"] = _normalize_handoff(handoff_source)
         contract["trigger_evidence"] = contract["handoff"].pop("_trigger_evidence", {})
 
-        manifest_path = workspace / ".sopify-runtime" / "manifest.json"
+        manifest_found = _workspace_manifest_found(workspace)
         strict_runtime_entry = bool(contract["handoff"].pop("_strict_runtime_entry", False))
         persisted_matches_current = _persisted_handoff_matches_current_request(
             persisted_handoff=persisted_handoff,
@@ -238,7 +242,7 @@ def enter_runtime_gate(
             request_sha1=stable_request_sha1(request),
         )
         contract["evidence"] = {
-            "manifest_found": manifest_path.is_file(),
+            "manifest_found": manifest_found,
             "handoff_found": _handoff_found(
                 persisted_handoff=persisted_handoff,
                 runtime_handoff=runtime_result.handoff,
@@ -906,7 +910,7 @@ def _build_action_proposal_retry_contract(
             "per the schema and retry the gate."
         ),
         "evidence": {
-            "manifest_found": (workspace / ".sopify-runtime" / "manifest.json").is_file(),
+            "manifest_found": _workspace_manifest_found(workspace),
             "handoff_found": False,
             "strict_runtime_entry": False,
             "handoff_source_kind": "action_proposal_retry",
