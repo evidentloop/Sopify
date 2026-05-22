@@ -109,7 +109,31 @@ archive_ready: false
   > **已完成 9 files**: config.py, state.py, deterministic_guard.py, router.py, handoff.py, checkpoint_request.py, checkpoint_materializer.py, execution_gate.py, context_snapshot.py。runtime/models.py 保留为非内核消费者的过渡桥，Step 3 删除。
   > **不在 Step 2**: skill_resolver.py（非内核，Step 3 co-delete/reclassify）、gate_output.py（无 .models import）、entry_guard.py（无 .models import）、tests（走 bridge 仍合法，Step 3 同步处理）。
   > **Step 1b**: check-runtime-smoke.sh 删除 sopify.json 断言（install-time artifact，非 engine 产物）。release-preflight.sh 全链恢复通过。其余 release chain 脚本（check-install-payload-bundle-smoke.py, check-skill-eval-gate.py, generate-builtin-catalog.py）暂不改——runtime 导入仍合法。
-- [ ] 4.10a 若 S3 审计确认 kernel 仍需宿主入口，采用 in-place cutover（原地重写内容、保留路径名）：只负责参数解析、调用 kernel、读写冻结 contract；不得复用 legacy bridge / renderer / preload / bundle 逻辑
+- [x] 4.10a **Step 3 Package B: kernel orchestration seam extraction** ✅
+  > **新建** `runtime/_kernel_turn.py` (~720 LOC)，导出 `execute_kernel_turn()`。
+  > gate.py / cli.py / plan_orchestrator.py 全部切换到 `from ._kernel_turn import execute_kernel_turn`。
+  > engine.py `run_runtime()` 降级为 lazy-import wrapper（-611 LOC 净减），但仍作为兼容入口存在。所有 helper 函数保留原位。
+  > 7 处 test mock patch 更新。743 tests pass，release-preflight 全链通过。
+  >
+  > **Advisor review 3 findings 处理**:
+  > - Finding 1 (High): _kernel_turn 仍从 engine.py import 29 helpers — 接受为过渡状态，engine import 已分组标注 (18 kernel path + 11 non-kernel handler)，Package A 内联/删除
+  > - Finding 2 (Medium): ✅ 修复 — `from .models` 全部替换为 `from sopify_contracts.*`
+  > - Finding 3 (Medium): ✅ 修复 — docstring 精确描述过渡状态和未达目标
+  >
+  > **Package B 实际达成**:
+  > 1. retained callers (gate/cli/plan_orchestrator) 不再直接引用 engine.run_runtime 符号 ✅
+  > 2. _kernel_turn 不消费 runtime.models bridge ✅
+  > 3. gate.py 不再直接 import engine 模块（但通过 _kernel_turn → engine helpers 仍有间接依赖）✅
+  >
+  > **Package B 未达**:
+  > - engine.py 实现依赖未切断（_kernel_turn → engine 29 helpers，间接拉入 engine 导入链）
+  > - run_runtime() 兼容 wrapper 仍在 engine.py，尚未删除
+  > - _kernel_turn 仍包含 11 个 non-kernel route handler 的分发逻辑
+  > - 以上均属 Package A 范围
+- [ ] 4.10b **Step 3 Package A: 批量删除 + kernel helpers 内联**
+  > 范围: (1) 批量删除 ~40 非内核模块 (~18.8K LOC); (2) 将 18 个 kernel helpers 从 engine.py 内联到 _kernel_turn.py; (3) 删除 11 个 non-kernel route handler import 及对应调用点; (4) 删除 engine.py; (5) 清理 models.py bridge 消费者
+- [ ] 4.10c Step 3 Package C: models.py bridge 退场
+  > 范围: (1) 删除 runtime/models.py; (2) tests 从 runtime.models → sopify_contracts; (3) manifest/protocol 表面收缩
 - [ ] 4.11 kernel 验证：确认 gate → route → handoff → checkpoint 链路在 kernel-only 模式下可用
 
 ## 5. 文档更新

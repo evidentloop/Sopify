@@ -16,7 +16,7 @@ from .clarification_bridge import prompt_cli_clarification_submission
 from .cli_interactive import InteractiveSessionFactory, TerminalInteractiveSession
 from .config import load_runtime_config
 from .decision_bridge import prompt_cli_decision_submission
-from .engine import run_runtime
+from ._kernel_turn import execute_kernel_turn
 from .models import RuntimeConfig, RuntimeResult
 from .workspace_preflight import WorkspacePreflightError, preflight_workspace_runtime as _shared_preflight_workspace_runtime
 
@@ -93,7 +93,7 @@ def run_plan_loop(
     preflight = preflight_workspace_runtime(workspace, request_text=request, payload_manifest_path=payload_manifest_path)
 
     if not bridge_loop:
-        result = run_runtime(request, workspace_root=workspace, global_config_path=global_config_path)
+        result = execute_kernel_turn(request, workspace_root=workspace, global_config_path=global_config_path)
         return PlanOrchestratorResult(
             runtime_result=result,
             exit_code=0,
@@ -111,7 +111,7 @@ def run_plan_loop(
     seen_signatures: dict[str, int] = {}
 
     for iteration in range(1, max_loops + 1):
-        result = run_runtime(current_request, workspace_root=workspace, global_config_path=global_config_path)
+        result = execute_kernel_turn(current_request, workspace_root=workspace, global_config_path=global_config_path)
         last_result = result
         handoff = result.handoff
         if handoff is None:

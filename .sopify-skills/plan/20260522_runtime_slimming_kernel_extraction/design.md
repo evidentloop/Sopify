@@ -296,12 +296,12 @@ S4 两刀策略:
      2. 不把 text rendering、config loader、diagnostics snapshot 误当 kernel 本体 -->
 
 ```
-Step 1: installer/scripts cutover — 保护安装链路 (第一刀: inspection.py)
+Step 1: installer/scripts cutover — 保护安装链路 (第一刀: inspection.py) ✅
   - 执行顺序: inspection.py → sopify_init.py → validate.py → bootstrap_workspace.py → install_sopify.py
   - inspection.py 是首个外部 blocker (L32-33 直接 import runtime.config / runtime.context_snapshot)
   - status/doctor 通过 inspection 改造继续可用，不单列 cutover
 
-Step 1b: release 链 cutover
+Step 1b: release 链 cutover ✅
   - check-runtime-smoke.sh: 删除 sopify.json 断言 (install-time artifact, 非 engine 产物) ✅
   - release-preflight.sh 全链恢复通过 ✅
   - check-install-payload-bundle-smoke.py / check-skill-eval-gate.py / generate-builtin-catalog.py: 暂不改 (runtime 导入仍合法)
@@ -315,11 +315,28 @@ Step 2: retained kernel/support 模块的 models.py import rewire ✅
   - tests 继续走 runtime.models bridge，Step 3 删 facade 时同步处理
   - handoff/router 的非内核模块依赖 (action_projection, skill_resolver 等) 属 Step 3，不在 Step 2
 
-Step 3: 非 kernel 批量删除 + in-place cutover 入口脚本
-  - ~40 非 kernel 模块批量删除
+Step 3 Package B: kernel orchestration seam extraction ✅
+  - 新建 runtime/_kernel_turn.py (~720 LOC)，导出 execute_kernel_turn()
+  - engine.py run_runtime() 降级为 lazy-import wrapper (-611 LOC)，兼容入口仍存在
+  - retained callers (gate/cli/plan_orchestrator) 不再直接引用 engine.run_runtime 符号
+  - gate.py 不再直接 import engine 模块（但通过 _kernel_turn → engine helpers 间接依赖仍在）
+  - _kernel_turn 不消费 runtime.models bridge，全部走 sopify_contracts
+  - engine helper 依赖保留 (29 symbols)，分组标注 kernel path / non-kernel handler
+  - action_intent.py 保留完整 (ingress support)，不拆分
+  - 决策记录: 6 项架构决策均已确认 (详见 tasks.md 4.10a)
+
+Step 3 Package A: 批量删除 + kernel helpers 内联 ← 当前位置
+  - 批量删除 ~40 非 kernel 模块 (~18.8K LOC)
+  - 18 kernel helpers: engine.py → _kernel_turn.py 内联
+  - 11 non-kernel route handlers: 删除 import + 对应调用点
+  - 删除 engine.py
   - 入口脚本 in-place cutover: 路径名被 manifest/test 冻结 → 原地重写
     只做: argparse → 调用 kernel → JSON/text 输出 → exit code
-    不做: config 加载、state 管理、receipt 写入（属于 kernel 内部）
+
+Step 3 Package C: models.py bridge 退场
+  - 删除 runtime/models.py
+  - tests 从 runtime.models → sopify_contracts
+  - manifest/protocol 表面收缩
 
 Step 4: 用等价覆盖测试守住 contract
   - 7 个 contract test 保留等价覆盖

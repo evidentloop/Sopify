@@ -2123,7 +2123,7 @@ class RuntimeGateTests(unittest.TestCase):
             runtime_handoff = _make_runtime_handoff(run_id="run-current")
 
             with patch(
-                "runtime.gate.run_runtime",
+                "runtime.gate.execute_kernel_turn",
                 return_value=_make_runtime_result(
                     request_text="补 runtime gate",
                     route_name="workflow",
@@ -2172,7 +2172,7 @@ class RuntimeGateTests(unittest.TestCase):
             )
 
             with patch(
-                "runtime.gate.run_runtime",
+                "runtime.gate.execute_kernel_turn",
                 return_value=_make_runtime_result(
                     request_text="看看状态",
                     route_name="state_conflict",
@@ -2321,7 +2321,7 @@ class RuntimeGateTests(unittest.TestCase):
             store.set_current_handoff(_make_runtime_handoff(run_id="run-persisted"))
 
             with patch(
-                "runtime.gate.run_runtime",
+                "runtime.gate.execute_kernel_turn",
                 return_value=_make_runtime_result(
                     request_text="补 runtime gate",
                     route_name="workflow",
@@ -2353,7 +2353,7 @@ class RuntimeGateTests(unittest.TestCase):
             )
 
             with patch(
-                "runtime.gate.run_runtime",
+                "runtime.gate.execute_kernel_turn",
                 return_value=_make_runtime_result(
                     request_text="补 runtime gate",
                     route_name="workflow",

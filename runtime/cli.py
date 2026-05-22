@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Callable, Mapping, Optional
 
 from .config import ConfigError, load_runtime_config
-from .engine import run_runtime
+from ._kernel_turn import execute_kernel_turn
 from .output import render_runtime_error, render_runtime_output
 
 RequestTransform = Callable[[str], str]
@@ -66,7 +66,7 @@ def execute_runtime_cli(
         if request_transform is not None:
             request = request_transform(request)
         config = load_runtime_config(workspace_root, global_config_path=global_config_path)
-        result = run_runtime(
+        result = execute_kernel_turn(
             request,
             workspace_root=workspace_root,
             global_config_path=global_config_path,

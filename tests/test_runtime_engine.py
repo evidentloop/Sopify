@@ -2266,7 +2266,7 @@ class EngineIntegrationTests(unittest.TestCase):
             )
             self.assertEqual(checkpoint_result.handoff.required_host_action, "confirm_decision")
 
-            with mock.patch("runtime.plan_orchestrator.run_runtime", return_value=checkpoint_result), mock.patch(
+            with mock.patch("runtime.plan_orchestrator.execute_kernel_turn", return_value=checkpoint_result), mock.patch(
                 "runtime.plan_orchestrator._consume_planning_handoff",
                 return_value=None,
             ):
@@ -2293,7 +2293,7 @@ class EngineIntegrationTests(unittest.TestCase):
                 user_home=workspace / "home",
             )
 
-            with mock.patch("runtime.plan_orchestrator.run_runtime", return_value=checkpoint_result), mock.patch(
+            with mock.patch("runtime.plan_orchestrator.execute_kernel_turn", return_value=checkpoint_result), mock.patch(
                 "runtime.plan_orchestrator._consume_planning_handoff",
                 side_effect=PlanOrchestratorError("bridge missing submit/resume"),
             ):
@@ -2319,7 +2319,7 @@ class EngineIntegrationTests(unittest.TestCase):
             )
             counter = iter(range(1, 10))
 
-            with mock.patch("runtime.plan_orchestrator.run_runtime", return_value=checkpoint_result), mock.patch(
+            with mock.patch("runtime.plan_orchestrator.execute_kernel_turn", return_value=checkpoint_result), mock.patch(
                 "runtime.plan_orchestrator._consume_planning_handoff",
                 return_value=None,
             ), mock.patch(
