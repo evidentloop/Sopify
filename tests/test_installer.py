@@ -235,12 +235,8 @@ class PayloadInstallTests(unittest.TestCase):
             self.assertEqual(payload_manifest["bundle_manifest"], f"bundles/{payload_manifest['active_version']}/manifest.json")
             self.assertEqual(payload_manifest["dependency_model"]["mode"], "stdlib_only")
             self.assertTrue(
-                payload_manifest["minimum_workspace_manifest"]["required_capabilities"]["planning_mode_orchestrator"]
-            )
-            self.assertTrue(
                 payload_manifest["minimum_workspace_manifest"]["required_capabilities"]["develop_callback"]
             )
-            self.assertTrue(payload_manifest["minimum_workspace_manifest"]["required_capabilities"]["preferences_preload"])
             self.assertTrue(payload_manifest["minimum_workspace_manifest"]["required_capabilities"]["runtime_gate"])
             self.assertTrue(payload_manifest["minimum_workspace_manifest"]["required_capabilities"]["runtime_entry_guard"])
 
@@ -402,7 +398,7 @@ class WorkspaceBootstrapCompatibilityTests(unittest.TestCase):
                 "stub_version": "1",
                 "bundle_version": "2026-02-13",
                 "locator_mode": "global_first",
-                "required_capabilities": ["runtime_gate", "preferences_preload"],
+                "required_capabilities": ["runtime_gate"],
                 "ignore_mode": "noop",
                 "written_by_host": True,
             }
@@ -447,7 +443,7 @@ class WorkspaceBootstrapCompatibilityTests(unittest.TestCase):
                 "stub_version": "1",
                 "bundle_version": "2026-02-13",
                 "locator_mode": "global_only",
-                "required_capabilities": ["runtime_gate", "preferences_preload"],
+                "required_capabilities": ["runtime_gate"],
                 "ignore_mode": "noop",
                 "written_by_host": True,
             }
@@ -492,7 +488,7 @@ class WorkspaceBootstrapCompatibilityTests(unittest.TestCase):
                 "bundle_version": "2026-02-13",
                 "locator_mode": "global_first",
                 "legacy_fallback": False,
-                "required_capabilities": ["runtime_gate", "preferences_preload"],
+                "required_capabilities": ["runtime_gate"],
                 "ignore_mode": "noop",
                 "written_by_host": True,
             }
@@ -537,7 +533,7 @@ class WorkspaceBootstrapCompatibilityTests(unittest.TestCase):
                 "bundle_version": "2026-02-13",
                 "locator_mode": "global_first",
                 "legacy_fallback": True,
-                "required_capabilities": ["runtime_gate", "preferences_preload"],
+                "required_capabilities": ["runtime_gate"],
                 "ignore_mode": "noop",
                 "written_by_host": True,
                 "capabilities": dict(_REQUIRED_BUNDLE_CAPABILITIES),
@@ -589,7 +585,7 @@ class WorkspaceBootstrapCompatibilityTests(unittest.TestCase):
                 "bundle_version": "2026-02-13",
                 "locator_mode": "global_first",
                 "legacy_fallback": True,
-                "required_capabilities": ["runtime_gate", "preferences_preload"],
+                "required_capabilities": ["runtime_gate"],
                 "ignore_mode": "noop",
                 "written_by_host": True,
                 "capabilities": dict(_REQUIRED_BUNDLE_CAPABILITIES),
@@ -637,11 +633,11 @@ class WorkspaceBootstrapCompatibilityTests(unittest.TestCase):
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text("", encoding="utf-8")
 
-            # Match the old incomplete layout that was slipping through bootstrap.
-            missing_runtime_module = bundle_root / "runtime" / "cli_interactive.py"
+            # Remove a kernel module to verify bundle validation catches it.
+            missing_runtime_module = bundle_root / "runtime" / "gate.py"
             missing_runtime_module.unlink()
 
-            with self.assertRaisesRegex(Exception, "cli_interactive.py"):
+            with self.assertRaisesRegex(Exception, "gate.py"):
                 validate_bundle_install(bundle_root)
 
     def test_validate_workspace_bundle_manifest_only_requires_manifest_object(self) -> None:
@@ -680,7 +676,7 @@ class WorkspaceBootstrapCompatibilityTests(unittest.TestCase):
             resolved_path, manifest = validate_workspace_stub_manifest(bundle_root)
             self.assertEqual(resolved_path, manifest_path)
             self.assertEqual(manifest["locator_mode"], "global_first")
-            self.assertEqual(manifest["required_capabilities"], ["runtime_gate", "preferences_preload"])
+            self.assertEqual(manifest["required_capabilities"], ["runtime_gate"])
             self.assertEqual(manifest["ignore_mode"], "noop")
             self.assertFalse(manifest["legacy_fallback"])
 
@@ -705,7 +701,7 @@ class WorkspaceBootstrapCompatibilityTests(unittest.TestCase):
             self.assertEqual(manifest["schema_version"], "1")
             self.assertEqual(manifest["stub_version"], "1")
             self.assertEqual(manifest["bundle_version"], "2026-02-13")
-            self.assertEqual(manifest["required_capabilities"], ["runtime_gate", "preferences_preload"])
+            self.assertEqual(manifest["required_capabilities"], ["runtime_gate"])
             self.assertEqual(manifest["locator_mode"], "global_first")
             self.assertFalse(manifest["legacy_fallback"])
             self.assertEqual(manifest["ignore_mode"], "noop")
@@ -730,7 +726,7 @@ class WorkspaceBootstrapCompatibilityTests(unittest.TestCase):
             self.assertEqual(manifest["schema_version"], "1")
             self.assertEqual(manifest["stub_version"], "1")
             self.assertEqual(manifest["bundle_version"], "2026-02-13")
-            self.assertEqual(manifest["required_capabilities"], ["runtime_gate", "preferences_preload"])
+            self.assertEqual(manifest["required_capabilities"], ["runtime_gate"])
             self.assertEqual(manifest["locator_mode"], "global_first")
             self.assertEqual(manifest["ignore_mode"], "noop")
             self.assertTrue(manifest["written_by_host"])
@@ -780,7 +776,7 @@ class WorkspaceBootstrapCompatibilityTests(unittest.TestCase):
                     "schema_version": "1",
                     "bundle_version": "latest",
                     "locator_mode": "global_first",
-                    "required_capabilities": ["runtime_gate", "preferences_preload"],
+                    "required_capabilities": ["runtime_gate"],
                 },
             )
 
@@ -799,7 +795,7 @@ class WorkspaceBootstrapCompatibilityTests(unittest.TestCase):
                     "schema_version": "1",
                     "stub_version": "1",
                     "bundle_version": None,
-                    "required_capabilities": ["runtime_gate", "preferences_preload"],
+                    "required_capabilities": ["runtime_gate"],
                 },
             )
 
@@ -819,7 +815,7 @@ class WorkspaceBootstrapCompatibilityTests(unittest.TestCase):
                     "schema_version": "1",
                     "stub_version": "1",
                     "bundle_version": "",
-                    "required_capabilities": ["runtime_gate", "preferences_preload"],
+                    "required_capabilities": ["runtime_gate"],
                 },
             )
 
@@ -837,7 +833,7 @@ class WorkspaceBootstrapCompatibilityTests(unittest.TestCase):
                 {
                     "stub_version": "1",
                     "bundle_version": "2026-02-13",
-                    "required_capabilities": ["runtime_gate", "preferences_preload"],
+                    "required_capabilities": ["runtime_gate"],
                 },
             )
 
@@ -857,7 +853,7 @@ class WorkspaceBootstrapCompatibilityTests(unittest.TestCase):
                     "bundle_version": "2026-02-13",
                     "locator_mode": "global_only",
                     "legacy_fallback": True,
-                    "required_capabilities": ["runtime_gate", "preferences_preload"],
+                    "required_capabilities": ["runtime_gate"],
                 },
             )
 

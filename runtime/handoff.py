@@ -42,7 +42,9 @@ from .vnext_phase_boundary import (
     build_vnext_phase_boundary,
     supports_vnext_phase_boundary,
 )
-from .models import ExecutionSummary, KbArtifact, PlanArtifact, RecoveredContext, RouteDecision, RunState, RuntimeConfig, RuntimeHandoff
+from sopify_contracts.artifacts import KbArtifact, PlanArtifact
+from sopify_contracts.core import ExecutionSummary, RouteDecision, RunState, RuntimeConfig
+from sopify_contracts.handoff import RecoveredContext, RuntimeHandoff
 
 HANDOFF_SCHEMA_VERSION = "1"
 CURRENT_HANDOFF_FILENAME = "current_handoff.json"

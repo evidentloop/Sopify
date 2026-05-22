@@ -65,11 +65,10 @@ archive_ready: false
 - [x] 3.9 确认 orchestration kernel extraction 作为本包内执行目标，不另开独立方案包
 - [x] 3.10 定义 orchestration kernel 最小模块边界：三层分类，详见 design.md §S3 Kernel Boundary Audit
   > **kernel core** (7): gate.py / entry_guard.py / execution_gate.py / router.py / handoff.py / checkpoint_request.py / checkpoint_materializer.py
-  > **kernel support** (3): config.py / state.py / deterministic_guard.py — 入口支撑层，不是内核本体
-  > **优先拆分**: context_snapshot.py — 从 973 LOC 提取最小快照解析，其余共删
+  > **kernel support** (3+1): config.py / state.py / deterministic_guard.py + context_snapshot.py(暂保留，router 重度依赖)
   > **非内核可暂留**: gate_output.py — text rendering，不计入 kernel
   > **删除**: models.py (DEPRECATED)
-  > LOC 现状 kernel core+support ~3.9K → 瘦身方向收敛但不锁具体 LOC 目标
+  > LOC 现状 kernel core+support ~3.9K + context_snapshot 973 → 瘦身方向收敛但不锁具体 LOC 目标
 - [x] 3.11 确认 kernel 与 `sopify_contracts` / `canonical_writer` 的接口约定，确保 kernel 不反向依赖 runtime 其余面
   > kernel 对外依赖: sopify_contracts (类型) + canonical_writer (写+时间) + stdlib
   > 14 个非内核 runtime 依赖必须在 S4 切断，详见 design.md §非内核 runtime 依赖汇总
@@ -100,10 +99,16 @@ archive_ready: false
   - `scripts/check-host-doc-contract.py`（按 runtime 依赖程度判定）
   - `tests/test_runtime_*`、`tests/runtime_test_support.py`、`tests/test_bundle_smoke.py`（按 runtime import 判定）
   - `installer/runtime_bundle.py`（pure legacy runtime bundle sync surface，直接退场）
-- [ ] 4.7 对 retain-after-decoupling 五文件（`installer/validate.py`、`installer/bootstrap_workspace.py`、`installer/inspection.py`、`scripts/install_sopify.py`、`scripts/sopify_init.py`），在删除 runtime 前同步去除 runtime import 和 bundle 硬依赖，确保安装链路可用
-- [ ] 4.8 `scripts/sopify_status.py` / `scripts/sopify_doctor.py` 不单列 cutover；仅验证其通过 `installer/inspection.py` 的改造继续可用
-- [ ] 4.9 Step 2 具体落地顺序按 `inspection.py` 优先执行，避免 Step 3 删除 runtime 后 `status` / `doctor` 先发生 import failure
-- [ ] 4.10 提取 orchestration kernel：在 `runtime/` 原地瘦身，清理 non-kernel 依赖，确保 kernel 可独立运行（不新建并行目录）
+- [x] 4.7 对 retain-after-decoupling 五文件（`installer/validate.py`、`installer/bootstrap_workspace.py`、`installer/inspection.py`、`scripts/install_sopify.py`、`scripts/sopify_init.py`），在删除 runtime 前同步去除 runtime import 和 bundle 硬依赖，确保安装链路可用
+  > **S4 Step 1 已完成**: validate/bootstrap 裁剪为 kernel-only bundle 验证，sopify_init/install_sopify 去除 preferences_preload。payload.py 同步裁剪 _REQUIRED_BUNDLE_CAPABILITIES。inspection.py 保留 resolve_context_snapshot（context_snapshot 已重分类为 kernel support）。75 installer tests pass。
+- [x] 4.8 `scripts/sopify_status.py` / `scripts/sopify_doctor.py` 不单列 cutover；仅验证其通过 `installer/inspection.py` 的改造继续可用
+  > 27 status/doctor tests pass (preferences_preload 降级为 fail，符合预期)
+- [x] 4.9 Step 2 具体落地顺序按 `inspection.py` 优先执行，避免 Step 3 删除 runtime 后 `status` / `doctor` 先发生 import failure
+  > inspection.py 保留 resolve_context_snapshot import，不再需要单独脱钩
+- [x] 4.10 Step 2: retained kernel/support 模块的 `from .models` → `from sopify_contracts.*` 机械 rewire
+  > **已完成 9 files**: config.py, state.py, deterministic_guard.py, router.py, handoff.py, checkpoint_request.py, checkpoint_materializer.py, execution_gate.py, context_snapshot.py。runtime/models.py 保留为非内核消费者的过渡桥，Step 3 删除。
+  > **不在 Step 2**: skill_resolver.py（非内核，Step 3 co-delete/reclassify）、gate_output.py（无 .models import）、entry_guard.py（无 .models import）、tests（走 bridge 仍合法，Step 3 同步处理）。
+  > **Step 1b**: check-runtime-smoke.sh 删除 sopify.json 断言（install-time artifact，非 engine 产物）。release-preflight.sh 全链恢复通过。其余 release chain 脚本（check-install-payload-bundle-smoke.py, check-skill-eval-gate.py, generate-builtin-catalog.py）暂不改——runtime 导入仍合法。
 - [ ] 4.10a 若 S3 审计确认 kernel 仍需宿主入口，采用 in-place cutover（原地重写内容、保留路径名）：只负责参数解析、调用 kernel、读写冻结 contract；不得复用 legacy bridge / renderer / preload / bundle 逻辑
 - [ ] 4.11 kernel 验证：确认 gate → route → handoff → checkpoint 链路在 kernel-only 模式下可用
 

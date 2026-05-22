@@ -15,7 +15,7 @@ from typing import Any, Optional
 
 from canonical_writer.store import SESSIONS_DIRNAME
 
-from .models import RuntimeConfig
+from sopify_contracts.core import RuntimeConfig
 
 
 def stable_request_sha1(text: str) -> str:

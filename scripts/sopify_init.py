@@ -24,7 +24,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 _SOPIFY_SKILLS_DIR = ".sopify-skills"
 _SOPIFY_JSON_FILENAME = "sopify.json"
-_WORKSPACE_CAPABILITIES = ["preferences_preload", "runtime_gate"]
+_WORKSPACE_CAPABILITIES = ["runtime_gate"]
 
 _LOGO_LINES = [
     "███████╗ █████╗ ██████╗ ██╗███████╗██╗   ██╗",

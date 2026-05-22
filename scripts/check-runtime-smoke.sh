@@ -100,7 +100,6 @@ PREFERENCES_FILE="$WORK_DIR/.sopify-skills/user/preferences.md"
 HISTORY_INDEX="$WORK_DIR/.sopify-skills/history/index.md"
 WIKI_OVERVIEW="$WORK_DIR/.sopify-skills/wiki/overview.md"
 WORKSPACE_STUB_MANIFEST="$WORK_DIR/.sopify-runtime/manifest.json"
-SOPIFY_JSON="$WORK_DIR/.sopify-skills/sopify.json"
 
 if [[ ! -d "$PLAN_DIR" ]]; then
   echo "Smoke check failed: missing plan directory: $PLAN_DIR" >&2
@@ -190,16 +189,6 @@ fi
 
 if [[ ! -f "$WORKSPACE_STUB_MANIFEST" ]]; then
   echo "Smoke check failed: missing workspace stub manifest: $WORKSPACE_STUB_MANIFEST" >&2
-  exit 1
-fi
-
-if [[ ! -f "$SOPIFY_JSON" ]]; then
-  echo "Smoke check failed: missing sopify.json activation marker: $SOPIFY_JSON" >&2
-  exit 1
-fi
-
-if ! grep -q '"schema_version"' "$SOPIFY_JSON"; then
-  echo "Smoke check failed: sopify.json is missing schema_version: $SOPIFY_JSON" >&2
   exit 1
 fi
 

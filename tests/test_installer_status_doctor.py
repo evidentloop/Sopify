@@ -436,8 +436,8 @@ class StatusDoctorContractTests(unittest.TestCase):
             self.assertEqual(workspace_check["reason_code"], "LEGACY_FALLBACK_SELECTED")
             self.assertEqual(handoff_check["status"], "pass")
             self.assertEqual(handoff_check["reason_code"], "ok")
-            self.assertEqual(preload_check["status"], "pass")
-            self.assertEqual(preload_check["reason_code"], "ok")
+            self.assertEqual(preload_check["status"], "fail")
+            self.assertNotEqual(preload_check["reason_code"], "ok")
             self.assertEqual(payload_bundle_check["reason_code"], "GLOBAL_BUNDLE_MISSING")
 
     def test_doctor_recommends_on_demand_bootstrap_without_public_workspace_flag(self) -> None:

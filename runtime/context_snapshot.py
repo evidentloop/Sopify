@@ -10,15 +10,10 @@ from typing import Any, Mapping
 from uuid import uuid4
 
 from canonical_writer._resume import develop_resume_context_issue
-from .models import (
-    ClarificationState,
-    DecisionState,
-    PlanArtifact,
-    RouteDecision,
-    RunState,
-    RuntimeConfig,
-    RuntimeHandoff,
-)
+from sopify_contracts.artifacts import PlanArtifact
+from sopify_contracts.core import RouteDecision, RunState, RuntimeConfig
+from sopify_contracts.decision import ClarificationState, DecisionState
+from sopify_contracts.handoff import RuntimeHandoff
 from canonical_writer import StateStore
 from canonical_writer.invariants import is_supported_phase
 

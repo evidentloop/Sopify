@@ -48,7 +48,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
             "Install Sopify for a host. Use `--target copilot` to bootstrap a workspace; "
-            "for Codex / Claude this installs the host prompt and Sopify runtime only, and "
+            "for Codex / Claude this installs the host prompt and Sopify kernel only, and "
             "project files are initialized later when you run `~go` in a workspace."
         )
     )

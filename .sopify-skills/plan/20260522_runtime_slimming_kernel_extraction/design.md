@@ -174,7 +174,7 @@ S4 两刀策略:
 
 | 模块 | LOC | 被谁依赖 | 定性 |
 |------|-----|---------|------|
-| `context_snapshot.py` | 973 | router.py, installer/inspection.py, tests | **S4 第一优先拆分目标**: 从 973 LOC 中提取最小快照解析(读 current_* + 选主作用域 + 一致性检查)，其余共删 |
+| `context_snapshot.py` | 973 | router.py, installer/inspection.py(已脱钩), tests | **暂保留为内核支撑**: router.py 重度依赖(resolve_context_snapshot + 9 字段 + conflict_artifacts)，Step 2 不拆。非内核消费方(engine/context_recovery/develop_callback) Step 3 随模块删除自然消失 |
 
 #### 非内核但可暂留 — gate_output.py
 
@@ -189,7 +189,7 @@ S4 两刀策略:
 
 | 模块 | LOC | 被谁依赖 | 定性 |
 |------|-----|---------|------|
-| `models.py` | 50 | 8 个内核模块(core 5 + support 3), tests | **删除**: DEPRECATED re-export facade，消费方改为 `from sopify_contracts` |
+| `models.py` | 50 | 8 个内核模块(core 5 + support 3) + context_snapshot, tests | **删除**: DEPRECATED re-export facade，消费方改为 `from sopify_contracts` |
 
 ### 表3: Host-Facing 最小入口职责表
 
@@ -302,18 +302,18 @@ Step 1: installer/scripts cutover — 保护安装链路 (第一刀: inspection.
   - status/doctor 通过 inspection 改造继续可用，不单列 cutover
 
 Step 1b: release 链 cutover
-  - check-install-payload-bundle-smoke.py: 改写路径期望值
-  - check-skill-eval-gate.py: 改为 kernel 接口或删除
-  - generate-builtin-catalog.py: 改为 sopify_contracts 或删除
-  - release-preflight.sh: 移除或改写 runtime smoke 调用
+  - check-runtime-smoke.sh: 删除 sopify.json 断言 (install-time artifact, 非 engine 产物) ✅
+  - release-preflight.sh 全链恢复通过 ✅
+  - check-install-payload-bundle-smoke.py / check-skill-eval-gate.py / generate-builtin-catalog.py: 暂不改 (runtime 导入仍合法)
 
-Step 2: kernel extraction — context_snapshot/handoff 拆分 + models.py rewire
-  - context_snapshot.py: 从 973 LOC 中提取最小快照解析(读 current_* + 选主作用域 + 一致性检查)
-  - handoff.py 第一刀: 砍 sidecar / resolution_planner / vnext / develop_quality / action_projection / decision_policy
-  - handoff.py 保住: 最小 handoff producer (checkpoint_request→payload + required_host_action + artifact + entry_guard)
-  - 同步: 8 个内核模块(core 5 + support 3) + context_snapshot 的 `from .models` → `from sopify_contracts`
-  - gate/route 关系: 代码可靠近（同一调用链），但保留独立入口函数（enter_gate / resolve_route），不合成一个 if-else
-  - 不急着追具体 LOC 目标
+Step 2: retained kernel/support 模块的 models.py import rewire ✅
+  - 9 files 机械 rewire: config, state, deterministic_guard, router, handoff,
+    checkpoint_request, checkpoint_materializer, execution_gate, context_snapshot
+  - `from .models import X` → `from sopify_contracts.{artifacts,core,decision,handoff} import X`
+  - runtime/models.py 保留为非内核消费者过渡桥，Step 3 co-delete
+  - 不在 Step 2: skill_resolver.py (非内核 co-delete)、gate_output.py / entry_guard.py (无 .models)
+  - tests 继续走 runtime.models bridge，Step 3 删 facade 时同步处理
+  - handoff/router 的非内核模块依赖 (action_projection, skill_resolver 等) 属 Step 3，不在 Step 2
 
 Step 3: 非 kernel 批量删除 + in-place cutover 入口脚本
   - ~40 非 kernel 模块批量删除

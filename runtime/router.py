@@ -10,7 +10,8 @@ from .clarification import has_submitted_clarification, parse_clarification_resp
 from .context_snapshot import ContextResolvedSnapshot, resolve_context_snapshot, snapshot_state_conflict_artifacts
 from .decision import has_submitted_decision, parse_decision_response
 from .entry_guard import DIRECT_EDIT_BLOCKED_RUNTIME_REQUIRED_REASON_CODE
-from .models import ClarificationState, DecisionState, RouteDecision, RuntimeConfig, SkillMeta
+from sopify_contracts.core import RouteDecision, RuntimeConfig, SkillMeta
+from sopify_contracts.decision import ClarificationState, DecisionState
 from .skill_resolver import resolve_route_candidate_skills, resolve_runtime_skill_id
 from canonical_writer import StateStore
 

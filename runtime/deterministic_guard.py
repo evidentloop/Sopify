@@ -5,7 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Mapping
 
-from .models import ExecutionGate, PlanArtifact, RunState
+from sopify_contracts.artifacts import PlanArtifact
+from sopify_contracts.core import ExecutionGate, RunState
 
 CHECKPOINT_ONLY = "checkpoint_only"
 NORMAL_RUNTIME_FOLLOWUP = "normal_runtime_followup"

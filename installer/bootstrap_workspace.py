@@ -100,27 +100,16 @@ _REQUIRED_BUNDLE_FILES = (
     Path("sopify_contracts") / "__init__.py",
     Path("canonical_writer") / "__init__.py",
     Path("runtime") / "__init__.py",
-    Path("runtime") / "clarification_bridge.py",
-    Path("runtime") / "cli_interactive.py",
-    Path("runtime") / "develop_callback.py",
-    Path("runtime") / "decision_bridge.py",
     Path("runtime") / "gate.py",
-    Path("runtime") / "preferences.py",
-    Path("runtime") / "workspace_preflight.py",
     Path("scripts") / "sopify_runtime.py",
     Path("scripts") / "runtime_gate.py",
-    Path("scripts") / "clarification_bridge_runtime.py",
     Path("scripts") / "develop_callback_runtime.py",
-    Path("scripts") / "decision_bridge_runtime.py",
-    Path("scripts") / "preferences_preload_runtime.py",
-    Path("scripts") / "check-runtime-smoke.sh",
-    Path("tests") / "test_runtime.py",
 )
 _IGNORE_PATTERNS = shutil.ignore_patterns(".DS_Store", "Thumbs.db", "__pycache__")
 _VERSION_TOKEN_RE = re.compile(r"[0-9]+|[A-Za-z]+")
 _EXACT_BUNDLE_VERSION_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 _PRERELEASE_RANK = {"dev": -4, "alpha": -3, "beta": -2, "rc": -1}
-_WORKSPACE_STUB_REQUIRED_CAPABILITIES = ("runtime_gate", "preferences_preload")
+_WORKSPACE_STUB_REQUIRED_CAPABILITIES = ("runtime_gate",)
 _WORKSPACE_STUB_LOCATOR_MODES = {"global_first", "global_only"}
 _WORKSPACE_STUB_IGNORE_MODES = {"exclude", "gitignore", "noop"}
 _SOPIFY_SKILLS_DIR = ".sopify-skills"
