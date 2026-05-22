@@ -2,7 +2,7 @@
 plan_id: 20260326_5-plan-20260326-phase1-2-3-plan-plan-20260326-ph
 feature_key: 5-plan-20260326-phase1-2-3-plan-plan-20260326-ph
 level: standard
-lifecycle_state: active
+lifecycle_state: archived
 knowledge_sync:
   project: review
   background: review

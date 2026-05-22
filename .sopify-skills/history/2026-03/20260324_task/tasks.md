@@ -2,7 +2,7 @@
 plan_id: 20260324_task
 feature_key: learning-path-steering
 level: standard
-lifecycle_state: active
+lifecycle_state: archived
 plan_kind: steering
 execution_gate_hint:
   status: blocked

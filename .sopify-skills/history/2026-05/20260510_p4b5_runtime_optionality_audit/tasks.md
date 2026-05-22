@@ -1,6 +1,6 @@
 # 任务清单: P4b.5 Runtime Optionality & Host Onboarding Audit
 
-lifecycle_state: active
+lifecycle_state: archived
 plan_status: drafting
 蓝图命中: P4b.5（tasks.md:60-66）
 前置里程碑: P4b（已完成）、Host Capability Governance bridge（已完成）

@@ -13,6 +13,12 @@
 - 一次性实现细节不默认写入本文件。
 - 当约定发生变化时，应以代码现状为准并同步更新。
 
+## Plan 归档约定
+- Plan 归档到 `history/` 后，`plan/` 下的同名原件**必须删除**，避免双驻留。
+- `lifecycle_state` 在 history 副本中须改为 `archived`（或 `completed`，视收口结论）。
+- 唯一例外：`lifecycle_state: deferred` 的 plan 尚未归档，保留在 `plan/` 下。
+- `_registry.yaml` 中对应条目一并清理（如有）。
+
 ## 文档边界
 - `project.md`：只放跨任务可复用的技术约定。
 - `blueprint/background.md`：放长期目标、范围与非目标。

@@ -2,7 +2,7 @@
 plan_id: 20260520_p6_canonical_writer_cutover
 feature_key: p6_canonical_writer_cutover
 level: standard
-lifecycle_state: active
+lifecycle_state: archived
 ---
 
 # 任务清单
