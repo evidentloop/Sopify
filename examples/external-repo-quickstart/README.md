@@ -14,7 +14,7 @@ decisions, and persist project knowledge.
 Run from your project root:
 
 ```bash
-curl -fsSL https://github.com/evidentloop/sopify/releases/latest/download/bootstrap.sh | bash
+curl -fsSL https://github.com/evidentloop/sopify/releases/latest/download/install.sh | bash -s -- --target copilot
 ```
 
 Or clone and run locally:
@@ -80,7 +80,8 @@ curl -fsSL https://github.com/evidentloop/sopify/releases/latest/download/instal
 Then use `~go` to start a managed workflow.
 
 For **Copilot** users: the workspace is ready. Full trigger wiring is coming in
-a future release.
+a future release. `bootstrap.sh` still works as a compatibility alias, but the
+recommended entrypoint is now `install.sh --target copilot`.
 
 ## What Happens Next
 

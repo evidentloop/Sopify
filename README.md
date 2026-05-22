@@ -93,6 +93,7 @@ Install targets:
 - `codex:en-US`
 - `claude:zh-CN`
 - `claude:en-US`
+- `copilot`
 
 The protocol works with any host. Verified runtime integrations today:
 
@@ -100,7 +101,7 @@ The protocol works with any host. Verified runtime integrations today:
 |------|----------------|--------------|---------------------|-------|
 | `codex` | `codex:zh-CN` / `codex:en-US` | Deep verified | Host install flow, workspace bootstrap, and runtime package smoke are verified | Suitable for daily use |
 | `claude` | `claude:zh-CN` / `claude:en-US` | Deep verified | Host install flow, workspace bootstrap, and runtime package smoke are verified | Suitable for daily use |
-| `copilot` | Bootstrap only | Workspace ready | Bootstrap, instruction distribution, and workspace marker are verified | Trigger wiring coming next |
+| `copilot` | Bootstrap via `install.sh` | Workspace ready | Workspace bootstrap, instruction distribution, and workspace marker are verified | Trigger wiring coming next |
 
 Notes:
 
@@ -111,11 +112,12 @@ Notes:
 
 | You want to… | Script | Command |
 |--------------|--------|---------|
-| Set up a new host (Codex / Claude) | `install.sh` | As shown above — installs host prompt layer + Sopify payload |
-| Add Sopify to an existing repo | `bootstrap.sh` | `curl -fsSL .../bootstrap.sh \| bash` — workspace only, no global install |
+| Set up Codex / Claude | `install.sh` | As shown above — installs host prompt layer + Sopify payload |
+| Set up Copilot | `install.sh` | `curl -fsSL https://github.com/evidentloop/sopify/releases/latest/download/install.sh \| bash -s -- --target copilot` |
 
-- `install.sh` installs the selected host prompt layer and the Sopify payload. Most users do not need `--workspace`; that is an advanced prewarm path for maintainers or CI.
-- `bootstrap.sh` creates `.sopify-skills/sopify.json`, updates `.gitignore`, and distributes Copilot instruction files. Pass `--no-copilot` to skip Copilot files.
+- `install.sh --target codex:... / claude:...` installs the selected host prompt layer and the Sopify payload. Most users do not need `--workspace`; that is an advanced prewarm path for maintainers or CI.
+- `install.sh --target copilot` bootstraps the current workspace, creates `.sopify-skills/sopify.json`, updates `.gitignore`, and distributes Copilot instruction files. Pass `--workspace <path>` to target another repo, `--language <lang>` to control output language, or `--no-copilot` to skip Copilot files.
+- `bootstrap.sh` remains available as a compatibility alias and forwards to `install.sh --target copilot`.
 
 For the full setup guide, see [Getting Started](./docs/getting-started.md). For a step-by-step demo, see [External Repo Quickstart](./examples/external-repo-quickstart/README.md).
 

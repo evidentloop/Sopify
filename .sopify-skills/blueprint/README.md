@@ -13,7 +13,7 @@
 ## 当前焦点
 
 <!-- sopify:auto:focus:start -->
-- 当前活动 plan：无（P7 已完成归档）
+- 当前活动 plan：暂无。
 - history 归档：已可用；最近归档为 `../history/2026-05/20260522_p7_payload_only_onboarding_mainline`。
 <!-- sopify:auto:focus:end -->
 

@@ -13,6 +13,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from installer.distribution import (
+    BootstrapOnlyResult,
     DistributionError,
     DistributionRequest,
     DistributionSourceMetadata,
@@ -34,6 +35,7 @@ from installer.validate import (
     validate_payload_install,
     validate_workspace_stub_manifest,
 )
+from scripts.sopify_init import init_workspace
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -42,9 +44,11 @@ def build_parser() -> argparse.ArgumentParser:
         for capability in iter_installable_hosts()
         for language in LANGUAGE_DIRECTORY_MAP
     )
+    supported_targets = f"copilot, {supported_targets}"
     parser = argparse.ArgumentParser(
         description=(
-            "Install Sopify for a host. By default this installs the host prompt and Sopify runtime only; "
+            "Install Sopify for a host. Use `--target copilot` to bootstrap a workspace; "
+            "for Codex / Claude this installs the host prompt and Sopify runtime only, and "
             "project files are initialized later when you run `~go` in a workspace."
         )
     )
@@ -57,9 +61,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--workspace",
         default=None,
         help=(
-            "Advanced: prewarm an existing project path now. Most users should omit this and let `~go` initialize "
+            "For copilot: bootstrap this workspace now (defaults to current directory when omitted). "
+            "For other hosts: advanced prewarm path. Most users should omit this and let `~go` initialize "
             "project files on first use."
         ),
+    )
+    parser.add_argument("--language", choices=("en-US", "zh-CN"), default=None, help="Copilot bootstrap output language.")
+    parser.add_argument(
+        "--no-copilot",
+        action="store_true",
+        help="Copilot bootstrap only: skip Copilot instruction file distribution.",
     )
     parser.add_argument(
         "--ref",
@@ -73,8 +84,30 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def run_install(*, target_value: str, workspace_value: str | None, repo_root: Path, home_root: Path | None = None) -> InstallResult:
+def run_install(
+    *,
+    target_value: str,
+    workspace_value: str | None,
+    repo_root: Path,
+    home_root: Path | None = None,
+    copilot_enabled: bool = True,
+) -> InstallResult | BootstrapOnlyResult:
     target = parse_install_target(target_value)
+    if target.host == "copilot":
+        workspace_root = Path(workspace_value or ".").expanduser().resolve()
+        result = init_workspace(
+            workspace_root,
+            source_root=repo_root,
+            copilot=copilot_enabled,
+        )
+        if result.get("action") == "failed":
+            raise InstallError(str(result.get("message") or "Workspace bootstrap failed"))
+        return BootstrapOnlyResult(
+            target=target,
+            workspace_root=workspace_root,
+            bundle_version=result.get("bundle_version"),
+            details=tuple(str(item) for item in result.get("details", [])),
+        )
     workspace_root = Path(workspace_value).expanduser().resolve() if workspace_value is not None else None
     if workspace_root is not None and not workspace_root.exists():
         raise InstallError(f"Workspace does not exist: {workspace_root}")
@@ -132,13 +165,17 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     verbose = args.verbose or _env_flag_enabled(os.environ.get("SOPIFY_DEBUG"))
-    output_language = _infer_output_language(args.target)
+    normalized_target = args.target
+    if normalized_target == "copilot":
+        copilot_language = args.language or _detect_default_output_language()
+        normalized_target = f"copilot:{copilot_language}"
+    output_language = _infer_output_language(normalized_target)
     source_metadata = DistributionSourceMetadata(
         resolved_ref=args.source_resolved_ref,
         asset_name=args.source_asset_name,
     )
     request = DistributionRequest(
-        target=args.target,
+        target=normalized_target,
         workspace=args.workspace,
         ref_override=args.ref,
         interactive=sys.stdin.isatty() and sys.stdout.isatty(),
@@ -151,7 +188,7 @@ def main(argv: list[str] | None = None) -> int:
             request=request,
             repo_root=REPO_ROOT,
             home_root=None,
-            install_executor=run_install,
+            install_executor=lambda **kwargs: run_install(**kwargs, copilot_enabled=not args.no_copilot),
         )
     except DistributionError as exc:
         if verbose:
@@ -179,6 +216,13 @@ def _env_flag_enabled(value: str | None) -> bool:
 
 def _infer_output_language(target_value: str | None) -> str:
     return "zh-CN" if str(target_value or "").strip().endswith(":zh-CN") else "en-US"
+
+
+def _detect_default_output_language() -> str:
+    lang_env = os.environ.get("LANG", "")
+    if "zh" in lang_env.lower():
+        return "zh-CN"
+    return "en-US"
 
 
 if __name__ == "__main__":

@@ -160,6 +160,13 @@ class BootstrapResult:
 def parse_install_target(raw_value: str) -> InstallTarget:
     """Parse a CLI target like `codex:zh-CN`."""
     value = raw_value.strip()
+    if value == "copilot":
+        return InstallTarget(host="copilot", language="en-US")
+    if value.startswith("copilot:"):
+        language = value.partition(":")[2]
+        if language not in LANGUAGE_DIRECTORY_MAP:
+            raise InstallError(f"Unsupported language: {language}")
+        return InstallTarget(host="copilot", language=language)
     host, separator, language = value.partition(":")
     if not separator:
         raise InstallError("Target must use the format <host:lang>, for example codex:zh-CN")

@@ -9,16 +9,23 @@ $SourceRef = "main"
 
 function Show-Usage {
   @"
-Usage: install.ps1 [--target <host:lang>] [--ref <tag-or-branch>]
+Usage: install.ps1 [--target <host[:lang]>] [--ref <tag-or-branch>]
 
 Install Sopify for a supported AI host.
 
-By default this installs the host prompt and Sopify runtime only. Project files
-are initialized later when you run `~go` inside a workspace.
+Use `--target copilot` to bootstrap the current workspace and write Copilot
+instruction files. For Codex / Claude, this installs the host prompt and
+Sopify runtime only. Project files are initialized later when you run `~go`
+inside a workspace.
 
 Options:
-  --target <host:lang>   Host and language to install, for example codex:zh-CN.
-  --workspace <path>     Advanced: prewarm an existing project path now.
+  --target <host[:lang]> Host and language to install, for example codex:zh-CN
+                         or copilot.
+  --workspace <path>     For copilot: target project directory (defaults to
+                         current directory). For other hosts: advanced prewarm.
+  --language <lang>      Copilot only: bootstrap output language (en-US/zh-CN).
+  --no-copilot           Copilot only: skip Copilot instruction file
+                         distribution.
   --verbose              Show full diagnostic install details.
   --ref <tag-or-branch>  Advanced: override the source ref.
   -h, --help             Show this help.
@@ -145,9 +152,9 @@ try {
     Fail-Install -Phase "unpack" -ReasonCode "INSTALL_ENTRYPOINT_MISSING" -Detail "Missing install entrypoint inside source archive: $entrypoint" -NextStep "Retry the installer or inspect the downloaded archive locally."
   }
 
-  Write-InstallStep -Message "Running installer..."
   $pythonArgs = @()
   $pythonArgs += $pythonCommand.prefixArgs
+  Write-InstallStep -Message "Running installer..."
   $pythonArgs += @(
     $entrypoint,
     "--source-channel",

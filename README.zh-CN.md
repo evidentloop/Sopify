@@ -93,6 +93,7 @@ python3 scripts/install_sopify.py --target claude:zh-CN --workspace /path/to/pro
 - `codex:en-US`
 - `claude:zh-CN`
 - `claude:en-US`
+- `copilot`
 
 协议层适用于任何宿主。当前已验证的 runtime 集成：
 
@@ -100,7 +101,7 @@ python3 scripts/install_sopify.py --target claude:zh-CN --workspace /path/to/pro
 |------|-------------|--------|----------|------|
 | `codex` | `codex:zh-CN` / `codex:en-US` | Deep verified | 已验证宿主安装链路、workspace bootstrap，且运行时包已通过 smoke 验证 | 适合日常使用 |
 | `claude` | `claude:zh-CN` / `claude:en-US` | Deep verified | 已验证宿主安装链路、workspace bootstrap，且运行时包已通过 smoke 验证 | 适合日常使用 |
-| `copilot` | Bootstrap only | Workspace ready | 已验证 bootstrap、指令分发和 workspace marker | 触发入口即将推出 |
+| `copilot` | 通过 `install.sh` bootstrap | Workspace ready | 已验证 workspace bootstrap、指令分发和 workspace marker | 触发入口即将推出 |
 
 说明：
 
@@ -111,11 +112,12 @@ python3 scripts/install_sopify.py --target claude:zh-CN --workspace /path/to/pro
 
 | 你想要… | 脚本 | 命令 |
 |---------|------|------|
-| 配置新宿主（Codex / Claude） | `install.sh` | 如上所示 — 安装宿主提示层 + Sopify payload |
-| 给现有仓库添加 Sopify | `bootstrap.sh` | `curl -fsSL .../bootstrap.sh \| bash` — 仅 workspace，无需全局安装 |
+| 配置 Codex / Claude | `install.sh` | 如上所示 — 安装宿主提示层 + Sopify payload |
+| 配置 Copilot | `install.sh` | `curl -fsSL https://github.com/evidentloop/sopify/releases/latest/download/install.sh \| bash -s -- --target copilot` |
 
-- `install.sh` 安装宿主提示层和 Sopify payload。大多数用户不需要 `--workspace`，那是给维护者和 CI 用的高级预热路径。
-- `bootstrap.sh` 创建 `.sopify-skills/sopify.json`、更新 `.gitignore`、分发 Copilot 指令文件。传 `--no-copilot` 跳过 Copilot 文件。
+- `install.sh --target codex:... / claude:...` 安装宿主提示层和 Sopify payload。大多数用户不需要 `--workspace`，那是给维护者和 CI 用的高级预热路径。
+- `install.sh --target copilot` 会 bootstrap 当前工作区，创建 `.sopify-skills/sopify.json`、更新 `.gitignore`、分发 Copilot 指令文件。可用 `--workspace <path>` 指定仓库、`--language <lang>` 控制输出语言，或用 `--no-copilot` 跳过 Copilot 文件。
+- `bootstrap.sh` 继续保留为兼容别名，内部转发到 `install.sh --target copilot`。
 
 完整设置指南见 [Getting Started (EN)](./docs/getting-started.md)。分步 demo 见 [External Repo Quickstart](./examples/external-repo-quickstart/README.md)。
 

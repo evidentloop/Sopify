@@ -22,7 +22,7 @@ Sopify adds resumable, traceable AI workflows to any project. After setup:
 From your project root:
 
 ```bash
-curl -fsSL https://github.com/evidentloop/sopify/releases/latest/download/bootstrap.sh | bash
+curl -fsSL https://github.com/evidentloop/sopify/releases/latest/download/install.sh | bash -s -- --target copilot
 ```
 
 This creates:
@@ -34,16 +34,16 @@ This creates:
 | `.github/copilot-instructions.md` | Copilot entry — project-level instruction for Copilot |
 | `.github/instructions/sopify.instructions.md` | Copilot detail — full Sopify rule set |
 
-> **Skip Copilot files:** Pass `--no-copilot` if you only use Codex or Claude.
+> **Skip Copilot files:** Pass `--no-copilot` with `--target copilot` if you only want workspace markers.
 
 ## Inspect-First Setup
 
 Review the script before running:
 
 ```bash
-curl -fsSL -o sopify-bootstrap.sh https://github.com/evidentloop/sopify/releases/latest/download/bootstrap.sh
-less sopify-bootstrap.sh
-bash sopify-bootstrap.sh
+curl -fsSL -o sopify-install.sh https://github.com/evidentloop/sopify/releases/latest/download/install.sh
+less sopify-install.sh
+bash sopify-install.sh --target copilot
 ```
 
 Or clone and run the Python entry point directly:
@@ -65,19 +65,19 @@ bootstrap individual projects:
 curl -fsSL https://github.com/evidentloop/sopify/releases/latest/download/install.sh | bash -s -- --target codex:en-US
 
 # Workspace bootstrap (per project)
-curl -fsSL https://github.com/evidentloop/sopify/releases/latest/download/bootstrap.sh | bash
+curl -fsSL https://github.com/evidentloop/sopify/releases/latest/download/install.sh | bash -s -- --target copilot
 ```
 
 After install, use `~go` in your AI host to start a managed workflow.
 
 ### Copilot
 
-Copilot discovers instructions via project-level files. The bootstrap command
+Copilot discovers instructions via project-level files. The install command
 writes `.github/copilot-instructions.md` and
 `.github/instructions/sopify.instructions.md` automatically.
 
 ```bash
-curl -fsSL https://github.com/evidentloop/sopify/releases/latest/download/bootstrap.sh | bash
+curl -fsSL https://github.com/evidentloop/sopify/releases/latest/download/install.sh | bash -s -- --target copilot
 ```
 
 Copilot reads project-level instruction files across its supported surfaces
@@ -153,13 +153,13 @@ As you work, Sopify creates project knowledge in `.sopify-skills/`:
 
 ## Updating
 
-Re-run the bootstrap to update the workspace marker and instruction files:
+Re-run the install command to update the workspace marker and instruction files:
 
 ```bash
-curl -fsSL https://github.com/evidentloop/sopify/releases/latest/download/bootstrap.sh | bash
+curl -fsSL https://github.com/evidentloop/sopify/releases/latest/download/install.sh | bash -s -- --target copilot
 ```
 
-The bootstrap is idempotent — it preserves existing settings and only updates
+The workspace bootstrap path is idempotent — it preserves existing settings and only updates
 what changed.
 
 ## Removing Sopify

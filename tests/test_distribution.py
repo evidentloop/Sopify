@@ -325,6 +325,57 @@ class DistributionFacadeTests(unittest.TestCase):
             self.assertEqual(report.install_result.target.value, "codex:zh-CN")
             self.assertIn("1. codex:zh-CN", prompt_output.getvalue())
 
+    def test_distribution_install_supports_copilot_unified_entrypoint(self) -> None:
+        with tempfile.TemporaryDirectory() as workspace_dir:
+            workspace_root = Path(workspace_dir)
+            request = DistributionRequest(
+                target="copilot",
+                workspace=str(workspace_root),
+                ref_override=None,
+                interactive=False,
+                source_channel="stable",
+                source_metadata=DistributionSourceMetadata(
+                    resolved_ref="2026-03-25.101956",
+                    asset_name="install.sh",
+                ),
+            )
+
+            report = run_distribution_install(
+                request=request,
+                repo_root=REPO_ROOT,
+                home_root=Path(tempfile.gettempdir()),
+                install_executor=run_install,
+            )
+
+            self.assertEqual(report.install_result.target.value, "copilot:en-US")
+            rendered = render_distribution_user_result(report)
+            self.assertIn("Copilot", rendered)
+            self.assertTrue((workspace_root / ".sopify-skills" / "sopify.json").exists())
+
+    def test_install_script_copilot_defaults_language_from_lang(self) -> None:
+        with tempfile.TemporaryDirectory() as workspace_dir:
+            env = os.environ.copy()
+            env["LANG"] = "zh_CN.UTF-8"
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(REPO_ROOT / "scripts" / "install_sopify.py"),
+                    "--target",
+                    "copilot",
+                    "--workspace",
+                    workspace_dir,
+                    "--no-copilot",
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+                env=env,
+            )
+
+            self.assertEqual(result.returncode, 0, msg=result.stderr)
+            self.assertIn("Sopify 工作区已就绪。", result.stdout)
+            self.assertIn("宿主：Copilot（copilot:zh-CN）", result.stdout)
+
     def test_repo_local_ref_override_is_rejected(self) -> None:
         request = DistributionRequest(
             target="codex:zh-CN",
@@ -405,12 +456,14 @@ class ReleaseAssetRenderingTests(unittest.TestCase):
         self.assertIn("scripts/install_sopify.py", install_ps1)
         self.assertIn("--source-channel", install_sh)
         self.assertIn("--source-channel", install_ps1)
-        self.assertIn("Usage: install.sh [--target <host:lang>] [--ref <tag-or-branch>]", install_sh)
-        self.assertIn("Usage: install.ps1 [--target <host:lang>] [--ref <tag-or-branch>]", install_ps1)
-        self.assertIn("Advanced: prewarm an existing project path now", install_sh)
-        self.assertIn("Advanced: prewarm an existing project path now", install_ps1)
-        self.assertIn("run `~go` inside a workspace", install_sh)
-        self.assertIn("run `~go` inside a workspace", install_ps1)
+        self.assertIn("Usage: install.sh [--target <host[:lang]>] [--ref <tag-or-branch>]", install_sh)
+        self.assertIn("Usage: install.ps1 [--target <host[:lang]>] [--ref <tag-or-branch>]", install_ps1)
+        self.assertIn("Use `--target copilot` to bootstrap the current workspace", install_sh)
+        self.assertIn("Use `--target copilot` to bootstrap the current workspace", install_ps1)
+        self.assertIn("--language <lang>", install_sh)
+        self.assertIn("--language <lang>", install_ps1)
+        self.assertIn("--no-copilot", install_sh)
+        self.assertIn("--no-copilot", install_ps1)
 
     def test_powershell_installer_prefers_python3_probe(self) -> None:
         install_ps1 = (REPO_ROOT / "install.ps1").read_text(encoding="utf-8")

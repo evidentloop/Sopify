@@ -54,10 +54,20 @@ class DistributionInstallReport:
     """Public-facing install report produced by the shared distribution facade."""
 
     request: DistributionRequest
-    install_result: InstallResult
+    install_result: InstallResult | BootstrapOnlyResult
     status_payload: dict[str, object]
     doctor_payload: dict[str, object]
     next_step: str
+
+
+@dataclass(frozen=True)
+class BootstrapOnlyResult:
+    """Summary for unified-entrypoint bootstrap-only targets such as Copilot."""
+
+    target: InstallTarget
+    workspace_root: Path
+    bundle_version: str | None
+    details: tuple[str, ...]
 
 
 class DistributionError(RuntimeError):
@@ -71,7 +81,7 @@ class DistributionError(RuntimeError):
         self.next_step = next_step
 
 
-InstallExecutor = Callable[..., InstallResult]
+InstallExecutor = Callable[..., InstallResult | BootstrapOnlyResult]
 
 
 def default_source_metadata(
@@ -119,16 +129,47 @@ def run_distribution_install(
     except InstallError as exc:
         raise _map_install_error(exc) from exc
 
-    try:
-        status_payload = build_status_payload(home_root=resolved_home, workspace_root=install_result.workspace_root)
-        doctor_payload = build_doctor_payload(home_root=resolved_home, workspace_root=install_result.workspace_root)
-    except Exception as exc:  # pragma: no cover - defensive wrapper for unexpected verification regressions.
-        raise DistributionError(
-            phase="verification",
-            reason_code="POST_INSTALL_VERIFICATION_FAILED",
-            detail=f"Post-install verification failed unexpectedly: {exc}",
-            next_step="Rerun the installer. If the failure persists, use the inspect-first path and review the local source snapshot.",
-        ) from exc
+    if isinstance(install_result, BootstrapOnlyResult):
+        status_payload = {
+            "state": {"overall_status": "workspace_ready"},
+            "workspace_state": {
+                "requested": True,
+                "root": str(install_result.workspace_root),
+                "bootstrap_mode": "bootstrap_only",
+            },
+            "hosts": [
+                {
+                    "host_id": install_result.target.host,
+                    "support_tier": "baseline_supported",
+                    "install_enabled": True,
+                    "state": {
+                        "installed": "not_applicable",
+                        "configured": "workspace_ready",
+                        "workspace_bundle_healthy": "yes",
+                        "workspace_ingress_proof": "not_requested",
+                    },
+                    "payload_bundle": {
+                        "source_kind": "bootstrap_only",
+                        "reason_code": "BOOTSTRAP_ONLY_TARGET",
+                    },
+                    "workspace_bundle": {
+                        "reason_code": "WORKSPACE_BOOTSTRAPPED",
+                    },
+                }
+            ],
+        }
+        doctor_payload = {"checks": []}
+    else:
+        try:
+            status_payload = build_status_payload(home_root=resolved_home, workspace_root=install_result.workspace_root)
+            doctor_payload = build_doctor_payload(home_root=resolved_home, workspace_root=install_result.workspace_root)
+        except Exception as exc:  # pragma: no cover - defensive wrapper for unexpected verification regressions.
+            raise DistributionError(
+                phase="verification",
+                reason_code="POST_INSTALL_VERIFICATION_FAILED",
+                detail=f"Post-install verification failed unexpectedly: {exc}",
+                next_step="Rerun the installer. If the failure persists, use the inspect-first path and review the local source snapshot.",
+            ) from exc
 
     return DistributionInstallReport(
         request=request,
@@ -142,6 +183,24 @@ def run_distribution_install(
 def render_distribution_result(report: DistributionInstallReport) -> str:
     """Render the full diagnostic install summary for repo-local and remote entrypoints."""
     install_result = report.install_result
+    if isinstance(install_result, BootstrapOnlyResult):
+        details = "\n".join(f"  - {item}" for item in install_result.details)
+        return "\n".join(
+            [
+                "Initialized Sopify workspace successfully:",
+                f"  target: {install_result.target.value}",
+                f"  source channel: {report.request.source_channel}",
+                f"  resolved source ref: {report.request.source_metadata.resolved_ref}",
+                f"  asset name: {report.request.source_metadata.asset_name}",
+                f"  workspace: {install_result.workspace_root}",
+                f"  bundle version: {install_result.bundle_version or 'unknown'}",
+                "",
+                "Bootstrap details:",
+                details or "  - none",
+                "",
+                f"Next: {report.next_step}",
+            ]
+        )
     selected_host = _select_host_status(report.status_payload, install_result.target)
     selected_checks = _select_host_checks(report.doctor_payload, install_result.target)
     payload_bundle = selected_host.get("payload_bundle") or {}
@@ -207,6 +266,8 @@ def render_distribution_result(report: DistributionInstallReport) -> str:
 def render_distribution_user_result(report: DistributionInstallReport) -> str:
     """Render the default user-facing install summary."""
     install_result = report.install_result
+    if isinstance(install_result, BootstrapOnlyResult):
+        return _render_distribution_bootstrap_user_result(report)
     if install_result.target.language == "zh-CN":
         return _render_distribution_user_result_zh(report)
     return _render_distribution_user_result_en(report)
@@ -293,11 +354,13 @@ def _resolve_target_value(
 
 
 def _target_options() -> tuple[str, ...]:
-    return tuple(
+    options = [
         f"{capability.host_id}:{language}"
         for capability in iter_installable_hosts()
         for language in LANGUAGE_DIRECTORY_MAP
-    )
+    ]
+    options.append("copilot")
+    return tuple(options)
 
 
 def _map_install_error(exc: InstallError) -> DistributionError:
@@ -395,6 +458,10 @@ def _map_install_error(exc: InstallError) -> DistributionError:
 
 
 def _build_next_step(target: InstallTarget, workspace_root: Path | None) -> str:
+    if target.host == "copilot":
+        if workspace_root is None:
+            return "Open Copilot in your project workspace to start using Sopify."
+        return f"Open Copilot in {workspace_root} to start using Sopify."
     if workspace_root is None:
         return (
             f"Open {target.host} in any project workspace and trigger Sopify. "
@@ -503,6 +570,41 @@ def _render_distribution_user_result_zh(report: DistributionInstallReport) -> st
     return "\n".join(lines)
 
 
+def _render_distribution_bootstrap_user_result(report: DistributionInstallReport) -> str:
+    install_result = report.install_result
+    assert isinstance(install_result, BootstrapOnlyResult)
+    if install_result.target.language == "zh-CN":
+        lines = [
+            "Sopify 工作区已就绪。",
+            "",
+            "已初始化：",
+            f"  宿主：{_host_display_name(install_result.target.host)}（{install_result.target.value}）",
+            f"  语言：{_language_display_name(install_result.target.language, 'zh-CN')}",
+            f"  工作区：{install_result.workspace_root}",
+            f"  版本：{install_result.bundle_version or 'unknown'}",
+            "",
+            "下一步：",
+            "  1. 在该目录打开 Copilot。",
+            "  2. 直接开始你的任务，或在支持的宿主里输入：~go",
+        ]
+        return "\n".join(lines)
+
+    lines = [
+        "Sopify workspace ready.",
+        "",
+        "Initialized:",
+        f"  Host: {_host_display_name(install_result.target.host)} ({install_result.target.value})",
+        f"  Language: {_language_display_name(install_result.target.language, 'en-US')}",
+        f"  Workspace: {install_result.workspace_root}",
+        f"  Version: {install_result.bundle_version or 'unknown'}",
+        "",
+        "Next:",
+        "  1. Open Copilot in that directory.",
+        "  2. Start your task directly, or type `~go` in supported hosts.",
+    ]
+    return "\n".join(lines)
+
+
 def _select_host_status(payload: dict[str, object], target: InstallTarget) -> dict[str, object]:
     for host in payload["hosts"]:
         if host["host_id"] == target.host:
@@ -562,6 +664,7 @@ def _host_display_name(host_id: str) -> str:
     return {
         "codex": "Codex",
         "claude": "Claude",
+        "copilot": "Copilot",
     }.get(host_id, host_id)
 
 

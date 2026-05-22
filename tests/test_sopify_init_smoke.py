@@ -201,7 +201,8 @@ class BootstrapShSmokeTests(unittest.TestCase):
         content = BOOTSTRAP_SH.read_text(encoding="utf-8")
         self.assertIn('SOURCE_CHANNEL="dev"', content)
         self.assertIn('SOURCE_REF="main"', content)
-        self.assertIn("sopify_init.py", content)
+        self.assertIn("install.sh", content)
+        self.assertIn("--target copilot", content)
 
     def test_bootstrap_sh_help_flag(self) -> None:
         result = subprocess.run(
