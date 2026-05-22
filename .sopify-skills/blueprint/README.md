@@ -13,7 +13,7 @@
 ## 当前焦点
 
 <!-- sopify:auto:focus:start -->
-- 当前活动 plan：暂无。
+- 当前活动 plan：`../plan/20260522_runtime_slimming_kernel_extraction`。
 - history 归档：已可用；最近归档为 `../history/2026-05/20260522_p7_payload_only_onboarding_mainline`。
 <!-- sopify:auto:focus:end -->
 

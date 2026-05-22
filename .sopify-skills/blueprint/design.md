@@ -744,8 +744,8 @@ P6:          直接切 canonical writer 新栈 + 定义 writer_input 契约
              新宿主直接适配 canonical writer（读 + 写）
              runtime 仅保留为 legacy reference implementation
              builder 留在 engine 侧，writer_input 契约独立定义
-后续:        老宿主 (Codex/Claude) 也迁移至 canonical writer
-             runtime 无消费者后下线
+后续 A:      若要保留老宿主 deep path，需先提取独立 orchestrator，再迁到 canonical writer
+后续 B:      若采用 target-state-first，可先解耦保留面，再让 runtime + legacy consumers 同步退场
 ```
 
 **约束**：
@@ -753,6 +753,15 @@ P6:          直接切 canonical writer 新栈 + 定义 writer_input 契约
 2. 轻量 canonical writer 是新分支，不是 payload_capable 的附属品
 3. writer_input 契约需独立定义 — builder 提供输入，writer 负责落盘 + 不变量
 4. 无用户 = 不需要渐进迁移，可直接面向目标态设计和适配
+
+**维护决策（2026-05-22）**：
+
+1. 采用 **后续 B / `target-state-first`**
+2. 停止维护 deep-capable host（Claude / Codex / Copilot）的宿主专属 legacy glue（bridge / renderer / bundle / smoke），但 kernel 通过协议对所有 deep-capable host 保持可达
+3. runtime 退场的真实门槛收敛为：
+   - 先解耦仍需保留的非 runtime 面：`installer/validate.py`、`installer/bootstrap_workspace.py`、`installer/inspection.py`、`scripts/install_sopify.py`、`scripts/sopify_init.py`
+   - 再同步删除 `runtime/`、`installer/runtime_bundle.py`、legacy deep scripts 与 runtime-coupled tests
+4. `scripts/sopify_status.py` / `scripts/sopify_doctor.py` 不作为独立解耦目标；它们仅通过 `installer/inspection.py` 的 cutover 继续保留
 
 
 ## 轻量化产品指标
