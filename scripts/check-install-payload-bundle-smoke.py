@@ -327,7 +327,7 @@ def _run_install_cli(*, target_value: str, temp_home: Path) -> str:
     env = dict(os.environ)
     env["HOME"] = str(temp_home)
     completed = subprocess.run(
-        ["bash", str(REPO_ROOT / "scripts" / "install-sopify.sh"), "--target", target_value],
+        ["bash", str(REPO_ROOT / "scripts" / "install-sopify.sh"), "--target", target_value, "--verbose"],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
