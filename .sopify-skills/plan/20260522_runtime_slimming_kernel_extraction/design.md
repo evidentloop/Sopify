@@ -54,6 +54,10 @@
 > 本节由 S1 蓝图校验 + S2 消费者扫描 + advisor 四点修正 共同输入，产出 kernel 精确边界。
 > **所有判定均为工作假设，待维护者审计确认后方可作为 S4 执行依据。**
 
+### 架构总览
+
+![Kernel Architecture](kernel-architecture.svg)
+
 ### 🔴 LOC 预算现实
 
 | 范围 | 当前 LOC | 备注 |
@@ -185,7 +189,7 @@ S4 两刀策略:
 
 | 模块 | LOC | 被谁依赖 | 定性 |
 |------|-----|---------|------|
-| `models.py` | 50 | 6+ 内部模块, tests | **删除**: DEPRECATED re-export facade，消费方改为 `from sopify_contracts` |
+| `models.py` | 50 | 8 个内核模块(core 5 + support 3), tests | **删除**: DEPRECATED re-export facade，消费方改为 `from sopify_contracts` |
 
 ### 表3: Host-Facing 最小入口职责表
 
@@ -194,21 +198,21 @@ S4 两刀策略:
      - "当前形态" = legacy 脚本是薄壳还是含业务逻辑
      - S4 动作 = 不保留旧脚本，按职责需要决定是否新建 thin shell -->
 
-| 职责 | 当前实现 (旧文件，将退场) | 当前形态 | runtime 导入 | S4 动作 |
+| 职责 | 当前实现 | 当前形态 | runtime 导入 | S4 动作 |
 |------|---------|---------|-------------|---------|
-| **Ingress gate** — host 调用入口闸门，获取 gate 合约 + receipt | `scripts/runtime_gate.py` | 薄壳 → `gate.enter_runtime_gate()` | gate, gate_output | 旧文件退场；**新建独立 thin shell** 承担此职责 (仅 argparse + kernel gate 调用 + JSON 输出) |
-| **Default raw entry** — 用户请求的默认 runtime 入口 | `scripts/sopify_runtime.py` | **含业务逻辑** (direct-entry blocking, receipt writing) | cli, config, entry_guard, gate, output, router, state | 旧文件退场；guard/receipt 逻辑上移到内核；**新建独立 thin shell** |
-| **Develop callback** — continue-host-develop 回调 | `scripts/develop_callback_runtime.py` | 薄壳 → `runtime.develop_callback` | config, develop_callback | 旧文件退场；**新建独立 thin shell** 承担此职责 (仅参数整形 + 转发) |
-| **Plan helper** — `~go plan` 产品入口 | `scripts/go_plan_runtime.py` | 产品辅助 → `plan_orchestrator.run_plan_loop()` | cli, config, output, plan_orchestrator | 旧文件退场；**产品决策，不默认新建入口** |
+| **Ingress gate** — host 调用入口闸门，获取 gate 合约 + receipt | `scripts/runtime_gate.py` | 薄壳 → `gate.enter_runtime_gate()` | gate, gate_output | **in-place cutover**: 路径名被 manifest/test 冻结，原地重写内容为 thin shell |
+| **Default raw entry** — 用户请求的默认 runtime 入口 | `scripts/sopify_runtime.py` | **含业务逻辑** (direct-entry blocking, receipt writing) | cli, config, entry_guard, gate, output, router, state | **in-place cutover**: guard/receipt 逻辑上移到内核；原地重写为 thin shell |
+| **Develop callback** — continue-host-develop 回调 | `scripts/develop_callback_runtime.py` | 薄壳 → `runtime.develop_callback` | config, develop_callback | **in-place cutover**: 原地重写为 thin shell |
+| **Plan helper** — `~go plan` 产品入口 | `scripts/go_plan_runtime.py` | 产品辅助 → `plan_orchestrator.run_plan_loop()` | cli, config, output, plan_orchestrator | **产品决策**: 路径名被 manifest 冻结；若删除需同步改 manifest/test/doc |
 
 #### 入口设计原则
 
 ```
-1. legacy 脚本（现有 *_runtime.py）不原样保留
-2. 若 kernel 需要 host-facing 入口，新建全新 thin shell：
+1. 路径名可能被 manifest/test/doc 冻结 → 优先 in-place cutover（重写内容、保留路径）
+2. 重写后的内容：
    - 只做: argparse → 调用 kernel 函数 → 输出 JSON/text → exit code
-   - 不做: config 加载、state 管理、receipt 写入（这些属于 kernel 内部）
-3. thin shell 数量以最小够用为准（预计 2-3 个，不超过现有 4 个）
+   - 不做: config 加载、state 管理、receipt 写入（属于 kernel 内部）
+3. 若确认路径名未被冻结，可改名或删除；但需在 S4 验证
 4. go_plan 的去留是产品决策，不在 kernel architecture scope
 ```
 
@@ -227,10 +231,11 @@ S4 两刀策略:
 | `test_runtime_state.py` | 内核: checkpoint/handoff 状态不变量、conflict 检测 | **必须保留等价覆盖** | 保留 paired write 不变量 + resolution ID 校验 |
 | `test_runtime_sample_invariant_gate.py` | 内核: gate 矩阵对齐、side-effect 映射 | **必须保留等价覆盖** | 保留矩阵完整性断言；replay 行为测试按瘦身后范围裁剪 |
 | `test_contract_consistency.py` | 内核: schema/manifest 冻结、allowed response modes | **必须保留等价覆盖** | 整体保留（已是 contract freeze 测试，接近不变） |
+| `test_runtime_config.py` | kernel support: config 加载行为 | **必须保留等价覆盖** | config.py 保留为 kernel support，对应测试保留 |
 | `test_context_checkpoints.py` | 实现细节: CLI/commit/PR 元数据 checkpoint 规则 | **可随 legacy 共删** | 测试对象是 CLI 检查脚本，非内核编排 |
 | `test_runtime_failure_recovery.py` | 恢复表形状、allowed-response-mode 行为 | **大概率共删** | 除非明确保留 failure-recovery contract 作为内核策略 |
 
-**统计: 保留等价覆盖 6 个 / 共删 2 个**
+**统计: 保留等价覆盖 7 个 / 共删 2 个**
 
 > "保留等价覆盖" ≠ 原封不动搬。测试可以重写、合并、简化，只要等价的 contract invariant 仍有覆盖即可。
 > 具体重建方式在 S4 执行时按实际 kernel 接口决定，不在 S3 预锁。
@@ -257,6 +262,32 @@ S4 两刀策略:
 | `sidecar_classifier_boundary` | handoff.py | 删除（属于分类器边界） |
 | `vnext_phase_boundary` | handoff.py | 删除（属于版本迁移） |
 
+### Kernel Context Scope 判定标准 (S4 执行护栏)
+
+<!-- 这 4 条是 S3 审计后维护者+advisor 达成一致的 kernel scope 判定标准。
+     S4 执行时所有"这个要不要留"的问题，先过这 4 条。-->
+
+1. **Kernel 对 machine truth 的关系：读消费者 + 写生产者，不是 owner**
+   - 读: current_run / current_handoff / current_clarification / current_decision / current_plan（通过最小 snapshot resolver）
+   - 写: gate receipt + handoff payload + checkpoint request（通过 canonical_writer.StateStore）
+   - machine truth 的存储层在 `canonical_writer`，不在 kernel
+
+2. **Kernel 只保留支撑 gate / route / handoff / checkpoint 的最小上下文**
+   - current_run, current_handoff, current_clarification, current_decision, 必要时 current_plan
+   - 少量用于 contract/receipt 的稳定字段
+   - 不保留 session 级 last_route、quarantine、conflict artifacts 等运行时局部语境
+
+3. **Runtime 局部语境、诊断解释上下文、策略附加上下文不进入 kernel**
+   - ❌ route 内部启发式痕迹
+   - ❌ sidecar / boundary / resolution planner 诊断上下文
+   - ❌ output/rendering 为宿主解释而拼出的本地解释层
+   - ❌ skill dispatch / preferences preload / workspace preflight 附加上下文
+   - 判定标准: "这个上下文是协议要求的 machine truth，还是为了调试/解释方便而生的？" — 后者不进 kernel
+
+4. **context_snapshot / handoff 的具体裁剪标准**
+   - context_snapshot: 只留 "读 current_* → 选主作用域 → 基本一致性检查"，quarantine/conflict/diagnostics 整体剥掉
+   - handoff: 只留 required_host_action + 最小 artifacts，局部策略上下文整体剥掉
+
 ### S4 最小路线 — 不做二次架构设计
 
 <!-- advisor 总结: S4 第一刀以去依赖、拆非核心分支为主，不按 LOC 倒推重写。
@@ -265,30 +296,221 @@ S4 两刀策略:
      2. 不把 text rendering、config loader、diagnostics snapshot 误当 kernel 本体 -->
 
 ```
-Step 1: 定义三层分类（kernel core / kernel support / non-kernel）
-  - kernel core: gate.py / entry_guard / execution_gate / router / handoff / checkpoint_request / checkpoint_materializer
-  - kernel support: config / state / deterministic_guard
-  - non-kernel: 其余 ~40 模块 + models.py(删除) + gate_output(暂留但非内核)
-  - 不急着追具体 LOC 目标
+Step 1: installer/scripts cutover — 保护安装链路 (第一刀: inspection.py)
+  - 执行顺序: inspection.py → sopify_init.py → validate.py → bootstrap_workspace.py → install_sopify.py
+  - inspection.py 是首个外部 blocker (L32-33 直接 import runtime.config / runtime.context_snapshot)
+  - status/doctor 通过 inspection 改造继续可用，不单列 cutover
 
-Step 2: 优先拆 context_snapshot.py 和 handoff.py 的非核心分支
+Step 1b: release 链 cutover
+  - check-install-payload-bundle-smoke.py: 改写路径期望值
+  - check-skill-eval-gate.py: 改为 kernel 接口或删除
+  - generate-builtin-catalog.py: 改为 sopify_contracts 或删除
+  - release-preflight.sh: 移除或改写 runtime smoke 调用
+
+Step 2: kernel extraction — context_snapshot/handoff 拆分 + models.py rewire
   - context_snapshot.py: 从 973 LOC 中提取最小快照解析(读 current_* + 选主作用域 + 一致性检查)
   - handoff.py 第一刀: 砍 sidecar / resolution_planner / vnext / develop_quality / action_projection / decision_policy
   - handoff.py 保住: 最小 handoff producer (checkpoint_request→payload + required_host_action + artifact + entry_guard)
-  - 同步: 所有 from .models → from sopify_contracts
+  - 同步: 8 个内核模块(core 5 + support 3) + context_snapshot 的 `from .models` → `from sopify_contracts`
+  - gate/route 关系: 代码可靠近（同一调用链），但保留独立入口函数（enter_gate / resolve_route），不合成一个 if-else
+  - 不急着追具体 LOC 目标
 
-Step 3: 新建 thin shell 入口（2-3 个）
-  - 不沿用 legacy *_runtime.py
-  - 只做: argparse → 调用 kernel → JSON/text 输出 → exit code
-  - 不做: config 加载、state 管理、receipt 写入（属于 kernel 内部）
+Step 3: 非 kernel 批量删除 + in-place cutover 入口脚本
+  - ~40 非 kernel 模块批量删除
+  - 入口脚本 in-place cutover: 路径名被 manifest/test 冻结 → 原地重写
+    只做: argparse → 调用 kernel → JSON/text 输出 → exit code
+    不做: config 加载、state 管理、receipt 写入（属于 kernel 内部）
 
 Step 4: 用等价覆盖测试守住 contract
-  - 6 个 contract test 保留等价覆盖
+  - 7 个 contract test 保留等价覆盖
   - 2 个 legacy test 共删
   - 具体重写方式按实际 kernel 接口决定
 ```
 
-## 审计边界
+## S3.1 文件级删除候选表 (target-state-first)
+
+<!-- S3.1-3.3 由 S2 消费者扫描 + S3 kernel 定义 + kernel context scope 护栏共同推导。
+     注意: agent 扫描结果经过以下修正:
+     1. "blocking_full_retirement" 在 target-state-first 下不成立（无在线用户，L727）
+     2. "keep_for_legacy_runtime" 在 target-state-first 下全部降为 co-delete
+     3. 脚本 smoke/sync 不是 "keep"，是 co-delete
+     4. 大量测试不需要 "preserve-equivalent"，只有 gate/route/handoff/checkpoint 合约测试需要 -->
+
+### runtime/ 非内核模块 (42 entries, ~18.8K LOC)
+
+<!-- 42 = 1 rewrite-first (models.py) + 40 co-delete + 1 rewrite (__init__.py) -->
+
+| 分类 | 文件 | LOC | 说明 |
+|------|------|-----|------|
+| **rewrite-first** | `models.py` | 50 | DEPRECATED re-export facade；被 8 个内核模块(core: execution_gate/router/handoff/checkpoint_request/checkpoint_materializer + support: config/state/deterministic_guard)直接 import → 必须先将 `from .models` 改为 `from sopify_contracts`，然后才能删除 |
+| **co-delete** | `engine.py` | 2,728 | 全功能 engine，kernel 不保留 |
+| **co-delete** | `decision_tables.py` | 1,632 | 决策表数据，非编排核 |
+| **co-delete** | `plan_registry.py` | 1,012 | 计划注册存储，非编排核 |
+| **co-delete** | `workspace_preflight.py` | 958 | 安装验证，非编排核 |
+| **co-delete** | `action_intent.py` | 884 | 动作意图，非编排核 |
+| **co-delete** | `decision_bridge.py` | 864 | 兼容桥接，非编排核 |
+| **co-delete** | `archive_lifecycle.py` | 831 | 归档生命周期，非编排核 |
+| **co-delete** | `failure_recovery.py` | 719 | 故障恢复，非编排核 |
+| **co-delete** | `output.py` | 620 | 渲染输出，非编排核 |
+| **co-delete** | `decision.py` | 607 | 决策对象，非编排核 |
+| **co-delete** | `develop_callback.py` | 599 | 开发回调管道，非编排核 |
+| **co-delete** | `manifest.py` | 475 | manifest 加载，非编排核 |
+| **co-delete** | `kb.py` | 463 | 知识库访问，非编排核 |
+| **co-delete** | `plan_scaffold.py` | 464 | 计划脚手架，非编排核 |
+| **co-delete** | `decision_policy.py` | 434 | 决策策略，非编排核 |
+| **co-delete** | `cli_interactive.py` | 412 | 交互 CLI，非编排核 |
+| **co-delete** | `develop_quality.py` | 403 | 质量检查，非编排核 |
+| **co-delete** | `clarification_bridge.py` | 401 | 兼容桥接，非编排核 |
+| **co-delete** | `clarification.py` | 386 | 交互流程，非编排核 |
+| **co-delete** | `context_v1_scope.py` | 329 | v1 上下文规则，非编排核 |
+| **co-delete** | `plan_orchestrator.py` | 272 | 计划编排，非编排核 |
+| **co-delete** | `builtin_catalog.py` | 267 | 内置目录，非编排核 |
+| **co-delete** | `message_templates.py` | 265 | 消息模板，非编排核 |
+| **co-delete** | `_yaml.py` | 264 | YAML 工具（被 kernel support config.py 使用 → S4 需判定: 内联或保留） |
+| **co-delete** | `skill_registry.py` | 255 | 技能注册，非编排核 |
+| **co-delete** | `action_projection.py` | 249 | 动作投影，非编排核 |
+| **co-delete** | `resolution_planner.py` | 216 | 诊断恢复，非编排核 |
+| **co-delete** | `vnext_phase_boundary.py` | 210 | 版本边界，非编排核 |
+| **co-delete** | `sidecar_classifier_boundary.py` | 205 | 分类器边界，非编排核 |
+| **co-delete** | `preferences.py` | 182 | 偏好预加载，非编排核 |
+| **co-delete** | `decision_templates.py` | 164 | 决策模板，非编排核 |
+| **co-delete** | `skill_schema.py` | 140 | 技能 schema，非编排核 |
+| **co-delete** | `knowledge_layout.py` | 135 | 知识布局，非编排核 |
+| **co-delete** | `cli.py` | 113 | CLI 入口，非编排核 |
+| **co-delete** | `context_builder.py` | 112 | 上下文组装，非编排核 |
+| **co-delete** | `skill_resolver.py` | 111 | 技能解析，非编排核 |
+| **co-delete** | `context_recovery.py` | 93 | 上下文恢复，非编排核 |
+| **co-delete** | `skill_runner.py` | 85 | 技能执行，非编排核 |
+| **co-delete** | `checkpoint_cancel.py` | 80 | checkpoint 取消，非编排核 |
+| **co-delete** | `knowledge_sync.py` | 66 | 知识同步，非编排核 |
+| **rewrite** | `__init__.py` | 33 | 改为只导出 kernel 面 |
+
+> **⚠ `_yaml.py` 特殊处理**: config.py (kernel support) 通过 `from ._yaml import` 依赖它。
+> S4 需决定: 将 YAML 加载逻辑内联到 config.py，还是保留 `_yaml.py` 作为 kernel utility。
+
+### scripts/ 退场+cutover 清单 (15 entries)
+
+<!-- 7 co-delete + 4 cutover (release 联动) + 3 in-place cutover + 1 产品决策
+     advisor 修正: 原表漏了 check-install-payload-bundle-smoke / check-skill-eval-gate / generate-builtin-catalog
+     这些脚本在 release 主链上，cutover 工作量被低估。
+     entry→新 shell 表述也不准确 — 若 manifest/test 冻结了路径名，实际是 in-place cutover，不是改名退场。-->
+
+| 分类 | 文件 | LOC | 说明 |
+|------|------|-----|------|
+| **co-delete** | `clarification_bridge_runtime.py` | 160 | legacy bridge |
+| **co-delete** | `decision_bridge_runtime.py` | 171 | legacy bridge |
+| **co-delete** | `preferences_preload_runtime.py` | 72 | legacy helper |
+| **co-delete** | `plan_registry_runtime.py` | 109 | legacy helper |
+| **co-delete** | `check-prompt-runtime-gate-smoke.py` | 369 | runtime smoke 脚本 |
+| **co-delete** | `check-runtime-smoke.sh` | 268 | runtime bundle smoke |
+| **co-delete** | `sync-runtime-assets.sh` | 137 | runtime 资产同步 |
+| **cutover (release 联动)** | `check-install-payload-bundle-smoke.py` | ~369 | L144+ 强校验 sopify_runtime.py/go_plan_runtime.py/runtime_gate.py 存在；release-preflight.sh 调用 |
+| **cutover (release 联动)** | `check-skill-eval-gate.py` | ~100 | L17 直接 import runtime.config/router/skill_registry |
+| **cutover (release 联动)** | `generate-builtin-catalog.py` | ~100 | L17 直接 import runtime._yaml/runtime.skill_schema |
+| **cutover (release 联动)** | `release-preflight.sh` | 83 | L75-77 串联上述脚本；是 release 主链，不是"待评估" |
+| **in-place cutover** | `runtime_gate.py` | 129 | manifest/test 冻结路径名 → 原地重写为 thin shell，不改名 |
+| **in-place cutover** | `sopify_runtime.py` | 157 | manifest/test 冻结路径名 → 原地重写为 thin shell，不改名 |
+| **in-place cutover** | `develop_callback_runtime.py` | 123 | 原地重写为 thin shell |
+| **产品决策** | `go_plan_runtime.py` | 76 | manifest 冻结路径名；若删除需同步改 manifest/test/doc |
+
+### tests/ 退场清单
+
+<!-- advisor 修正: 原表只覆盖 test_runtime_* 命名的测试。
+     实际还有一批非 test_runtime_* 但冻结 runtime contract 的测试需要处理。-->
+
+#### A. kernel 合约测试（保留等价覆盖）
+
+| 文件 | LOC | 说明 |
+|------|-----|------|
+| `test_runtime_gate.py` | ~43 | gate 合约 |
+| `test_runtime_execution_gate.py` | 133 | 状态转换 |
+| `test_runtime_router.py` | 260 | 路由不变量 |
+| `test_runtime_state.py` | 240 | 状态不变量 |
+| `test_runtime_sample_invariant_gate.py` | 140 | gate 矩阵 |
+| `test_contract_consistency.py` | 43 | schema 冻结 |
+| `test_runtime_config.py` | 71 | config 加载（kernel support 模块保留） |
+
+#### B. 需人工审查（可能嵌入 kernel 不变量）
+
+| 文件 | LOC | 说明 |
+|------|-----|------|
+| `test_runtime_engine.py` | 3,666 | engine 退场但可能嵌入 gate/handoff 集成不变量 |
+
+#### C. 非 test_runtime_* 但冻结 runtime contract 的测试（S4 cutover 联动）
+
+<!-- 这批测试不叫 test_runtime_* 但内部冻结了 runtime 路径/脚本/能力:
+     - 硬编码 bundle manifest 中 runtime 脚本路径
+     - subprocess 直调 scripts/runtime_gate.py
+     - 固定校验 runtime_gate / preferences_preload 能力
+     必须在 S4 cutover 时同步改写。-->
+
+| 文件 | LOC | 冻结内容 | S4 处理 |
+|------|-----|---------|---------|
+| `test_installer.py` | ~230+ | L751+ 校验 bundle 含 sopify_runtime.py / go_plan_runtime.py / runtime_gate.py | cutover: 改写 manifest 期望值 |
+| `test_installer_status_doctor.py` | ~80+ | L80+ 校验 runtime_gate / preferences_preload / .sopify-runtime | cutover: 改写能力/路径期望 |
+| `test_action_intent.py` | ~983 | subprocess 调 scripts/runtime_gate.py | cutover 或 co-delete（视 action_intent 是否保留） |
+| `test_runtime_decision.py` | ~900 | 直调 bridge 脚本 | co-delete（bridge 退场） |
+| `test_context_v1_scope.py` | — | 引用 deterministic_guard | 跟随 kernel support 保留 |
+
+#### D. co-delete（非内核 runtime 测试）
+
+| 文件 | LOC | 说明 |
+|------|-----|------|
+| `test_context_checkpoints.py` | ~129 | CLI 元数据规则 |
+| `test_runtime_failure_recovery.py` | ~100 | 恢复表形状 |
+| `test_runtime_plan_reuse.py` | 326 | 计划复用 |
+| `test_runtime_plan_registry.py` | 374 | 计划注册 |
+| `test_runtime_preferences.py` | 68 | 偏好 |
+| `test_runtime_decision_tables.py` | 368 | 决策表 |
+| `test_runtime_skill_registry.py` | 380 | 技能注册 |
+| `test_runtime_output_rendering.py` | 287 | 渲染输出 |
+| `test_runtime_kb.py` | 164 | KB |
+| `test_runtime_message_templates.py` | 76 | 消息模板 |
+| `test_runtime_plan_scaffold.py` | 85 | 计划脚手架 |
+| `test_bundle_smoke.py` | 85 | bundle smoke |
+| `runtime_test_support.py` | ~150 | 测试支撑模块 |
+
+## S3.2 阻塞表 (双口径)
+
+### legacy-preserving 口径
+
+| 阻塞项 | 涉及模块 | 解除条件 |
+|--------|---------|---------|
+| engine 是 gate/router/handoff 调用枢纽 | `engine.py` (2,728 LOC) | 不可解除；保留 legacy 则 engine 必须存在 |
+| 宿主仍 import runtime 入口 | `__init__.py`, scripts/*.py | 不可解除；保留 legacy 则所有 runtime surface 必须存在 |
+| installer 直接 import runtime | `inspection.py` L32-33 | 需先完成 inspection cutover |
+| runtime tests 覆盖 engine 路径 | `test_runtime_engine.py` (3,666 LOC) | 不可解除；保留 legacy 则测试必须存在 |
+
+**结论: legacy-preserving 下几乎无法删除任何 runtime 模块（高度耦合）。**
+
+### target-state-first 口径
+
+| 阻塞项 | 涉及模块 | 解除条件 |
+|--------|---------|---------|
+| installer/inspection.py import 级依赖 | `inspection.py` L32-33 | Step 1 第 1 个 cutover (已有方案) |
+| installer/validate.py 路径级依赖 | `validate.py` L166-181 | Step 1 第 3 个 cutover (已有方案) |
+| installer/bootstrap_workspace.py 路径级依赖 | `bootstrap_workspace.py` L102-117 | Step 1 第 4 个 cutover (已有方案) |
+| scripts/sopify_init.py 能力声明 | `sopify_init.py` L27 | Step 1 第 2 个 cutover (已有方案) |
+| scripts/install_sopify.py 文案 | `install_sopify.py` | Step 1 第 5 个 cutover (已有方案) |
+| `_yaml.py` 被 kernel support config.py 依赖 | `_yaml.py` | Step 2 判定: 内联或保留 |
+| `test_runtime_engine.py` 可能嵌入 kernel 不变量 | `test_runtime_engine.py` | Step 4 逐 case 人工审查 |
+| release-preflight.sh 串联 runtime smoke 脚本 | `release-preflight.sh` L75-77 | Step 1b cutover: 移除或改写 runtime smoke 调用 |
+| check-install-payload-bundle-smoke.py 冻结 runtime 脚本路径 | `check-install-payload-bundle-smoke.py` L144+ | Step 1b cutover: 改写路径期望值 |
+| check-skill-eval-gate.py import runtime 模块 | `check-skill-eval-gate.py` L17 | Step 1b cutover: 改为 kernel 接口或删除 |
+| generate-builtin-catalog.py import runtime 模块 | `generate-builtin-catalog.py` L17 | Step 1b cutover: 改为 sopify_contracts 或删除 |
+| 非 test_runtime_* 测试冻结 runtime 路径/能力 | `test_installer.py`, `test_installer_status_doctor.py`, `test_action_intent.py` | Step 1b cutover: 同步改写期望值 |
+| models.py 被 8 个内核模块 import | `models.py` | rewrite-first: 先改 8 个内核模块(core 5 + support 3)的 `from .models` → `from sopify_contracts`，再删；context_snapshot(优先拆分)也需同步改 |
+
+**结论: target-state-first 下无硬阻塞，但 cutover 联动面比原估多 ~8-10 个文件（release 链 + 非 runtime 命名测试 + models.py rewire）。**
+
+## S3.3 推荐策略
+
+1. **采用 target-state-first 口径** — 维护者已于 2026-05-22 确认 (tasks.md 4.1 ✅)
+2. **退场量级**: runtime/ 非 kernel ~18.8K + scripts co-delete ~1.3K + tests co-delete ~2.6K + test_runtime_engine ~3.7K(待审查) ≈ **~26.4K LOC** 直接退场；加上 kernel 瘦身砍掉的代码，总退场量 **~28K+ LOC**
+3. **cutover 真实范围**: 原估 5 文件 (installer/scripts 解耦)；实际需加上 release 链 4 脚本 + 非 runtime 命名测试 3-5 个 + models.py rewire = **~12-15 个文件需 cutover**
+4. **S4 执行优先级**: Step 2 cutover (installer/scripts 5 文件，inspection.py 第一刀) → release 链 cutover (4 脚本) → kernel extraction (含 models.py rewire + context_snapshot/handoff 拆分) → 非 kernel 批量删除 → in-place 入口 cutover → 等价覆盖测试 → 非 runtime 命名测试 cutover
+5. **风险最低路径**: 先完成 installer cutover (inspection.py 第一刀) 保护安装链路 + release 链路，再做 runtime/ 内部 kernel extraction (models.py rewire + 瘦身)和批量删除
+6. **test_runtime_engine.py 特殊处理**: 3,666 LOC 不做盲删，S4 先逐 case 审查是否有 gate/handoff 集成不变量需要提取
 
 ### 在范围内
 

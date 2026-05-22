@@ -47,17 +47,21 @@ archive_ready: false
 > 3. `go_plan_runtime.py` 是产品决策，不默认算内核
 > 4. 测试分两类：legacy tests 共删 vs gate/checkpoint contract tests 必须重建
 
-## 3. 删除就绪结论 (S3 kernel 定义 — 部分完成)
-- [ ] 3.1 产出文件级删除候选表，明确每个候选的依据和风险
-- [ ] 3.2 分别产出“保留 legacy 路径”与“目标态优先、允许同步退场”两种口径下的阻塞表
-- [ ] 3.3 给出推荐策略、删除准入范围与后续实施切片建议
-- [ ] 3.4 明确 `target-state-first` 下退场后的保留面清单（双栏）：
+## 3. 删除就绪结论 (S3 — ✅ 全部完成)
+- [x] 3.1 产出文件级删除候选表，明确每个候选的依据和风险
+  > design.md §S3.1: runtime/ 42 entries ~18.8K + scripts/ 15 entries (7 co-delete + 4 release cutover + 3 in-place cutover + 1 产品决策) + tests/ 全分类
+  > agent 扫描结果经 target-state-first + kernel context scope 护栏修正
+- [x] 3.2 分别产出"保留 legacy 路径"与"目标态优先、允许同步退场"两种口径下的阻塞表
+  > design.md §S3.2: legacy-preserving 下几乎无法删除；target-state-first 下全部阻塞项已有解除方案
+- [x] 3.3 给出推荐策略、删除准入范围与后续实施切片建议
+  > design.md §S3.3: 退场量级 ~28K+ LOC，S4 优先级 cutover→拆分→替换→批删→thin shell→测试
+- [x] 3.4 明确 `target-state-first` 下退场后的保留面清单（双栏）：
   - **retain-as-is**：`sopify_contracts/`、`canonical_writer/`、`.sopify-skills/` — 无 runtime 代码依赖，可直接保留
   - **retain-after-decoupling**：`installer/validate.py`、`installer/bootstrap_workspace.py`、`installer/inspection.py`、`scripts/install_sopify.py`、`scripts/sopify_init.py` — 当前仍有 runtime import / bundle 验证硬依赖，需先解耦再保留
-- [ ] 3.5 明确退场量级修正：`runtime/` 非 kernel ~18.8K + runtime-coupled scripts ~4K + runtime-coupled tests ~15.3K ≈ **~38K LOC**（减去 kernel core+support ~5K 及 kernel 等价覆盖 tests）
-- [ ] 3.6 产出 retain-after-decoupling 五文件 cutover 表：列出当前耦合、替代依据（payload-only / `sopify.json` / canonical state）、保留后的行为边界
-- [ ] 3.7 明确 `installer/runtime_bundle.py` 为 pure legacy surface，归入 Step 3 同步退场而不是 Step 2 解耦保留
-- [ ] 3.8 记录 Step 2 固定执行顺序：`installer/inspection.py` → `scripts/sopify_init.py` → `installer/validate.py` → `installer/bootstrap_workspace.py` → `scripts/install_sopify.py`
+- [x] 3.5 明确退场量级修正：`runtime/` 非 kernel ~18.8K + runtime-coupled scripts ~4K + runtime-coupled tests ~15.3K ≈ **~38K LOC**（减去 kernel core+support ~5K 及 kernel 等价覆盖 tests）
+- [x] 3.6 产出 retain-after-decoupling 五文件 cutover 表：列出当前耦合、替代依据（payload-only / `sopify.json` / canonical state）、保留后的行为边界
+- [x] 3.7 明确 `installer/runtime_bundle.py` 为 pure legacy surface，归入 Step 3 同步退场而不是 Step 2 解耦保留
+- [x] 3.8 记录 Step 2 固定执行顺序：`installer/inspection.py` → `scripts/sopify_init.py` → `installer/validate.py` → `installer/bootstrap_workspace.py` → `scripts/install_sopify.py`
 - [x] 3.9 确认 orchestration kernel extraction 作为本包内执行目标，不另开独立方案包
 - [x] 3.10 定义 orchestration kernel 最小模块边界：三层分类，详见 design.md §S3 Kernel Boundary Audit
   > **kernel core** (7): gate.py / entry_guard.py / execution_gate.py / router.py / handoff.py / checkpoint_request.py / checkpoint_materializer.py
@@ -70,7 +74,7 @@ archive_ready: false
   > kernel 对外依赖: sopify_contracts (类型) + canonical_writer (写+时间) + stdlib
   > 14 个非内核 runtime 依赖必须在 S4 切断，详见 design.md §非内核 runtime 依赖汇总
 - [x] 3.12 列出 kernel 需要保留的最小测试覆盖面
-  > **保留等价覆盖** 6 个: test_runtime_gate / test_runtime_execution_gate / test_runtime_router / test_runtime_state / test_runtime_sample_invariant_gate / test_contract_consistency
+  > **保留等价覆盖** 7 个: test_runtime_gate / test_runtime_execution_gate / test_runtime_router / test_runtime_state / test_runtime_sample_invariant_gate / test_contract_consistency / test_runtime_config
   > **共删** 2 个: test_context_checkpoints / test_runtime_failure_recovery
   > "保留等价覆盖" ≠ 原封不动搬，具体重写方式在 S4 按实际 kernel 接口决定
 
@@ -82,13 +86,17 @@ archive_ready: false
 - [ ] 4.5 明确哪些 `keep_for_legacy_runtime` / `blocking_full_retirement` 面留待后续包处理
 - [ ] 4.6 若采用 `target-state-first`，显式确认以下同步退场范围（不限于 `*_runtime.py`）：
   - legacy `scripts/*_runtime.py` bridge/helper 退场：`clarification_bridge_runtime.py`、`decision_bridge_runtime.py`、`preferences_preload_runtime.py`、`plan_registry_runtime.py`
-  - 以下旧脚本文件退场，但其中有入口职责的必须由新 thin shell 接替（先建新、再删旧，避免断链）：
-    - `scripts/runtime_gate.py` → 旧文件退场；ingress gate 入口职责由新 thin shell 承担
-    - `scripts/sopify_runtime.py` → 旧文件退场；default raw entry 职责由新 thin shell 承担
-    - `scripts/develop_callback_runtime.py` → 旧文件退场；develop callback 入口职责由新 thin shell 承担
-    - `scripts/go_plan_runtime.py` → 旧文件退场；plan helper 是产品决策，不默认建新入口
+  - 以下入口脚本 in-place cutover（路径名被 manifest/test 冻结 → 原地重写内容，不新建并行文件）：
+    - `scripts/runtime_gate.py` → in-place cutover: 原地重写为 thin shell (argparse → kernel → exit code)
+    - `scripts/sopify_runtime.py` → in-place cutover: guard/receipt 逻辑上移到内核，原地重写为 thin shell
+    - `scripts/develop_callback_runtime.py` → in-place cutover: 原地重写为 thin shell
+    - `scripts/go_plan_runtime.py` → 产品决策: 路径名被 manifest 冻结，若删除需同步改 manifest/test/doc
   - `scripts/check-runtime-smoke.sh`、`scripts/sync-runtime-assets.sh`
-  - `scripts/check-prompt-runtime-gate-smoke.py`、`scripts/check-install-payload-bundle-smoke.py`（按审计结果判定）
+  - `scripts/check-prompt-runtime-gate-smoke.py` — co-delete: runtime smoke 脚本
+  - `scripts/check-install-payload-bundle-smoke.py` — cutover (release 联动): L159 冻结入口路径，改写路径期望值
+  - `scripts/check-skill-eval-gate.py` — cutover: 改为 kernel 接口或删除
+  - `scripts/generate-builtin-catalog.py` — cutover: 改为 sopify_contracts 或删除
+  - `scripts/release-preflight.sh` — cutover: 移除或改写 runtime smoke 调用
   - `scripts/check-host-doc-contract.py`（按 runtime 依赖程度判定）
   - `tests/test_runtime_*`、`tests/runtime_test_support.py`、`tests/test_bundle_smoke.py`（按 runtime import 判定）
   - `installer/runtime_bundle.py`（pure legacy runtime bundle sync surface，直接退场）
@@ -96,7 +104,7 @@ archive_ready: false
 - [ ] 4.8 `scripts/sopify_status.py` / `scripts/sopify_doctor.py` 不单列 cutover；仅验证其通过 `installer/inspection.py` 的改造继续可用
 - [ ] 4.9 Step 2 具体落地顺序按 `inspection.py` 优先执行，避免 Step 3 删除 runtime 后 `status` / `doctor` 先发生 import failure
 - [ ] 4.10 提取 orchestration kernel：在 `runtime/` 原地瘦身，清理 non-kernel 依赖，确保 kernel 可独立运行（不新建并行目录）
-- [ ] 4.10a 若 S3 审计确认 kernel 仍需宿主入口，仅新增最小数量的全新薄壳脚本：只负责参数解析、调用 kernel、读写冻结 contract；不得复用 legacy bridge / renderer / preload / bundle 逻辑
+- [ ] 4.10a 若 S3 审计确认 kernel 仍需宿主入口，采用 in-place cutover（原地重写内容、保留路径名）：只负责参数解析、调用 kernel、读写冻结 contract；不得复用 legacy bridge / renderer / preload / bundle 逻辑
 - [ ] 4.11 kernel 验证：确认 gate → route → handoff → checkpoint 链路在 kernel-only 模式下可用
 
 ## 5. 文档更新

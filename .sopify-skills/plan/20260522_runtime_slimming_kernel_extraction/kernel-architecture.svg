@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 700">
+<style>
+  text { font-family: 'Helvetica Neue', Helvetica, Arial, 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+  .title { font-size: 18px; font-weight: 600; fill: #111827; }
+  .subtitle { font-size: 13px; fill: #6b7280; }
+  .label { font-size: 13px; fill: #111827; font-weight: 500; }
+  .small { font-size: 11px; fill: #6b7280; }
+  .loc { font-size: 10px; fill: #9ca3af; }
+  .arrow-label { font-size: 11px; fill: #374151; }
+</style>
+<defs>
+  <marker id="arrow-blue" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+    <polygon points="0 0, 10 3.5, 0 7" fill="#2563eb"/>
+  </marker>
+  <marker id="arrow-green" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+    <polygon points="0 0, 10 3.5, 0 7" fill="#059669"/>
+  </marker>
+  <marker id="arrow-gray" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+    <polygon points="0 0, 10 3.5, 0 7" fill="#9ca3af"/>
+  </marker>
+</defs>
+<rect width="960" height="700" fill="#ffffff"/>
+<text x="480" y="35" text-anchor="middle" class="title">Runtime Slimming — Orchestration Kernel Architecture</text>
+<text x="480" y="55" text-anchor="middle" class="subtitle">gate → route → handoff → checkpoint 最小编排核</text>
+<rect x="340" y="75" width="280" height="50" rx="10" fill="#faf5ff" stroke="#c084fc" stroke-width="2"/>
+<text x="480" y="105" text-anchor="middle" class="label">Host (LLM) — 协议驱动编排</text>
+<line x1="480" y1="125" x2="480" y2="155" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow-blue)"/>
+<rect x="440" y="133" width="80" height="16" rx="3" fill="#ffffff" opacity="0.95"/>
+<text x="480" y="145" text-anchor="middle" class="arrow-label">调用 kernel</text>
+<rect x="40" y="160" width="580" height="180" rx="10" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.5" stroke-dasharray="6,3"/>
+<text x="55" y="180" class="label" fill="#2563eb">Kernel Core (7 modules)</text>
+<rect x="60" y="195" width="120" height="55" rx="8" fill="#ffffff" stroke="#2563eb" stroke-width="1.5"/>
+<text x="120" y="218" text-anchor="middle" class="label">gate.py</text>
+<text x="120" y="235" text-anchor="middle" class="loc">946 LOC → 瘦身</text>
+<line x1="180" y1="222" x2="210" y2="222" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow-blue)"/>
+<rect x="215" y="195" width="120" height="55" rx="8" fill="#ffffff" stroke="#2563eb" stroke-width="1.5"/>
+<text x="275" y="218" text-anchor="middle" class="label">router.py</text>
+<text x="275" y="235" text-anchor="middle" class="loc">783 LOC → 瘦身</text>
+<line x1="335" y1="222" x2="365" y2="222" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow-blue)"/>
+<rect x="370" y="195" width="120" height="55" rx="8" fill="#ffffff" stroke="#2563eb" stroke-width="1.5"/>
+<text x="430" y="218" text-anchor="middle" class="label">handoff.py</text>
+<text x="430" y="235" text-anchor="middle" class="loc">618 LOC → 瘦身</text>
+<line x1="430" y1="250" x2="430" y2="270" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow-blue)"/>
+<rect x="60" y="275" width="140" height="50" rx="8" fill="#ffffff" stroke="#2563eb" stroke-width="1.5"/>
+<text x="130" y="298" text-anchor="middle" class="label">checkpoint_request</text>
+<text x="130" y="312" text-anchor="middle" class="loc">319 LOC</text>
+<line x1="200" y1="300" x2="230" y2="300" stroke="#2563eb" stroke-width="1.5" marker-end="url(#arrow-blue)"/>
+<rect x="235" y="275" width="160" height="50" rx="8" fill="#ffffff" stroke="#2563eb" stroke-width="1.5"/>
+<text x="315" y="298" text-anchor="middle" class="label">checkpoint_materializer</text>
+<text x="315" y="312" text-anchor="middle" class="loc">167 LOC</text>
+<rect x="430" y="275" width="100" height="50" rx="8" fill="#ffffff" stroke="#2563eb" stroke-width="1.5"/>
+<text x="480" y="298" text-anchor="middle" class="label">entry_guard</text>
+<text x="480" y="312" text-anchor="middle" class="loc">54 LOC</text>
+<rect x="540" y="195" width="70" height="55" rx="8" fill="#ffffff" stroke="#2563eb" stroke-width="1.5"/>
+<text x="575" y="215" text-anchor="middle" class="small">execution</text>
+<text x="575" y="228" text-anchor="middle" class="small">_gate</text>
+<text x="575" y="243" text-anchor="middle" class="loc">351 LOC</text>
+<rect x="40" y="350" width="580" height="65" rx="10" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5" stroke-dasharray="6,3"/>
+<text x="55" y="370" class="label" fill="#059669">Kernel Support (3 modules)</text>
+<rect x="60" y="380" width="120" height="28" rx="6" fill="#ffffff" stroke="#86efac" stroke-width="1"/>
+<text x="120" y="399" text-anchor="middle" class="small">config.py (236)</text>
+<rect x="200" y="380" width="120" height="28" rx="6" fill="#ffffff" stroke="#86efac" stroke-width="1"/>
+<text x="260" y="399" text-anchor="middle" class="small">state.py (137)</text>
+<rect x="340" y="380" width="170" height="28" rx="6" fill="#ffffff" stroke="#86efac" stroke-width="1"/>
+<text x="425" y="399" text-anchor="middle" class="small">deterministic_guard (325)</text>
+<rect x="40" y="435" width="280" height="55" rx="8" fill="#fff7ed" stroke="#fdba74" stroke-width="1.5"/>
+<text x="180" y="458" text-anchor="middle" class="label">sopify_contracts</text>
+<text x="180" y="475" text-anchor="middle" class="small">类型定义层 (frozen types)</text>
+<rect x="340" y="435" width="280" height="55" rx="8" fill="#fff7ed" stroke="#fdba74" stroke-width="1.5"/>
+<text x="480" y="458" text-anchor="middle" class="label">canonical_writer</text>
+<text x="480" y="475" text-anchor="middle" class="small">写层 (StateStore + machine truth)</text>
+<line x1="180" y1="415" x2="180" y2="433" stroke="#059669" stroke-width="1.5" marker-end="url(#arrow-green)"/>
+<line x1="480" y1="415" x2="480" y2="433" stroke="#059669" stroke-width="1.5" marker-end="url(#arrow-green)"/>
+<rect x="650" y="160" width="280" height="330" rx="10" fill="#fef2f2" stroke="#fca5a5" stroke-width="1.5" stroke-dasharray="6,3"/>
+<text x="790" y="185" text-anchor="middle" class="label" fill="#dc2626">Non-Kernel — 退场</text>
+<text x="790" y="205" text-anchor="middle" class="small">~40 modules, ~18.8K LOC</text>
+<text x="670" y="225" class="small" fill="#9ca3af">engine.py</text>
+<text x="910" y="225" text-anchor="end" class="loc">2,728</text>
+<text x="670" y="249" class="small" fill="#9ca3af">decision_tables.py</text>
+<text x="910" y="249" text-anchor="end" class="loc">1,632</text>
+<text x="670" y="273" class="small" fill="#9ca3af">plan_registry.py</text>
+<text x="910" y="273" text-anchor="end" class="loc">1,012</text>
+<text x="670" y="297" class="small" fill="#9ca3af">workspace_preflight.py</text>
+<text x="910" y="297" text-anchor="end" class="loc">958</text>
+<text x="670" y="321" class="small" fill="#9ca3af">action_intent.py</text>
+<text x="910" y="321" text-anchor="end" class="loc">884</text>
+<text x="670" y="345" class="small" fill="#9ca3af">decision_bridge.py</text>
+<text x="910" y="345" text-anchor="end" class="loc">864</text>
+<text x="670" y="369" class="small" fill="#9ca3af">output.py / rendering</text>
+<text x="910" y="369" text-anchor="end" class="loc">620</text>
+<text x="670" y="393" class="small" fill="#9ca3af">clarification / decision</text>
+<text x="910" y="393" text-anchor="end" class="loc">993</text>
+<text x="670" y="417" class="small" fill="#9ca3af">develop_callback.py</text>
+<text x="910" y="417" text-anchor="end" class="loc">599</text>
+<text x="670" y="441" class="small" fill="#9ca3af">... + 30 more modules</text>
+<text x="910" y="441" text-anchor="end" class="loc">~9.5K</text>
+<line x1="660" y1="340" x2="920" y2="340" stroke="#dc2626" stroke-width="1" opacity="0.3"/>
+<rect x="650" y="505" width="280" height="55" rx="8" fill="#fefce8" stroke="#fbbf24" stroke-width="1.5"/>
+<text x="790" y="528" text-anchor="middle" class="label" fill="#b45309">context_snapshot.py</text>
+<text x="790" y="545" text-anchor="middle" class="small">优先拆分: 973 LOC → 提取最小快照</text>
+<rect x="40" y="520" width="580" height="155" rx="8" fill="#f9fafb" stroke="#e5e7eb" stroke-width="1"/>
+<text x="55" y="545" class="label">Kernel 数据流</text>
+<line x1="60" y1="565" x2="120" y2="565" stroke="#059669" stroke-width="1.5" marker-end="url(#arrow-green)"/>
+<text x="130" y="569" class="small">读: current_run / current_handoff / current_clarification / current_decision</text>
+<line x1="60" y1="590" x2="120" y2="590" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow-blue)"/>
+<text x="130" y="594" class="small">写: gate receipt + handoff payload + checkpoint request (via canonical_writer)</text>
+<line x1="60" y1="615" x2="120" y2="615" stroke="#9ca3af" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#arrow-gray)"/>
+<text x="130" y="619" class="small">协议驱动: host 按 protocol.md 依次调用 kernel 决策函数</text>
+<text x="60" y="650" class="small">Kernel: ~3.9K LOC (core+support) | 退场: ~28K+ LOC | cutover: ~12-15 files</text>
+<text x="60" y="668" class="small">判定标准: 协议要求的 machine truth 留 / runtime 局部语境不留 / 调试解释上下文不进 kernel</text>
+</svg>
