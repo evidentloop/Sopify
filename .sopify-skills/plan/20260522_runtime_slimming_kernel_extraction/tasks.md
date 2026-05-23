@@ -187,6 +187,14 @@ archive_ready: false
   > 进入条件: runtime/ 下零 `from .models` 消费者（retained 模块 rewire + legacy 模块删除/rewire 全部完成）
   > tests rewire 是同步动作，不是独立前提。
 - [ ] 4.11 kernel 验证：确认 gate → route → handoff → checkpoint 链路在 kernel-only 模式下可用
+  > **coverage audit** ✅ 完成 (2026-05-23):
+  > - gate.py / router.py / checkpoint_request.py / checkpoint_materializer.py 均有直接 contract/integration 覆盖
+  > - end-to-end 真实链路存在：`test_runtime_engine.py` 中有 6+ integration tests 通过 `run_runtime()` 走完 gate → _kernel_turn → route → handoff → checkpoint
+  > - 结论: 对 C1 (`from .models` → `from sopify_contracts.*`) 机械 rewire，无需先补测试；现有测试足以捕获 import 断裂
+  >
+  > **未闭合项**:
+  > - `_kernel_turn.py` 作为 orchestration seam 仍无直接测试，当前仅通过 gate/engine 间接覆盖
+  > - 审计完成的是主链覆盖追踪，不等于“kernel-only 模式”已完全独立验证
 - [ ] 4.12 post-cutover naming/comment polish（deferred，非行为变更）
   > 进入条件: Package A + C 完成，retained 模块集合稳定
   > 范围:
