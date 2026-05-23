@@ -29,7 +29,6 @@ from .decision import (
     response_from_submission,
     stale_decision,
 )
-from .develop_callback import develop_resume_after, is_develop_callback_state
 from .execution_gate import evaluate_execution_gate
 from .archive_lifecycle import (
     ARCHIVE_STATUS_ALREADY_ARCHIVED,
@@ -90,6 +89,22 @@ _HOST_FACING_TRUTH_KIND_ENGINE_RUNTIME_HANDOFF = "engine_runtime_handoff"
 _HOST_FACING_TRUTH_KIND_PROMOTION_GLOBAL_EXECUTION = "promotion_global_execution"
 _ABORTABLE_CLARIFICATION_STATUSES = frozenset({"pending", "collecting"})
 _ABORTABLE_DECISION_STATUSES = frozenset({"pending", "collecting", "cancelled", "timed_out"})
+
+
+def is_develop_callback_state(_state: object) -> bool:
+    """Fail-close — develop callback path retired."""
+    if hasattr(_state, 'resume_context') and isinstance(getattr(_state, 'resume_context', None), dict):
+        if _state.resume_context.get("source") == "develop_callback":
+            raise RuntimeError(
+                "develop_callback state detected but develop_callback is retired; "
+                "clear the stale current_clarification/current_decision to proceed"
+            )
+    return False
+
+
+def develop_resume_after(_resume_context: object) -> object:
+    """Fail-close — develop callback path retired."""
+    raise RuntimeError("develop_callback is retired; develop_resume_after should not be reached")
 
 # Canonical route families (blueprint design.md §Route Families).
 # Internal consumers should reference families, not enumerate individual route names.

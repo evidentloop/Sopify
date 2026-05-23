@@ -1,16 +1,16 @@
 """Kernel orchestration entry point (internal).
 
 Guarantees achieved:
-  - gate.py / cli.py / plan_orchestrator.py import execute_kernel_turn()
-    from this module instead of engine.run_runtime().
+  - gate.py imports execute_kernel_turn() from this module instead of
+    engine.run_runtime().
   - engine.run_runtime() is a deprecated lazy-import wrapper.
   - No runtime.models bridge consumption — types come from sopify_contracts.
   - Kernel-path helpers are inlined (A1 complete) — no engine.py
     implementation coupling for the core orchestration pipeline.
 
 Remaining engine dependency:
-  - 11 non-kernel route handlers still imported from engine.py.
-    A2 contract audit will determine which are live vs. dead.
+  - 10 non-kernel route handlers still imported from engine.py.
+    A2 contract audit determined 9 retain + 1 deleted (skill execution sidecar).
 """
 
 from __future__ import annotations

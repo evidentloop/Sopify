@@ -150,18 +150,20 @@ archive_ready: false
   > **第二层模块重分类** (原 S3.1 co-delete → 实际 retained):
   > | 模块 | LOC | 新分类 | 关键证据 |
   > |------|-----|--------|---------|
-  > | `archive_lifecycle.py` | 831 | **retain as module** | _kernel_turn.py:53-59; 蓝图 canonical capability (blueprint/design.md:295,659,794) |
-  > | `plan_registry.py` | 1,012 | **retain as module** | archive_lifecycle:17 → remove_plan_entry (critical path); output.py:12 |
-  > | `kb.py` | 463 | **retain as module** | _kernel_turn.py:63,534 bootstrap_kb |
-  > | `clarification.py` | 386 | **retain as module** | router + checkpoint_request + handoff + _kernel_turn |
-  > | `decision.py` | 607 | **retain as module** | router + handoff + _kernel_turn |
-  > | `context_recovery.py` | 93 | **retain as module** | _kernel_turn.py:35 recover_context |
+  > | `archive_lifecycle.py` | 831 | **retain as module** ✅ 维护者确认 | _kernel_turn.py:53-59; 蓝图 canonical capability (blueprint/design.md:295,659,794) |
+  > | `kb.py` | 463 | **retain as module** ✅ 维护者确认 | _kernel_turn.py:63,534 bootstrap_kb |
+  > | `clarification.py` | 386 | **retain as module** ✅ 维护者确认 | router + checkpoint_request + handoff + _kernel_turn |
+  > | `decision.py` | 607 | **retain as module** ✅ 维护者确认 | router + handoff + _kernel_turn |
+  > | `context_recovery.py` | 93 | **retain as module** ✅ 维护者确认 | _kernel_turn.py:35 recover_context |
+  > | `plan_registry.py` | 1,012 | **pending / needs focused audit** | engine.py:47 (5 符号), archive_lifecycle:18, output.py:12, plan_scaffold:17; 消费者过硬不可直接删，但内联可行性待评估 |
   > | `skill_registry.py` | 255 | **retain as module** | _kernel_turn.py:538 SkillRegistry.discover() |
   > | `skill_resolver.py` | 111 | **retain as module** | router.py:775 resolve_route_candidate_skills() |
   > | `plan_scaffold.py` | 464 | **delete candidate, blocked by engine.py** | 零直接 retained 消费者 |
   > | `skill_runner.py` | 85 | **deleted** ✅ 2141ed6 | 悬空路径 |
   >
-  > S3.1 co-delete 表中 8 个模块 (~3,758 LOC) 重分类为 retain as module。
+  > 5 个模块 (archive_lifecycle / kb / clarification / decision / context_recovery) 经维护者确认为 retain as module。
+  > plan_registry.py 消费者过硬（engine.py Tier 1 + 2 个 retained 模块），但结论暂不写死；需 focused audit 评估内联可行性。
+  > skill_registry / skill_resolver: 证据充分但维护者尚未显式确认。
   > 保留的是 capability / contract，不是所有实现载体；legacy scripts/bridge/helper 仍可删。
   >
   > **A3: 立即删除面** ✅ 收口
@@ -180,6 +182,48 @@ archive_ready: false
   > 13 个 runtime 模块 + 3 个 test 文件 rewired to sopify_contracts.*
   > runtime/models.py 已删除 (-50 LOC): 仓库零消费者
   > C1+C2 合计: 22 个文件 rewired, 740 tests pass, 纯 import rewire, 零行为变更
+- [ ] 4.10d Step B: mainline-only slimming — 非主链功能层删除
+  > 目标切换: 从 contract-preserving slimming 切到 mainline-only slimming
+  > 明确接受退化: fail-close validator / context-checkpoint / future-boundary / observability
+  > 2026-05-23 文档收口: canonical 主链改为 `gate → current_* machine truth → handoff → host consume rule`；
+  > clarification/decision checkpoint 为分叉，不是每轮必经主干。后续删除以 keep-list 为准，不再以 runtime 文件完整性为目标。
+  >
+  > **Wave 1 — 非主链功能模块删除 (-2,708 LOC runtime)**:
+  > - 删除 9 个 runtime 模块: message_templates(265), context_builder(112), context_v1_scope(329),
+  >   resolution_planner(216), sidecar_classifier_boundary(205), vnext_phase_boundary(210),
+  >   action_projection(249), develop_quality(403), failure_recovery(719)
+  > - handoff.py: 删除 boundary artifact 构建/develop_quality/action_projection/tradeoff_signal + observability fallback
+  > - decision_tables.py: 去除 context_v1_scope + failure_recovery validator hooks
+  > - handoff.py: 移除 CHECKPOINT_REASON_MISSING_BUT_TRADEOFF_DETECTED 无用 import
+  > - decision_policy.py: 原计划删除后恢复——主链测试证明 decision checkpoint 依赖它
+  > - 删除 5 个测试文件: test_context_v1_scope, test_contract_consistency, test_runtime_failure_recovery,
+  >   test_runtime_message_templates, test_runtime_sample_invariant_gate
+  >
+  > **Wave 2 — develop_callback 彻底退役 (-601 LOC runtime, -82 LOC script)**:
+  > - 删除 runtime/develop_callback.py + scripts/develop_callback_runtime.py
+  > - engine.py: is_develop_callback_state/develop_resume_after 改为 fail-close（非静默 stub）
+  > - manifest.py: 清除 develop_callback/develop_quality/develop_resume 全部声明
+  > - installer/{runtime_bundle,bootstrap_workspace,validate,payload}.py: 清除 develop_callback 引用
+  > - scripts/sync-runtime-assets.sh: 清除 develop_callback 条目
+  > - blueprint/protocol.md: continue_host_develop 条目标注 develop_callback 已退役
+  > - blueprint/design.md: Develop callback 章节标注已退役
+  > - tests/runtime_test_support.py: 清除 develop_callback + decision_bridge 导入
+  >
+  > **Wave 3 — CLI bridge / orchestration 外围删除 (-1,952 LOC runtime, -3 scripts)**:
+  > - 删除 4 个 runtime 模块: decision_bridge(864), clarification_bridge(403),
+  >   cli_interactive(412), plan_orchestrator(273)
+  > - 删除 3 个 scripts: clarification_bridge_runtime, decision_bridge_runtime, go_plan_runtime
+  > - manifest.py: 清除 decision_bridge/clarification_bridge/planning_mode_orchestrator 声明
+  > - installer/runtime_bundle.py: 清除 bridge 必需路径
+  > - scripts/sync-runtime-assets.sh: 清除 bridge/orchestrator 条目
+  > - blueprint/protocol.md: Helper 索引清除已删 scripts
+  > - tests/runtime_test_support.py: 清除 clarification_bridge + plan_orchestrator 导入
+  >
+  > **主链测试**: 112 passed (gate/router/execution_gate)
+  > **累计删减**: ~5,261 LOC runtime + 3 scripts + 5 test files
+  > **已知遗留声明**: runtime/contracts/decision_tables.yaml 仍引用 failure_recovery_table/host_message_templates/action_projection；
+  >   tests/pytest_entries/fail_close_contract_entry.py 仍 import failure_recovery（import 会断）
+  > **接受退化**: 非主链测试可能 fail，后续不救
 - [ ] 4.11 kernel 验证：确认 gate → route → handoff → checkpoint 链路在 kernel-only 模式下可用
   > **coverage audit** ✅ 完成 (2026-05-23):
   > - gate.py / router.py / checkpoint_request.py / checkpoint_materializer.py 均有直接 contract/integration 覆盖
@@ -202,8 +246,10 @@ archive_ready: false
 
 ## 5. 文档更新
 - [ ] 5.1 按审计结果决定是否需要回写 `blueprint/tasks.md`
-- [ ] 5.2 若形成稳定边界变化，再同步 `blueprint/design.md` 或 `project.md`
-- [ ] 5.3 若维护者决定弃养 legacy deep runtime 路径，把该决策显式回写到长期文档而不是只留在临时审计结论
+- [x] 5.2 若形成稳定边界变化，再同步 `blueprint/design.md` 或 `project.md`
+  > 已回写 `blueprint/design.md` / `blueprint/protocol.md`：冻结 mainline-only keep-list，明确 checkpoint 是主链分叉而非每轮必经主干
+- [x] 5.3 若维护者决定弃养 legacy deep runtime 路径，把该决策显式回写到长期文档而不是只留在临时审计结论
+  > 已明确后续 slimming 口径：保 gate + machine truth + handoff + host consume rule，其余 runtime 内围能力默认可删/可内联
 - [ ] 5.4 若 `deferred` 语义需要统一，单列为后续 contract 决策项，不在本审计中顺手修补
 - [ ] 5.5 对齐 user-facing docs/examples：更新 `README.md`、`examples/external-repo-quickstart/README.md`、`examples/external-repo-quickstart/sopify.json.example`，移除或改写因 runtime slimming 失实的安装目标、能力矩阵、目录树、bootstrap 叙述、`runtime_gate` 描述。不做产品定位刷新或营销文案重写
 - [ ] 5.6 文档验收：grep 验证 user-facing docs 不再宣称已删除的 runtime surface / deep runtime path / runtime bundle smoke

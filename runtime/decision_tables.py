@@ -71,7 +71,6 @@ def load_decision_tables(path: str | Path, *, schema_path: str | Path | None = N
         host_message_templates_schema=deepcopy(host_message_templates_schema),
         source_path=source_path,
     )
-    _validate_context_v1_scope(tables)
     return tables
 
 
@@ -131,15 +130,6 @@ def _parse_yaml(text: str) -> Any:
         return load_yaml(text)
     except YamlParseError as exc:
         raise DecisionTableError(str(exc)) from exc
-
-
-def _validate_context_v1_scope(tables: dict[str, Any]) -> None:
-    from .context_v1_scope import ContextV1ScopeError, validate_decision_tables_v1_scope
-
-    try:
-        validate_decision_tables_v1_scope(tables)
-    except ContextV1ScopeError as exc:
-        raise DecisionTableError(f"Decision tables exceed current V1 scope: {exc}") from exc
 
 
 def _validate_decision_table_schema(schema: dict[str, Any], *, source_path: Path) -> dict[str, Any]:
@@ -812,26 +802,6 @@ def _validate_decision_tables(
         source_path=source_path,
     )
 
-    from .failure_recovery import (
-        DEFAULT_FAILURE_RECOVERY_SCHEMA_PATH,
-        _validate_failure_recovery_table,
-        load_failure_recovery_schema,
-    )
-
-    recovery_schema = load_failure_recovery_schema(DEFAULT_FAILURE_RECOVERY_SCHEMA_PATH)
-    embedded_recovery = _expect_mapping(
-        data.get("failure_recovery_table"),
-        path="failure_recovery_table",
-    )
-    data["failure_recovery_table"] = _validate_failure_recovery_table(
-        deepcopy(dict(embedded_recovery)),
-        schema=deepcopy(recovery_schema),
-        decision_tables={
-            "primary_failure_priority": data["primary_failure_priority"],
-            "source_path": str(source_path),
-        },
-        source_path=source_path,
-    )
     data["side_effect_mapping_table"] = _validate_side_effect_mapping_table(
         data.get("side_effect_mapping_table"),
         schema=side_effect_mapping_schema,

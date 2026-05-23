@@ -370,48 +370,49 @@ Step 4: 用等价覆盖测试守住 contract
 ### runtime/ 非内核模块 (42 entries, ~18.8K LOC)
 
 <!-- 42 = 1 rewrite-first (models.py) + 40 co-delete + 1 rewrite (__init__.py) -->
+<!-- 2026-05-23 部分收口: 标注已删除 / 已重分类的模块，S3.1 表仅作历史参考 -->
 
 | 分类 | 文件 | LOC | 说明 |
 |------|------|-----|------|
-| **rewrite-first** | `models.py` | 50 | DEPRECATED re-export facade；被 8 个内核模块(core: execution_gate/router/handoff/checkpoint_request/checkpoint_materializer + support: config/state/deterministic_guard)直接 import → 必须先将 `from .models` 改为 `from sopify_contracts`，然后才能删除 |
-| **co-delete** | `engine.py` | 2,728 | 全功能 engine，kernel 不保留 |
-| **co-delete** | `decision_tables.py` | 1,632 | 决策表数据，非编排核 |
-| **co-delete** | `plan_registry.py` | 1,012 | 计划注册存储，非编排核 |
+| ~~rewrite-first~~ **deleted (Package C)** | `models.py` | 50 | ~~DEPRECATED re-export facade~~ → Package C 已删除，22 文件 rewired to sopify_contracts.* |
+| **co-delete** | `engine.py` | 2,728 | 全功能 engine，blocked shell (10 handler 仍被 _kernel_turn.py import) |
+| **co-delete** | `decision_tables.py` | 1,632 | 决策表数据，legacy data surface 保留（下一轮单独决策） |
+| **pending / focused audit** | `plan_registry.py` | 1,012 | engine.py(5 符号) + archive_lifecycle + output.py 均依赖；消费者过硬不可直接删，内联可行性待评估 |
 | **co-delete** | `workspace_preflight.py` | 958 | 安装验证，非编排核 |
 | **co-delete** | `action_intent.py` | 884 | 动作意图，非编排核 |
-| **co-delete** | `decision_bridge.py` | 864 | 兼容桥接，非编排核 |
-| **co-delete** | `archive_lifecycle.py` | 831 | 归档生命周期，非编排核 |
-| **co-delete** | `failure_recovery.py` | 719 | 故障恢复，非编排核 |
+| ~~co-delete~~ **deleted (Step B Wave 3)** | `decision_bridge.py` | 864 | 兼容桥接，已删除 |
+| ~~co-delete~~ **retain as module** ✅ | `archive_lifecycle.py` | 831 | 蓝图 canonical capability；维护者确认 retain |
+| ~~co-delete~~ **deleted (Step B Wave 1)** | `failure_recovery.py` | 719 | 故障恢复，已删除 |
 | **co-delete** | `output.py` | 620 | 渲染输出，非编排核 |
-| **co-delete** | `decision.py` | 607 | 决策对象，非编排核 |
-| **co-delete** | `develop_callback.py` | 599 | 开发回调管道，非编排核 |
+| ~~co-delete~~ **retain as module** ✅ | `decision.py` | 607 | router + handoff + _kernel_turn；维护者确认 retain |
+| ~~co-delete~~ **deleted (Step B Wave 2)** | `develop_callback.py` | 599 | 开发回调管道，已删除 |
 | **co-delete** | `manifest.py` | 475 | manifest 加载，非编排核 |
-| **co-delete** | `kb.py` | 463 | 知识库访问，非编排核 |
-| **co-delete** | `plan_scaffold.py` | 464 | 计划脚手架，非编排核 |
-| **co-delete** | `decision_policy.py` | 434 | 决策策略，非编排核 |
-| **co-delete** | `cli_interactive.py` | 412 | 交互 CLI，非编排核 |
-| **co-delete** | `develop_quality.py` | 403 | 质量检查，非编排核 |
-| **co-delete** | `clarification_bridge.py` | 401 | 兼容桥接，非编排核 |
-| **co-delete** | `clarification.py` | 386 | 交互流程，非编排核 |
-| **co-delete** | `context_v1_scope.py` | 329 | v1 上下文规则，非编排核 |
-| **co-delete** | `plan_orchestrator.py` | 272 | 计划编排，非编排核 |
+| ~~co-delete~~ **retain as module** ✅ | `kb.py` | 463 | _kernel_turn.py bootstrap_kb；维护者确认 retain |
+| **delete candidate** | `plan_scaffold.py` | 464 | blocked by engine.py _advance_planning_route → create_plan_scaffold |
+| **co-delete** | `decision_policy.py` | 434 | 决策策略 (Step B 恢复: decision checkpoint 依赖) |
+| ~~co-delete~~ **deleted (Step B Wave 3)** | `cli_interactive.py` | 412 | 交互 CLI，已删除 |
+| ~~co-delete~~ **deleted (Step B Wave 1)** | `develop_quality.py` | 403 | 质量检查，已删除 |
+| ~~co-delete~~ **deleted (Step B Wave 3)** | `clarification_bridge.py` | 401 | 兼容桥接，已删除 |
+| ~~co-delete~~ **retain as module** ✅ | `clarification.py` | 386 | router + checkpoint_request + handoff + _kernel_turn；维护者确认 retain |
+| ~~co-delete~~ **deleted (Step B Wave 1)** | `context_v1_scope.py` | 329 | v1 上下文规则，已删除 |
+| ~~co-delete~~ **deleted (Step B Wave 3)** | `plan_orchestrator.py` | 272 | 计划编排，已删除 |
 | **co-delete** | `builtin_catalog.py` | 267 | 内置目录，非编排核 |
-| **co-delete** | `message_templates.py` | 265 | 消息模板，非编排核 |
-| **co-delete** | `_yaml.py` | 264 | YAML 工具（被 kernel support config.py 使用 → S4 需判定: 内联或保留） |
-| **co-delete** | `skill_registry.py` | 255 | 技能注册，非编排核 |
-| **co-delete** | `action_projection.py` | 249 | 动作投影，非编排核 |
-| **co-delete** | `resolution_planner.py` | 216 | 诊断恢复，非编排核 |
-| **co-delete** | `vnext_phase_boundary.py` | 210 | 版本边界，非编排核 |
-| **co-delete** | `sidecar_classifier_boundary.py` | 205 | 分类器边界，非编排核 |
+| ~~co-delete~~ **deleted (Step B Wave 1)** | `message_templates.py` | 265 | 消息模板，已删除 |
+| **co-delete** | `_yaml.py` | 264 | YAML 工具（被 kernel support config.py 使用 → 需判定: 内联或保留） |
+| **retain as module** | `skill_registry.py` | 255 | _kernel_turn.py:538 SkillRegistry.discover()；维护者待显式确认 |
+| ~~co-delete~~ **deleted (Step B Wave 1)** | `action_projection.py` | 249 | 动作投影，已删除 |
+| ~~co-delete~~ **deleted (Step B Wave 1)** | `resolution_planner.py` | 216 | 诊断恢复，已删除 |
+| ~~co-delete~~ **deleted (Step B Wave 1)** | `vnext_phase_boundary.py` | 210 | 版本边界，已删除 |
+| ~~co-delete~~ **deleted (Step B Wave 1)** | `sidecar_classifier_boundary.py` | 205 | 分类器边界，已删除 |
 | **co-delete** | `preferences.py` | 182 | 偏好预加载，非编排核 |
 | **co-delete** | `decision_templates.py` | 164 | 决策模板，非编排核 |
 | **co-delete** | `skill_schema.py` | 140 | 技能 schema，非编排核 |
 | **co-delete** | `knowledge_layout.py` | 135 | 知识布局，非编排核 |
 | **co-delete** | `cli.py` | 113 | CLI 入口，非编排核 |
-| **co-delete** | `context_builder.py` | 112 | 上下文组装，非编排核 |
-| **co-delete** | `skill_resolver.py` | 111 | 技能解析，非编排核 |
-| **co-delete** | `context_recovery.py` | 93 | 上下文恢复，非编排核 |
-| **co-delete** | `skill_runner.py` | 85 | 技能执行，非编排核 |
+| ~~co-delete~~ **deleted (Step B Wave 1)** | `context_builder.py` | 112 | 上下文组装，已删除 |
+| **retain as module** | `skill_resolver.py` | 111 | router.py:775 resolve_route_candidate_skills()；维护者待显式确认 |
+| ~~co-delete~~ **retain as module** ✅ | `context_recovery.py` | 93 | _kernel_turn.py recover_context；维护者确认 retain |
+| ~~co-delete~~ **deleted (Package A)** | `skill_runner.py` | 85 | 技能执行，已删除 (2141ed6) |
 | **co-delete** | `checkpoint_cancel.py` | 80 | checkpoint 取消，非编排核 |
 | **co-delete** | `knowledge_sync.py` | 66 | 知识同步，非编排核 |
 | **rewrite** | `__init__.py` | 33 | 改为只导出 kernel 面 |

@@ -167,7 +167,6 @@ def expected_bundle_paths(bundle_root: Path) -> tuple[Path, ...]:
         bundle_root / "runtime" / "gate.py",
         bundle_root / "scripts" / "sopify_runtime.py",
         bundle_root / "scripts" / "runtime_gate.py",
-        bundle_root / "scripts" / "develop_callback_runtime.py",
     )
 
 

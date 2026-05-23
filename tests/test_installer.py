@@ -227,16 +227,10 @@ class PayloadInstallTests(unittest.TestCase):
             self.assertEqual(result.root, payload_root)
             payload_manifest = json.loads((payload_root / "payload-manifest.json").read_text(encoding="utf-8"))
             bundle_root = payload_root / "bundles" / payload_manifest["active_version"]
-            self.assertTrue((bundle_root / "scripts" / "clarification_bridge_runtime.py").exists())
-            self.assertTrue((bundle_root / "scripts" / "develop_callback_runtime.py").exists())
-            self.assertTrue((bundle_root / "scripts" / "decision_bridge_runtime.py").exists())
             self.assertTrue((bundle_root / "scripts" / "preferences_preload_runtime.py").exists())
             self.assertTrue((bundle_root / "scripts" / "runtime_gate.py").exists())
             self.assertEqual(payload_manifest["bundle_manifest"], f"bundles/{payload_manifest['active_version']}/manifest.json")
             self.assertEqual(payload_manifest["dependency_model"]["mode"], "stdlib_only")
-            self.assertTrue(
-                payload_manifest["minimum_workspace_manifest"]["required_capabilities"]["develop_callback"]
-            )
             self.assertTrue(payload_manifest["minimum_workspace_manifest"]["required_capabilities"]["runtime_gate"])
             self.assertTrue(payload_manifest["minimum_workspace_manifest"]["required_capabilities"]["runtime_entry_guard"])
 
@@ -303,8 +297,8 @@ class WorkspaceBootstrapCompatibilityTests(unittest.TestCase):
             )
 
             for relative_path in _REQUIRED_BUNDLE_FILES:
-                if relative_path == Path("scripts") / "clarification_bridge_runtime.py":
-                    continue
+                if relative_path == Path("runtime") / "gate.py":
+                    continue  # intentionally skip to create incomplete workspace bundle
                 path = bundle_root / relative_path
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text("", encoding="utf-8")

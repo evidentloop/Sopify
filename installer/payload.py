@@ -25,8 +25,6 @@ _REQUIRED_BUNDLE_CAPABILITIES = {
     "bundle_role": "control_plane",
     "manifest_first": True,
     "writes_handoff_file": True,
-    "develop_callback": True,
-    "develop_resume_context": True,
     "runtime_gate": True,
     "runtime_entry_guard": True,
 }

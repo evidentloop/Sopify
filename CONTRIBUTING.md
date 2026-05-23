@@ -115,7 +115,6 @@ python3 scripts/sopify_runtime.py "Refactor the database layer"
 python3 scripts/runtime_gate.py enter --workspace-root . --request "Refactor the database layer"
 python3 scripts/sopify_runtime.py "~go plan Refactor the database layer"
 python3 scripts/sopify_runtime.py "~go finalize"
-python3 scripts/go_plan_runtime.py "Refactor the database layer"
 bash scripts/check-runtime-smoke.sh
 ```
 

@@ -121,7 +121,6 @@ python3 scripts/sopify_runtime.py "重构数据库层"
 python3 scripts/runtime_gate.py enter --workspace-root . --request "重构数据库层"
 python3 scripts/sopify_runtime.py "~go plan 重构数据库层"
 python3 scripts/sopify_runtime.py "~go finalize"
-python3 scripts/go_plan_runtime.py "重构数据库层"
 bash scripts/check-runtime-smoke.sh
 ```
 

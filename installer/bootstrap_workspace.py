@@ -103,7 +103,6 @@ _REQUIRED_BUNDLE_FILES = (
     Path("runtime") / "gate.py",
     Path("scripts") / "sopify_runtime.py",
     Path("scripts") / "runtime_gate.py",
-    Path("scripts") / "develop_callback_runtime.py",
 )
 _IGNORE_PATTERNS = shutil.ignore_patterns(".DS_Store", "Thumbs.db", "__pycache__")
 _VERSION_TOKEN_RE = re.compile(r"[0-9]+|[A-Za-z]+")

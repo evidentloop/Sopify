@@ -88,9 +88,6 @@ PLAN_DIR="$WORK_DIR/.sopify-skills/plan"
 STATE_FILE="$WORK_DIR/.sopify-skills/state/current_plan.json"
 HANDOFF_FILE="$WORK_DIR/.sopify-skills/state/current_handoff.json"
 GATE_RECEIPT_FILE="$WORK_DIR/.sopify-skills/state/current_gate_receipt.json"
-CLARIFICATION_BRIDGE_ENTRY="$BUNDLE_ROOT/scripts/clarification_bridge_runtime.py"
-DECISION_BRIDGE_ENTRY="$BUNDLE_ROOT/scripts/decision_bridge_runtime.py"
-DEVELOP_CALLBACK_ENTRY="$BUNDLE_ROOT/scripts/develop_callback_runtime.py"
 PROJECT_FILE="$WORK_DIR/.sopify-skills/project.md"
 BLUEPRINT_INDEX="$WORK_DIR/.sopify-skills/blueprint/README.md"
 BLUEPRINT_BACKGROUND="$WORK_DIR/.sopify-skills/blueprint/background.md"
@@ -123,21 +120,6 @@ fi
 
 if ! grep -q '"entry_guard"' "$HANDOFF_FILE"; then
   echo "Smoke check failed: handoff is missing entry_guard contract: $HANDOFF_FILE" >&2
-  exit 1
-fi
-
-if [[ ! -f "$CLARIFICATION_BRIDGE_ENTRY" ]]; then
-  echo "Smoke check failed: missing clarification bridge helper: $CLARIFICATION_BRIDGE_ENTRY" >&2
-  exit 1
-fi
-
-if [[ ! -f "$DECISION_BRIDGE_ENTRY" ]]; then
-  echo "Smoke check failed: missing decision bridge helper: $DECISION_BRIDGE_ENTRY" >&2
-  exit 1
-fi
-
-if [[ ! -f "$DEVELOP_CALLBACK_ENTRY" ]]; then
-  echo "Smoke check failed: missing develop callback helper: $DEVELOP_CALLBACK_ENTRY" >&2
   exit 1
 fi
 
