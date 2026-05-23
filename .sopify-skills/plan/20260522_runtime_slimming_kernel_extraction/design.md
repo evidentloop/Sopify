@@ -367,16 +367,17 @@ Step 4: 用等价覆盖测试守住 contract
      3. 脚本 smoke/sync 不是 "keep"，是 co-delete
      4. 大量测试不需要 "preserve-equivalent"，只有 gate/route/handoff/checkpoint 合约测试需要 -->
 
-### runtime/ 非内核模块 (42 entries, ~18.8K LOC)
+### runtime/ 非内核模块 (42 entries, ~18.8K LOC → 6.1 后实际 38 files / 17,147 LOC)
 
 <!-- 42 = 1 rewrite-first (models.py) + 40 co-delete + 1 rewrite (__init__.py) -->
 <!-- 2026-05-23 部分收口: 标注已删除 / 已重分类的模块，S3.1 表仅作历史参考 -->
+<!-- 2026-05-24 6.1 收口: decision_tables.py + runtime/contracts/ 全删，runtime 实际 38 files / 17,147 LOC -->
 
 | 分类 | 文件 | LOC | 说明 |
 |------|------|-----|------|
 | ~~rewrite-first~~ **deleted (Package C)** | `models.py` | 50 | ~~DEPRECATED re-export facade~~ → Package C 已删除，22 文件 rewired to sopify_contracts.* |
 | **co-delete** | `engine.py` | 2,728 | 全功能 engine，blocked shell (10 handler 仍被 _kernel_turn.py import) |
-| **co-delete** | `decision_tables.py` | 1,632 | 决策表数据，legacy data surface 保留（下一轮单独决策） |
+| ~~co-delete~~ **deleted (Topic 6.1 全删)** | `decision_tables.py` | 1,632 | ~~决策表数据~~ → 零 runtime 生产消费者，Topic 6.1 全删 (-3,543 LOC 含 contracts/ + tests) |
 | **pending / focused audit** | `plan_registry.py` | 1,012 | engine.py(5 符号) + archive_lifecycle + output.py 均依赖；消费者过硬不可直接删，内联可行性待评估 |
 | **co-delete** | `workspace_preflight.py` | 958 | 安装验证，非编排核 |
 | **co-delete** | `action_intent.py` | 884 | 动作意图，非编排核 |
@@ -420,24 +421,12 @@ Step 4: 用等价覆盖测试守住 contract
 > **⚠ `_yaml.py` 特殊处理**: config.py (kernel support) 通过 `from ._yaml import` 依赖它。
 > S4 需决定: 将 YAML 加载逻辑内联到 config.py，还是保留 `_yaml.py` 作为 kernel utility。
 
-> **⚠ A2 重分类 (2026-05-23)**: 上表中以下模块经 A2 live contract audit 重分类。
-> S3.1 原表不再作为执行清单；保留的是 capability/contract，不是所有实现载体。
+> **⚠ A2 重分类 + 维护者部分收口 (2026-05-23)**: 上表已直接标注。
 >
-> | 模块 | 原分类 | 新分类 | 证据 |
-> |------|--------|--------|------|
-> | `archive_lifecycle.py` | co-delete | **retain** | _kernel_turn.py:53-59; 蓝图 canonical capability (blueprint/design.md:295,659,794) |
-> | `plan_registry.py` | co-delete | **retain** | archive_lifecycle:17 → remove_plan_entry (critical path); output.py:12 |
-> | `kb.py` | co-delete | **retain** | _kernel_turn.py:63,534 bootstrap_kb |
-> | `clarification.py` | co-delete | **retain** | router + checkpoint_request + handoff + _kernel_turn |
-> | `decision.py` | co-delete | **retain** | router + handoff + _kernel_turn |
-> | `context_recovery.py` | co-delete | **retain** | _kernel_turn.py:35 recover_context |
-> | `skill_registry.py` | co-delete | **retain** | _kernel_turn.py:538 SkillRegistry.discover() |
-> | `skill_resolver.py` | co-delete | **retain** | router.py:775 resolve_route_candidate_skills() |
-> | `plan_scaffold.py` | co-delete | **delete candidate, blocked by engine.py** | 零直接 retained 消费者 |
-> | `skill_runner.py` | co-delete | **deleted** ✅ 2141ed6 | A2 确认悬空路径 |
->
-> 净效果: 8 模块 (~3,758 LOC) retain; 1 模块 (85 LOC) 已删; 1 模块 (464 LOC) 待删 blocked。
-> legacy scripts/bridge/helper 不因模块 retain 而自动保留，仍可独立退场。
+> 维护者已确认 retain: archive_lifecycle / kb / clarification / decision / context_recovery (5 模块)。
+> plan_registry.py: **pending / needs focused audit** — 消费者过硬 (engine.py Tier 1 + 2 retained 模块)，内联可行性待评估。
+> skill_registry / skill_resolver: 证据充分但维护者尚未显式确认，待 §6 recommended_skill_ids contract 裁定后决定。
+> S3.1 原表不再作为执行清单；已删模块直接标注 deleted + 来源 commit/step。
 
 ### scripts/ 退场+cutover 清单 (15 entries)
 
@@ -512,7 +501,7 @@ Step 4: 用等价覆盖测试守住 contract
 | `test_runtime_plan_reuse.py` | 326 | 计划复用 |
 | `test_runtime_plan_registry.py` | 374 | 计划注册 |
 | `test_runtime_preferences.py` | 68 | 偏好 |
-| `test_runtime_decision_tables.py` | 368 | 决策表 |
+| ~~`test_runtime_decision_tables.py`~~ | ~~368~~ | ~~决策表~~ → **deleted (Topic 6.1)** |
 | `test_runtime_skill_registry.py` | 380 | 技能注册 |
 | `test_runtime_output_rendering.py` | 287 | 渲染输出 |
 | `test_runtime_kb.py` | 164 | KB |

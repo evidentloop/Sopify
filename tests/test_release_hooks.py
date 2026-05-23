@@ -223,8 +223,8 @@ class ReleaseHookTests(unittest.TestCase):
             root = Path(temp_dir)
             _init_release_hook_fixture(root)
 
-            _write(root / "runtime/resolution_planner.py", "print('scope change')\n")
-            _run_git(root, "add", "runtime/resolution_planner.py", capture_output=False, text=False)
+            _write(root / "runtime/state.py", "print('scope change')\n")
+            _run_git(root, "add", "runtime/state.py", capture_output=False, text=False)
 
             message_file = root / "COMMIT_EDITMSG"
             _write(message_file, "feat: tighten scope guard\n")
@@ -246,8 +246,8 @@ class ReleaseHookTests(unittest.TestCase):
             root = Path(temp_dir)
             _init_release_hook_fixture(root)
 
-            _write(root / "runtime/resolution_planner.py", "print('scope change')\n")
-            _run_git(root, "add", "runtime/resolution_planner.py", capture_output=False, text=False)
+            _write(root / "runtime/deterministic_guard.py", "print('scope change')\n")
+            _run_git(root, "add", "runtime/deterministic_guard.py", capture_output=False, text=False)
 
             message_file = root / "COMMIT_EDITMSG"
             _write(

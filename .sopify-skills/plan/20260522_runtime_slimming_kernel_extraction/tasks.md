@@ -254,3 +254,43 @@ archive_ready: false
 - [ ] 5.5 对齐 user-facing docs/examples：更新 `README.md`、`examples/external-repo-quickstart/README.md`、`examples/external-repo-quickstart/sopify.json.example`，移除或改写因 runtime slimming 失实的安装目标、能力矩阵、目录树、bootstrap 叙述、`runtime_gate` 描述。不做产品定位刷新或营销文案重写
 - [ ] 5.6 文档验收：grep 验证 user-facing docs 不再宣称已删除的 runtime surface / deep runtime path / runtime bundle smoke
 - [ ] 5.7 完成后归档审计结论或继续拆下一实施包
+
+## 6. 下一轮收缩：contract 面清理与边缘能力裁定
+
+> 进入条件: 5427520 (mainline-only control plane) 已提交
+> 口径: 上一轮删的是代码/模块；这一轮清的是 legacy data contract + 边缘能力 contract + 结构重构
+
+- [x] 6.1 **decision_tables legacy contract 清除** (难度: 中偏高) — ✅ 已执行: 全删
+  > 执行结果: decision_tables.py (1,602 LOC) + runtime/contracts/ 整组 (928 LOC) + test_runtime_decision_tables.py + 2 fixtures 全删 = **-3,543 LOC**
+  > decision_templates.py (164 LOC) 确认保留 — 被 decision.py:13 消费，与 decision_tables 完全独立
+  > 同步清理: test_action_intent.py (删 3 个 decision-table 测试类)、check-context-checkpoints.py (checkpoint A scope/files 裁剪)
+  > 额外修复: test_context_checkpoints.py + test_release_hooks.py 3 个 pre-existing failures (commit 5427520 遗留的 resolution_planner/context_v1_scope 引用断裂)
+  > 验证: 281 tests pass (含 action_intent/context_checkpoints/release_hooks 扩展验证)
+- [ ] 6.2 **router ingress / checkpoint reply 协议拆分** (难度: 中)
+  > 目标: 把 router 的主请求入口协议与 checkpoint 回复协议拆开，结束两类语义长期混跑
+  > ingress 终态: 普通 host request 优先只吃 ActionProposal，不再依赖 `_CONTINUE_KEYWORDS` / `_CANCEL_KEYWORDS` 这类自由文本猜测
+  > checkpoint 终态: clarification / decision 继续保留轻量自然语言回复解析，只负责 `继续` / `取消` / `choose` / answer 这类 checkpoint reply
+  > 直接收益: router 从"富文本分类器"收敛成"主入口控制层 + checkpoint 回复层"两块，后续才能继续清 candidate_skill_ids / recommended_skill_ids 等局部语境
+  > 联动面: router.py / gate.py / _kernel_turn.py / action_intent.py / clarification.py / decision.py / handoff.py + 对应 tests
+  > 边界: 本题不顺手重做 decision/clarification capability，只拆协议边界；普通主请求与 checkpoint reply 的 contract 要分别写清
+- [ ] 6.3 **recommended_skill_ids contract 裁定** (难度: 低，纯决策)
+  > 前置于 6.4 实现。三选一:
+  > - 保留 recommended_skill_ids，把动态发现改成静态推荐
+  > - 保留字段但降级为空/弱语义
+  > - 连字段一起从 handoff contract 里删除
+  > 证据面: blueprint/protocol.md:410 明文说宿主要消费 recommended_skill_ids
+  > 裁定不先定，后面做的全是假动作
+- [ ] 6.4 **skill discovery 退场** (难度: 中，依赖 6.3 裁定)
+  > 范围: skill_registry.py (255) + skill_resolver.py (111) + skill_schema.py (140) = ~506 LOC
+  > 联动: builtin_catalog.py (267 LOC) 被 manifest.py:12 直接依赖，不可随 skill_registry 一起删
+  > engine.py:61,71 也消费 skill_resolver/skill_registry，non-kernel handler path 需同步处理
+  > candidate_skill_ids 是 CheckpointRequest dataclass 字段 (checkpoint_request.py:60)，序列化进 current_decision.json / current_clarification.json — 这是 contract surface
+  > 如果 6.3 裁定保留字段: 删 skill_registry/resolver/schema，router + _kernel_turn + engine 改为静态 tuple
+  > 如果 6.3 裁定不保留字段: 整条链 + handoff/checkpoint contract 一起退场，范围更大
+- [ ] 6.5 **plan_registry 结构重构审计** (难度: 最高)
+  > 范围: plan_registry.py (1,013 LOC) + plan_scaffold.py (464 LOC, blocked by engine.py)
+  > 消费者: engine.py:47 (5 符号) + archive_lifecycle.py:18 + output.py:12 + plan_scaffold.py:17
+  > 核心问题不是"能不能删文件"，而是:
+  > - plan registry 这项能力是否继续作为独立治理层存在
+  > - 还是拆回 engine / archive_lifecycle / output / plan_scaffold
+  > 最后打；受益于前面题目的清理减少干扰变量

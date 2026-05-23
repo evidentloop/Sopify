@@ -37,15 +37,7 @@ CHECKPOINT_TASK_REQUIREMENTS = {
 
 CHECKPOINT_FILE_REQUIREMENTS = {
     "A": (
-        "runtime/contracts/decision_tables.yaml",
-        "runtime/contracts/decision_tables.schema.json",
-        "runtime/contracts/failure_recovery_table.schema.json",
-        "runtime/contracts/host_message_templates.schema.json",
-        "runtime/decision_tables.py",
         "runtime/state.py",
-        "tests/fixtures/context_fail_close_contract.yaml",
-        "tests/fixtures/fail_close_case_matrix.yaml",
-        "tests/test_runtime_decision_tables.py",
     ),
     "B": (
         "tests/fixtures/sample_invariant_gate_matrix.yaml",
@@ -63,12 +55,7 @@ CHECKPOINT_FILE_REQUIREMENTS = {
 CHECKPOINT_SCOPE_PATTERNS = {
     "A": (
         ".sopify-skills/plan/20260403_plan-a-risk-adaptive-interruption/",
-        "runtime/contracts/",
-        "runtime/decision_tables.py",
         "runtime/state.py",
-        "tests/fixtures/context_fail_close_contract.yaml",
-        "tests/fixtures/fail_close_case_matrix.yaml",
-        "tests/test_runtime_decision_tables.py",
     ),
     "B": (
         ".sopify-skills/plan/20260403_plan-a-risk-adaptive-interruption/",
