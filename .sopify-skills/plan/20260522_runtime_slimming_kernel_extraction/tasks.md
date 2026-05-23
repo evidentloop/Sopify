@@ -170,22 +170,16 @@ archive_ready: false
   > - 剩余: plan_scaffold.py (464 LOC, blocked by engine.py _advance_planning_route → create_plan_scaffold)
   > - engine.py: blocked shell，10 个 handler 仍被 _kernel_turn.py import，本包不承诺整体删除
   > - S3.1 大 co-delete 表不再作为执行清单；已降级为旧假设
-- [ ] 4.10c Step 3 Package C: models.py bridge 退场
-  > **C1: retained 模块 rewire** ✅ 完成 (2026-05-23, dbd1bc6)
+- [x] 4.10c Step 3 Package C: models.py bridge 退场 ✅ 完成 (2026-05-23)
+  > **C1: retained 模块 rewire** ✅ 完成 (dbd1bc6)
   > 9 个 A2 retained 非 kernel 模块已从 `from .models` 切到 `sopify_contracts.*`:
   > archive_lifecycle / clarification / context_recovery / decision / kb /
   > output / plan_registry / skill_registry / skill_resolver
-  > 740 tests pass, 纯 import rewire, 零行为变更
   >
-  > **C2: legacy 消费者清理** — 未开始
-  > runtime/ 下仍有其他模块 `from .models` import（engine.py, plan_orchestrator.py,
-  > plan_scaffold.py, action_projection.py, builtin_catalog.py, develop_callback.py,
-  > preferences.py, knowledge_layout.py, knowledge_sync.py, clarification_bridge.py,
-  > decision_bridge.py, decision_policy.py, decision_templates.py 等）。
-  > **以上不是完整枚举**；所有未删除的 `.models` 消费者都必须 rewire 或共删。
-  >
-  > 进入条件 (models.py 可删): runtime/ 下零 `from .models` 消费者
-  > tests rewire 是同步动作，不是独立前提。
+  > **C2: legacy 消费者清理 + models.py 删除** ✅ 完成 (e346583)
+  > 13 个 runtime 模块 + 3 个 test 文件 rewired to sopify_contracts.*
+  > runtime/models.py 已删除 (-50 LOC): 仓库零消费者
+  > C1+C2 合计: 22 个文件 rewired, 740 tests pass, 纯 import rewire, 零行为变更
 - [ ] 4.11 kernel 验证：确认 gate → route → handoff → checkpoint 链路在 kernel-only 模式下可用
   > **coverage audit** ✅ 完成 (2026-05-23):
   > - gate.py / router.py / checkpoint_request.py / checkpoint_materializer.py 均有直接 contract/integration 覆盖
