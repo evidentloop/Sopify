@@ -167,4 +167,4 @@ P0→P4c 主航道已全部完成。后续执行遵循以下原则：
 
 ## 遴选决策记录
 
-（待填写）
+- `2026-05-23 delayed writeback audit note`：`plan/runtime-slimming-kernel-extraction` 当天已在 feature branch 完成 `models.py` bridge 退役、mainline-only slimming 波次以及 Topic 6.1 contract surface 删除等实施与审计记录；当日未回写到 `main` 的 blueprint。此条仅作审计追踪与展示层补记，不替代后续 `5.1 blueprint/tasks.md` 正式回写。
