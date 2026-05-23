@@ -11,7 +11,8 @@ from tempfile import NamedTemporaryFile
 from typing import Any, Mapping, Sequence
 
 from ._yaml import YamlParseError, load_yaml
-from .models import PlanArtifact, RuntimeConfig
+from sopify_contracts.artifacts import PlanArtifact
+from sopify_contracts.core import RuntimeConfig
 from canonical_writer import StateStore, iso_now
 
 REGISTRY_FILENAME = "_registry.yaml"

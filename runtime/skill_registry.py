@@ -9,7 +9,7 @@ import re
 
 from ._yaml import YamlParseError, load_yaml
 from .builtin_catalog import load_builtin_skills
-from .models import RuntimeConfig, SkillMeta
+from sopify_contracts.core import RuntimeConfig, SkillMeta
 from .skill_schema import SkillManifestError, normalize_skill_manifest
 
 _FRONT_MATTER_RE = re.compile(r"\A---\s*\n(.*?)\n---\s*\n", re.DOTALL)

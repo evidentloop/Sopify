@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Iterable
 
-from .models import SkillMeta
+from sopify_contracts.core import SkillMeta
 
 _SOURCE_ORDER = {
     "workspace": 0,

@@ -9,7 +9,8 @@ from typing import Any, Mapping, Optional
 
 from canonical_writer._time import iso_now
 from .knowledge_layout import resolve_context_profile
-from .models import ClarificationState, RouteDecision, RuntimeConfig
+from sopify_contracts.core import RouteDecision, RuntimeConfig
+from sopify_contracts.decision import ClarificationState
 
 CURRENT_CLARIFICATION_FILENAME = "current_clarification.json"
 CURRENT_CLARIFICATION_RELATIVE_PATH = f".sopify-skills/state/{CURRENT_CLARIFICATION_FILENAME}"
