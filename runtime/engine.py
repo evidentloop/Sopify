@@ -73,7 +73,6 @@ from .action_intent import (
     DECISION_REJECT,
     generate_proposal_id,
 )
-from .skill_registry import SkillRegistry
 from canonical_writer import StateStore, iso_now
 from .state import (
     local_day_now,
@@ -534,7 +533,6 @@ def _with_global_handoff_ownership(
         plan_path=handoff.plan_path,
         handoff_kind=handoff.handoff_kind,
         required_host_action=handoff.required_host_action,
-        recommended_skill_ids=handoff.recommended_skill_ids,
         artifacts=handoff.artifacts,
         notes=handoff.notes,
         observability=observability,

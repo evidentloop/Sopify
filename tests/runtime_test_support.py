@@ -48,7 +48,6 @@ from runtime.plan_scaffold import create_plan_scaffold, request_explicitly_wants
 from runtime.output import render_runtime_output
 from runtime.preferences import preload_preferences, preload_preferences_for_workspace
 from runtime.router import Router
-from runtime.skill_registry import SkillRegistry
 from canonical_writer import StateStore, iso_now
 from canonical_writer.invariants import HOST_FACING_TRUTH_WRITE_KINDS, InvariantViolationError
 from runtime.state import local_day_now, stable_request_sha1

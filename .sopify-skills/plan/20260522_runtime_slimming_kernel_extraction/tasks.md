@@ -292,7 +292,8 @@ archive_ready: false
   > - candidate_skill_ids 保留为内部字段（checkpoint materializer 恢复链需要），不再往宿主面扩散
 - [ ] 6.4 **skill discovery 退场 + recommended_skill_ids 删除** (难度: 中，承接 6.3 裁定 C1)
   > 删除范围:
-  > - skill_registry.py (255) + skill_resolver.py (111) + skill_schema.py (140) = ~506 LOC 全删
+  > - skill_registry.py (255) + skill_resolver.py (111) = ~366 LOC 删除
+  > - skill_schema.py (140) 保留：generate-builtin-catalog.py (CI/preflight 依赖) 仍需要 normalize_skill_manifest
   > - RuntimeHandoff.recommended_skill_ids 字段删除（sopify_contracts/handoff.py）
   > - handoff.py:143 的 recommended_skill_ids 透传删除
   > - _kernel_turn.py:151 / engine.py:537 的 recommended_skill_ids 搬运删除
@@ -303,7 +304,12 @@ archive_ready: false
   > - candidate_skill_ids 保留为内部字段（checkpoint materializer 恢复链需要）
   > - Router/derive 里的 candidate_skill_ids 改为硬编码静态 tuple（已经事实静态化，只去掉 resolve 调用壳）
   > SkillRegistry.discover() 调用点退场: router.py / _kernel_turn.py / engine.py / tests
-  > 一并清理: _ACTION_KEYWORDS / _ARCHITECTURE_KEYWORDS 及其对应的普通 ingress heuristics；checkpoint local reply grammar 不在此删
+  > 不在本题处理: host bare-text ingress fallback、authorized ActionProposal complexity heuristic（modify_files / propose_plan 仍经 estimate_complexity() 落 quick_fix / light_iterate / workflow + plan_level）
+  > 明确保留: checkpoint local reply grammar / checkpoint reply NLP（clarification / decision / state_conflict）
+  > 事实债记录: 当前仍存在两层猜测
+  > - host bare-text ingress 仍依赖 _ACTION_KEYWORDS / _ARCHITECTURE_KEYWORDS + estimate_complexity()
+  > - authorized ActionProposal derive 仍依赖同一套 complexity heuristic
+  > 上述两层待单独题处理；代码收口前不得先改协议宣称其已退役
 - [ ] 6.5 **plan_registry 结构重构审计** (难度: 最高)
   > 范围: plan_registry.py (1,013 LOC) + plan_scaffold.py (464 LOC, blocked by engine.py)
   > 消费者: engine.py:47 (5 符号) + archive_lifecycle.py:18 + output.py:12 + plan_scaffold.py:17

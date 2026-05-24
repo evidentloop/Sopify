@@ -140,7 +140,6 @@ def build_runtime_handoff(
         plan_path=resolved_plan.path if resolved_plan is not None else None,
         handoff_kind=handoff_kind,
         required_host_action=required_host_action,
-        recommended_skill_ids=tuple(decision.candidate_skill_ids),
         artifacts=artifacts,
         notes=normalized_notes,
         observability=observability,

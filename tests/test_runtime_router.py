@@ -14,9 +14,8 @@ class RouterTests(unittest.TestCase):
             store = StateStore(config)
             store.ensure()
             router = Router(config, state_store=store)
-            skills = SkillRegistry(config, user_home=workspace / "home").discover()
 
-            route = router.classify("删除操作会影响哪些表？", skills=skills)
+            route = router.classify("删除操作会影响哪些表？")
 
             self.assertEqual(route.route_name, "consult")
 
@@ -27,9 +26,8 @@ class RouterTests(unittest.TestCase):
             store = StateStore(config)
             store.ensure()
             router = Router(config, state_store=store)
-            skills = SkillRegistry(config, user_home=workspace / "home").discover()
 
-            route = router.classify("能否帮我修改这段代码？", skills=skills)
+            route = router.classify("能否帮我修改这段代码？")
 
             self.assertNotEqual(route.route_name, "consult")
 
@@ -56,9 +54,8 @@ class RouterTests(unittest.TestCase):
             store = StateStore(config)
             store.ensure()
             router = Router(config, state_store=store)
-            skills = SkillRegistry(config, user_home=workspace / "home").discover()
 
-            route = router.classify("修复这个 bug", skills=skills)
+            route = router.classify("修复这个 bug")
 
             self.assertNotEqual(route.route_name, "consult")
 
@@ -69,9 +66,8 @@ class RouterTests(unittest.TestCase):
             store = StateStore(config)
             store.ensure()
             router = Router(config, state_store=store)
-            skills = SkillRegistry(config, user_home=workspace / "home").discover()
 
-            route = router.classify("帮我删除这个文件？", skills=skills)
+            route = router.classify("帮我删除这个文件？")
 
             self.assertNotEqual(route.route_name, "consult")
 
@@ -82,9 +78,8 @@ class RouterTests(unittest.TestCase):
             store = StateStore(config)
             store.ensure()
             router = Router(config, state_store=store)
-            skills = SkillRegistry(config, user_home=workspace / "home").discover()
 
-            route = router.classify("帮我添加日志", skills=skills)
+            route = router.classify("帮我添加日志")
 
             self.assertEqual(route.route_name, "light_iterate")
             self.assertEqual(route.plan_level, "light")
@@ -96,9 +91,8 @@ class RouterTests(unittest.TestCase):
             store = StateStore(config)
             store.ensure()
             router = Router(config, state_store=store)
-            skills = SkillRegistry(config, user_home=workspace / "home").discover()
 
-            route = router.classify("重构整个认证模块，把 session 改成 JWT", skills=skills)
+            route = router.classify("重构整个认证模块，把 session 改成 JWT")
 
             self.assertEqual(route.route_name, "workflow")
 
@@ -133,10 +127,9 @@ class RouterTests(unittest.TestCase):
             store = StateStore(config)
             store.ensure()
             router = Router(config, state_store=store)
-            skills = SkillRegistry(config, user_home=workspace / "home").discover()
 
-            plan_route = router.classify("~go plan 补 runtime 骨架", skills=skills)
-            archive_route = router.classify("~go finalize", skills=skills)
+            plan_route = router.classify("~go plan 补 runtime 骨架")
+            archive_route = router.classify("~go finalize")
             self.assertEqual(plan_route.route_name, "plan_only")
             self.assertTrue(plan_route.should_create_plan)
             self.assertEqual(archive_route.route_name, "workflow")
@@ -156,9 +149,9 @@ class RouterTests(unittest.TestCase):
             # triggers resume/cancel on general ingress.  These intents must
             # come through ActionProposal (execute_existing_plan / cancel_flow).
             # Router classifies them as normal requests.
-            resume_route = router.classify("继续", skills=skills)
-            cancel_route = router.classify("取消", skills=skills)
-            consult_route = router.classify("这个方案为什么要这样拆？", skills=skills)
+            resume_route = router.classify("继续")
+            cancel_route = router.classify("取消")
+            consult_route = router.classify("这个方案为什么要这样拆？")
 
             self.assertNotEqual(resume_route.route_name, "resume_active")
             self.assertNotEqual(cancel_route.route_name, "cancel_active")
@@ -171,9 +164,8 @@ class RouterTests(unittest.TestCase):
             store = StateStore(config)
             store.ensure()
             router = Router(config, state_store=store)
-            skills = SkillRegistry(config, user_home=workspace / "home").discover()
 
-            route = router.classify("design 阶段现在怎么收口？", skills=skills)
+            route = router.classify("design 阶段现在怎么收口？")
 
             self.assertEqual(route.route_name, "workflow")
             self.assertEqual(route.plan_package_policy, "authorized_only")
@@ -190,9 +182,8 @@ class RouterTests(unittest.TestCase):
             store = StateStore(config)
             store.ensure()
             router = Router(config, state_store=store)
-            skills = SkillRegistry(config, user_home=workspace / "home").discover()
 
-            route = router.classify("~go 不要新建新的 plan 包，直接在当前 plan 上细化 tasks", skills=skills)
+            route = router.classify("~go 不要新建新的 plan 包，直接在当前 plan 上细化 tasks")
 
             self.assertEqual(route.route_name, "workflow")
             self.assertEqual(route.plan_package_policy, "authorized_only")
@@ -205,9 +196,8 @@ class RouterTests(unittest.TestCase):
             store = StateStore(config)
             store.ensure()
             router = Router(config, state_store=store)
-            skills = SkillRegistry(config, user_home=workspace / "home").discover()
 
-            route = router.classify("长期契约上是继续手写 catalog 还是改成生成链？", skills=skills)
+            route = router.classify("长期契约上是继续手写 catalog 还是改成生成链？")
 
             self.assertEqual(route.route_name, "workflow")
             self.assertIn("tradeoff or long-term contract split", route.reason)
@@ -225,9 +215,8 @@ class RouterTests(unittest.TestCase):
             plan_artifact = create_plan_scaffold("第一性原理协作规则分层落地", config=config, level="standard")
             store.set_current_plan(plan_artifact)
             router = Router(config, state_store=store)
-            skills = SkillRegistry(config, user_home=workspace / "home").discover()
 
-            route = router.classify("review 一下然后改一下 tasks", skills=skills)
+            route = router.classify("review 一下然后改一下 tasks")
 
             self.assertIn(route.route_name, {"workflow", "light_iterate"})
 
@@ -240,9 +229,8 @@ class RouterTests(unittest.TestCase):
             plan_artifact = create_plan_scaffold("第一性原理协作规则分层落地", config=config, level="standard")
             store.set_current_plan(plan_artifact)
             router = Router(config, state_store=store)
-            skills = SkillRegistry(config, user_home=workspace / "home").discover()
 
-            route = router.classify("review 一下，然后改一下 tasks", skills=skills)
+            route = router.classify("review 一下，然后改一下 tasks")
 
             self.assertIn(route.route_name, {"workflow", "light_iterate"})
 
@@ -255,9 +243,8 @@ class RouterTests(unittest.TestCase):
             plan_artifact = create_plan_scaffold("第一性原理协作规则分层落地", config=config, level="standard")
             store.set_current_plan(plan_artifact)
             router = Router(config, state_store=store)
-            skills = SkillRegistry(config, user_home=workspace / "home").discover()
 
-            route = router.classify("改一下 tasks，然后 review 一下", skills=skills)
+            route = router.classify("改一下 tasks，然后 review 一下")
 
             self.assertIn(route.route_name, {"workflow", "light_iterate"})
 
@@ -270,9 +257,8 @@ class RouterTests(unittest.TestCase):
             plan_artifact = create_plan_scaffold("第一性原理协作规则分层落地", config=config, level="standard")
             store.set_current_plan(plan_artifact)
             router = Router(config, state_store=store)
-            skills = SkillRegistry(config, user_home=workspace / "home").discover()
 
-            route = router.classify("分析下风险", skills=skills)
+            route = router.classify("分析下风险")
 
             self.assertEqual(route.route_name, "light_iterate")
 
@@ -285,9 +271,8 @@ class RouterTests(unittest.TestCase):
             plan_artifact = create_plan_scaffold("第一性原理协作规则分层落地", config=config, level="standard")
             store.set_current_plan(plan_artifact)
             router = Router(config, state_store=store)
-            skills = SkillRegistry(config, user_home=workspace / "home").discover()
 
-            route = router.classify("分析下设计风险", skills=skills)
+            route = router.classify("分析下设计风险")
 
             self.assertEqual(route.route_name, "light_iterate")
 
@@ -300,9 +285,8 @@ class RouterTests(unittest.TestCase):
             plan_artifact = create_plan_scaffold("第一性原理协作规则分层落地", config=config, level="standard")
             store.set_current_plan(plan_artifact)
             router = Router(config, state_store=store)
-            skills = SkillRegistry(config, user_home=workspace / "home").discover()
 
-            route = router.classify("review 一下，先确认风险，再改一下 tasks", skills=skills)
+            route = router.classify("review 一下，先确认风险，再改一下 tasks")
 
             self.assertIn(route.route_name, {"workflow", "light_iterate"})
 
@@ -315,9 +299,8 @@ class RouterTests(unittest.TestCase):
             plan_artifact = create_plan_scaffold("第一性原理协作规则分层落地", config=config, level="standard")
             store.set_current_plan(plan_artifact)
             router = Router(config, state_store=store)
-            skills = SkillRegistry(config, user_home=workspace / "home").discover()
 
-            route = router.classify("看下风险，再改一下 tasks", skills=skills)
+            route = router.classify("看下风险，再改一下 tasks")
 
             self.assertIn(route.route_name, {"workflow", "light_iterate"})
 
@@ -330,9 +313,8 @@ class RouterTests(unittest.TestCase):
             plan_artifact = create_plan_scaffold("第一性原理协作规则分层落地", config=config, level="standard")
             store.set_current_plan(plan_artifact)
             router = Router(config, state_store=store)
-            skills = SkillRegistry(config, user_home=workspace / "home").discover()
 
-            route = router.classify("状态如何，再改一下 tasks", skills=skills)
+            route = router.classify("状态如何，再改一下 tasks")
 
             self.assertIn(route.route_name, {"workflow", "light_iterate"})
 
@@ -345,9 +327,8 @@ class RouterTests(unittest.TestCase):
             plan_artifact = create_plan_scaffold("第一性原理协作规则分层落地", config=config, level="standard")
             store.set_current_plan(plan_artifact)
             router = Router(config, state_store=store)
-            skills = SkillRegistry(config, user_home=workspace / "home").discover()
 
-            route = router.classify("看下这个方案状态，再改下 tasks", skills=skills)
+            route = router.classify("看下这个方案状态，再改下 tasks")
 
             self.assertNotEqual(route.route_name, "consult")
 
@@ -358,9 +339,8 @@ class RouterTests(unittest.TestCase):
             store = StateStore(config)
             store.ensure()
             router = Router(config, state_store=store)
-            skills = SkillRegistry(config, user_home=workspace / "home").discover()
 
-            route = router.classify("这是一个性能问题，需要优化数据库查询", skills=skills)
+            route = router.classify("这是一个性能问题，需要优化数据库查询")
 
             self.assertEqual(route.route_name, "light_iterate")
             self.assertNotIn("meta-debug", route.reason)
@@ -370,10 +350,9 @@ class RouterTests(unittest.TestCase):
             workspace = Path(temp_dir)
             config, store, _ = _prepare_ready_plan_state(workspace)
             router = Router(config, state_store=store)
-            skills = SkillRegistry(config, user_home=workspace / "home").discover()
 
-            quick_fix_route = router.classify("修改 README 里的 helper 路径说明", skills=skills)
-            consult_route = router.classify("解释一下 decision_pending 和 clarification_pending 的区别", skills=skills)
+            quick_fix_route = router.classify("修改 README 里的 helper 路径说明")
+            consult_route = router.classify("解释一下 decision_pending 和 clarification_pending 的区别")
 
             self.assertEqual(quick_fix_route.route_name, "quick_fix")
             self.assertIsNone(quick_fix_route.active_run_action)
@@ -387,12 +366,11 @@ class RouterTests(unittest.TestCase):
             store = StateStore(config)
             store.ensure()
             router = Router(config, state_store=store)
-            skills = SkillRegistry(config, user_home=workspace / "home").discover()
 
             run_runtime("~go plan 优化一下", workspace_root=workspace, user_home=workspace / "home")
 
-            blocked_exec = router.classify("~go exec", skills=skills)
-            answer = router.classify("目标是 runtime/router.py，预期结果是补状态骨架", skills=skills)
+            blocked_exec = router.classify("~go exec")
+            answer = router.classify("目标是 runtime/router.py，预期结果是补状态骨架")
 
             self.assertEqual(blocked_exec.route_name, "clarification_pending")
             self.assertEqual(answer.route_name, "clarification_resume")
@@ -404,7 +382,6 @@ class RouterTests(unittest.TestCase):
             store = StateStore(config)
             store.ensure()
             router = Router(config, state_store=store)
-            skills = SkillRegistry(config, user_home=workspace / "home").discover()
 
             run_runtime("~go plan 优化一下", workspace_root=workspace, user_home=workspace / "home")
 
@@ -419,7 +396,7 @@ class RouterTests(unittest.TestCase):
                 response_message="host form submitted",
             )
 
-            resumed = router.classify("继续", skills=skills)
+            resumed = router.classify("继续")
 
             self.assertEqual(resumed.route_name, "clarification_resume")
             self.assertEqual(resumed.active_run_action, "clarification_response_from_state")
@@ -431,7 +408,6 @@ class RouterTests(unittest.TestCase):
             store = StateStore(config)
             store.ensure()
             router = Router(config, state_store=store)
-            skills = SkillRegistry(config, user_home=workspace / "home").discover()
 
             run_runtime(
                 "~go plan payload 放 host root 还是 workspace/.sopify-runtime",
@@ -439,7 +415,7 @@ class RouterTests(unittest.TestCase):
                 user_home=workspace / "home",
             )
 
-            blocked_exec = router.classify("~go exec", skills=skills)
+            blocked_exec = router.classify("~go exec")
             self.assertEqual(blocked_exec.route_name, "decision_pending")
             self.assertEqual(blocked_exec.active_run_action, "inspect_decision")
 
@@ -474,10 +450,9 @@ class RouterTests(unittest.TestCase):
             )
 
             router = Router(config, state_store=store)
-            skills = SkillRegistry(config, user_home=workspace / "home").discover()
 
-            inspect_route = router.classify("看看状态", skills=skills)
-            cancel_route = router.classify("强制取消", skills=skills)
+            inspect_route = router.classify("看看状态")
+            cancel_route = router.classify("强制取消")
 
             self.assertEqual(inspect_route.route_name, "state_conflict")
             self.assertEqual(inspect_route.active_run_action, "inspect_conflict")
@@ -492,7 +467,6 @@ class RouterTests(unittest.TestCase):
             store = StateStore(config)
             store.ensure()
             router = Router(config, state_store=store)
-            skills = SkillRegistry(config, user_home=workspace / "home").discover()
 
             run_runtime(
                 "~go plan payload 放 host root 还是 workspace/.sopify-runtime",
@@ -509,112 +483,10 @@ class RouterTests(unittest.TestCase):
                 )
             )
 
-            resumed = router.classify("继续", skills=skills)
+            resumed = router.classify("继续")
 
             self.assertEqual(resumed.route_name, "decision_resume")
             self.assertEqual(resumed.active_run_action, "resume_submitted_decision")
-
-    def test_route_skill_resolution_prefers_declarative_supports_routes(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            workspace = Path(temp_dir)
-            user_home = workspace / "home"
-            custom_skill = workspace / "skills" / "decision-helper"
-            custom_skill.mkdir(parents=True)
-            (custom_skill / "SKILL.md").write_text(
-                "---\nname: decision-helper\ndescription: custom pending decision helper\n---\n\n# decision-helper\n",
-                encoding="utf-8",
-            )
-            (custom_skill / "skill.yaml").write_text(
-                "id: decision-helper\n"
-                "mode: advisory\n"
-                "supports_routes:\n"
-                "  - decision_pending\n"
-                "  - decision_resume\n"
-                "metadata:\n"
-                "  priority: 1\n",
-                encoding="utf-8",
-            )
-
-            run_runtime(
-                "~go plan payload 放 host root 还是 workspace/.sopify-runtime",
-                workspace_root=workspace,
-                user_home=user_home,
-            )
-
-            config = load_runtime_config(workspace)
-            store = StateStore(config)
-            store.ensure()
-            router = Router(config, state_store=store)
-            skills = SkillRegistry(config, user_home=user_home).discover()
-
-            blocked_exec = router.classify("~go exec", skills=skills)
-
-            self.assertEqual(blocked_exec.route_name, "decision_pending")
-            self.assertEqual(blocked_exec.candidate_skill_ids, ("decision-helper",))
-
-    def test_route_skill_resolution_falls_back_when_supports_routes_missing(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            workspace = Path(temp_dir)
-            user_home = workspace / "home"
-            custom_skill = workspace / "skills" / "decision-helper"
-            custom_skill.mkdir(parents=True)
-            (custom_skill / "SKILL.md").write_text(
-                "---\nname: decision-helper\ndescription: custom helper without route metadata\n---\n\n# decision-helper\n",
-                encoding="utf-8",
-            )
-            (custom_skill / "skill.yaml").write_text(
-                "id: decision-helper\n"
-                "mode: advisory\n",
-                encoding="utf-8",
-            )
-
-            run_runtime(
-                "~go plan payload 放 host root 还是 workspace/.sopify-runtime",
-                workspace_root=workspace,
-                user_home=user_home,
-            )
-
-            config = load_runtime_config(workspace)
-            store = StateStore(config)
-            store.ensure()
-            router = Router(config, state_store=store)
-            skills = SkillRegistry(config, user_home=user_home).discover()
-
-            blocked_exec = router.classify("~go exec", skills=skills)
-
-            self.assertEqual(blocked_exec.route_name, "decision_pending")
-            self.assertEqual(blocked_exec.candidate_skill_ids, ("design",))
-
-    def test_route_skill_resolution_prefers_workspace_declarative_workflow_over_builtin_order(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            workspace = Path(temp_dir)
-            user_home = workspace / "home"
-            custom_skill = workspace / ".agents" / "skills" / "custom-workflow"
-            custom_skill.mkdir(parents=True)
-            (custom_skill / "SKILL.md").write_text(
-                "---\nname: custom-workflow\ndescription: custom workflow helper\n---\n\n# custom-workflow\n",
-                encoding="utf-8",
-            )
-            (custom_skill / "skill.yaml").write_text(
-                "id: custom-workflow\n"
-                "mode: workflow\n"
-                "supports_routes:\n"
-                "  - workflow\n"
-                "metadata:\n"
-                "  priority: 1\n",
-                encoding="utf-8",
-            )
-
-            config = load_runtime_config(workspace)
-            store = StateStore(config)
-            store.ensure()
-            router = Router(config, state_store=store)
-            skills = SkillRegistry(config, user_home=user_home).discover()
-
-            decision = router.classify("重构 runtime adapter 和 workflow 引擎", skills=skills)
-
-            self.assertEqual(decision.route_name, "workflow")
-            self.assertEqual(decision.candidate_skill_ids, ("custom-workflow", "analyze", "design", "develop"))
 
     def test_runtime_handoff_preserves_direct_edit_runtime_required_reason_code(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -672,7 +544,7 @@ class DeriveRouteTests(unittest.TestCase):
             config = load_runtime_config(workspace)
             proposal = ActionProposal("cancel_flow", "none", "high", evidence=("test",))
             route = _derive_route_from_authorized_proposal(
-                proposal, "取消", skills=(), config=config, snapshot=snapshot,
+                proposal, "取消", config=config, snapshot=snapshot,
             )
         self.assertEqual(route.route_name, "cancel_active")
         self.assertEqual(route.artifacts.get("cancel_scope"), "session")
@@ -695,7 +567,7 @@ class DeriveRouteTests(unittest.TestCase):
             config = load_runtime_config(workspace)
             proposal = ActionProposal("cancel_flow", "none", "high", evidence=("test",))
             route = _derive_route_from_authorized_proposal(
-                proposal, "取消", skills=(), config=config, snapshot=snapshot,
+                proposal, "取消", config=config, snapshot=snapshot,
             )
         self.assertEqual(route.route_name, "cancel_active")
         self.assertEqual(route.artifacts.get("cancel_scope"), "global")
@@ -718,7 +590,7 @@ class DeriveRouteTests(unittest.TestCase):
             config = load_runtime_config(workspace)
             proposal = ActionProposal("checkpoint_response", "write_runtime_state", "high", evidence=("test",))
             route = _derive_route_from_authorized_proposal(
-                proposal, "回答问题", skills=(), config=config, snapshot=snapshot,
+                proposal, "回答问题", config=config, snapshot=snapshot,
             )
         self.assertEqual(route.route_name, "clarification_resume")
 
@@ -740,7 +612,7 @@ class DeriveRouteTests(unittest.TestCase):
             config = load_runtime_config(workspace)
             proposal = ActionProposal("checkpoint_response", "write_runtime_state", "high", evidence=("test",))
             route = _derive_route_from_authorized_proposal(
-                proposal, "选方案 A", skills=(), config=config, snapshot=snapshot,
+                proposal, "选方案 A", config=config, snapshot=snapshot,
             )
         self.assertEqual(route.route_name, "decision_resume")
 
@@ -755,7 +627,7 @@ class DeriveRouteTests(unittest.TestCase):
             config = load_runtime_config(workspace)
             proposal = ActionProposal("checkpoint_response", "write_runtime_state", "high", evidence=("test",))
             route = _derive_route_from_authorized_proposal(
-                proposal, "确认", skills=(), config=config, snapshot=snapshot,
+                proposal, "确认", config=config, snapshot=snapshot,
             )
         self.assertEqual(route.route_name, "proposal_rejected")
 
@@ -779,7 +651,7 @@ class DeriveRouteTests(unittest.TestCase):
                     config = load_runtime_config(workspace)
                     proposal = ActionProposal("checkpoint_response", "write_runtime_state", "high", evidence=("test",))
                     route = _derive_route_from_authorized_proposal(
-                        proposal, "确认", skills=(), config=config, snapshot=snapshot,
+                        proposal, "确认", config=config, snapshot=snapshot,
                     )
                 self.assertEqual(route.route_name, "proposal_rejected",
                     f"terminal status {status!r} must reject")
@@ -802,7 +674,7 @@ class DeriveRouteTests(unittest.TestCase):
             config = load_runtime_config(workspace)
             proposal = ActionProposal("checkpoint_response", "write_runtime_state", "high", evidence=("test",))
             route = _derive_route_from_authorized_proposal(
-                proposal, "补充信息", skills=(), config=config, snapshot=snapshot,
+                proposal, "补充信息", config=config, snapshot=snapshot,
             )
         self.assertEqual(route.route_name, "decision_resume")
 
@@ -816,7 +688,7 @@ class DeriveRouteTests(unittest.TestCase):
             proposal = ActionProposal("modify_files", "write_files", "high", evidence=("test",))
             route = _derive_route_from_authorized_proposal(
                 proposal, "修改 router.py 增加 timeout 参数",
-                skills=(), config=config, snapshot=None,
+ config=config, snapshot=None,
             )
         self.assertEqual(route.route_name, "quick_fix")
 
@@ -838,7 +710,7 @@ class DeriveRouteTests(unittest.TestCase):
             config = load_runtime_config(workspace)
             proposal = ActionProposal("modify_files", "write_files", "high", evidence=("test",))
             route = _derive_route_from_authorized_proposal(
-                proposal, complex_text, skills=(), config=config, snapshot=None,
+                proposal, complex_text, config=config, snapshot=None,
             )
         self.assertIn(route.route_name, {"workflow", "light_iterate"})
 
@@ -852,6 +724,6 @@ class DeriveRouteTests(unittest.TestCase):
             proposal = ActionProposal("modify_files", "write_files", "high", evidence=("test",))
             route = _derive_route_from_authorized_proposal(
                 proposal, "修改 router.py 增加 timeout 参数",
-                skills=(), config=config, snapshot=None,
+ config=config, snapshot=None,
             )
         self.assertEqual(route.capture_mode, "off")

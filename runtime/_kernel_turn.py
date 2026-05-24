@@ -69,7 +69,6 @@ from .archive_lifecycle import (
 from .clarification import stale_clarification
 from .decision import build_execution_gate_decision_state, stale_decision
 from .kb import bootstrap_kb
-from .skill_registry import SkillRegistry
 
 # -- Kernel-path constants & helpers (A1: inlined from engine.py) -------------
 
@@ -148,7 +147,6 @@ def _with_global_handoff_ownership(
         plan_path=handoff.plan_path,
         handoff_kind=handoff.handoff_kind,
         required_host_action=handoff.required_host_action,
-        recommended_skill_ids=handoff.recommended_skill_ids,
         artifacts=handoff.artifacts,
         notes=handoff.notes,
         observability=observability,
@@ -469,7 +467,6 @@ def execute_kernel_turn(
     global_store.ensure()
     kb_artifact: KbArtifact | None = bootstrap_kb(config)
 
-    skills = SkillRegistry(config, user_home=user_home).discover()
     router = Router(config, state_store=review_store, global_state_store=global_store)
     snapshot = resolve_context_snapshot(
         config=config,
@@ -560,7 +557,7 @@ def execute_kernel_turn(
         classified_route = proposal_override_route
     elif action_proposal is not None and validation_decision.decision == DECISION_AUTHORIZE:
         classified_route = _derive_route_from_authorized_proposal(
-            action_proposal, user_input, skills=skills, config=config, snapshot=snapshot,
+            action_proposal, user_input, config=config, snapshot=snapshot,
         )
     else:
         # Legacy text-classification path: used when no ActionProposal is
@@ -568,7 +565,7 @@ def execute_kernel_turn(
         # cancel/continue intent from free text — those must come through
         # ActionProposal (cancel_flow / execute_existing_plan) or checkpoint
         # reply.  Will be removed when all hosts emit ActionProposal.
-        classified_route = router.classify(user_input, skills=skills, snapshot=snapshot)
+        classified_route = router.classify(user_input, snapshot=snapshot)
     recovered = recover_context(
         classified_route,
         config=config,
@@ -1029,7 +1026,7 @@ def execute_kernel_turn(
     return RuntimeResult(
         route=effective_route,
         recovered_context=latest_context,
-        discovered_skills=skills,
+        discovered_skills=(),
         kb_artifact=kb_artifact,
         plan_artifact=plan_artifact,
         skill_result=skill_result,

@@ -1,66 +1,5 @@
 {
   "version": "1",
-  "discovery_cases": [
-    {
-      "id": "workspace_alias_precedence_over_user",
-      "workspace_skills": [
-        {
-          "root": ".agents/skills",
-          "skill_id": "shared-skill",
-          "description": "workspace-agents"
-        }
-      ],
-      "user_skills": [
-        {
-          "root": ".agents/skills",
-          "skill_id": "shared-skill",
-          "description": "user-agents"
-        }
-      ],
-      "assertions": [
-        {
-          "skill_id": "shared-skill",
-          "source": "workspace",
-          "description": "workspace-agents"
-        }
-      ]
-    },
-    {
-      "id": "user_legacy_claude_path_visible",
-      "workspace_skills": [],
-      "user_skills": [
-        {
-          "root": ".claude/skills",
-          "skill_id": "claude-only",
-          "description": "claude-only"
-        }
-      ],
-      "assertions": [
-        {
-          "skill_id": "claude-only",
-          "source": "user",
-          "description": "claude-only"
-        }
-      ]
-    },
-    {
-      "id": "builtin_override_requires_explicit_opt_in",
-      "workspace_skills": [
-        {
-          "root": "skills",
-          "skill_id": "analyze",
-          "description": "local-override-attempt"
-        }
-      ],
-      "user_skills": [],
-      "assertions": [
-        {
-          "skill_id": "analyze",
-          "source": "builtin"
-        }
-      ]
-    }
-  ],
   "selection_cases": [
     {
       "id": "explicit_go_plan",
@@ -117,46 +56,6 @@
       "expected_candidate_skills": [],
       "expectation": "negative",
       "target_skill": "develop"
-    }
-  ],
-  "navigation_cases": [
-    {
-      "id": "runtime_package_with_full_resources",
-      "root": ".agents/skills",
-      "skill_id": "nav-runtime",
-      "description": "navigation runtime skill",
-      "manifest": {
-        "mode": "runtime",
-        "runtime_entry": "scripts/nav_runtime.py",
-        "supports_routes": ["workflow"]
-      },
-      "required_paths": [
-        "references/guide.md",
-        "assets/template.md",
-        "scripts/nav_runtime.py"
-      ],
-      "assertions": {
-        "source": "workspace",
-        "runtime_entry_required": true
-      }
-    },
-    {
-      "id": "advisory_package_with_reference_assets",
-      "root": ".gemini/skills",
-      "skill_id": "nav-advisory",
-      "description": "navigation advisory skill",
-      "manifest": {
-        "mode": "advisory",
-        "supports_routes": ["consult"]
-      },
-      "required_paths": [
-        "references/notes.md",
-        "assets/example.md"
-      ],
-      "assertions": {
-        "source": "workspace",
-        "runtime_entry_required": false
-      }
     }
   ]
 }

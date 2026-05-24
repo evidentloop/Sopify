@@ -57,7 +57,6 @@ class RuntimeHandoff:
     plan_path: Optional[str] = None
     handoff_kind: str = "default"
     required_host_action: str = "continue_host_develop"
-    recommended_skill_ids: tuple[str, ...] = ()
     artifacts: Mapping[str, Any] = field(default_factory=dict)
     notes: tuple[str, ...] = ()
     observability: Mapping[str, Any] = field(default_factory=dict)
@@ -72,7 +71,6 @@ class RuntimeHandoff:
             "plan_path": self.plan_path,
             "handoff_kind": self.handoff_kind,
             "required_host_action": self.required_host_action,
-            "recommended_skill_ids": list(self.recommended_skill_ids),
             "artifacts": dict(self.artifacts),
             "notes": list(self.notes),
             "observability": _json_mapping(self.observability),
@@ -90,7 +88,6 @@ class RuntimeHandoff:
             plan_path=data.get("plan_path") or None,
             handoff_kind=str(data.get("handoff_kind") or "default"),
             required_host_action=str(data.get("required_host_action") or "continue_host_develop"),
-            recommended_skill_ids=tuple(data.get("recommended_skill_ids") or ()),
             artifacts=dict(artifacts) if isinstance(artifacts, Mapping) else {},
             notes=tuple(data.get("notes") or ()),
             observability=_json_mapping(data.get("observability")),
