@@ -27,6 +27,31 @@ archive_ready: false
 4. 已完成 kernel 提取与非 kernel 面删除，并记录实施结果
 5. 已完成最小必要验证与文档同步，足以决定归档或继续拆下一实施包
 
+## 状态概览 (2026-05-24)
+
+> **runtime/ 当前**: 37 个 .py 文件, 16,379 LOC
+
+| 阶段 | 状态 | 摘要 |
+|------|------|------|
+| 1. 蓝图 delta 校验 | ✅ 完成 | 5 项审计全通过 |
+| 2. 当前消费者扫描 | ✅ 完成 | 4 类清单 + consumer 判定 |
+| 3. 删除就绪结论 | ✅ 完成 | kernel 边界锁定, 退场量级 ~38K LOC |
+| 4. 审计后删除 | ⚠️ 部分完成 | 4.1-4.5/4.7-4.10a/4.10c/4.10d ✅; **4.6 scripts cutover + 4.10b plan_scaffold + 4.11/4.12 未完成** |
+| 5. 文档更新 | ⚠️ 部分完成 | 5.2/5.3 ✅; **5.1/5.4-5.7 未完成** |
+| 6. contract 面清理 + engine 重构 | ✅ 完成 | 6.1-6.6 全部收完, −6,400+ LOC |
+
+### 执行顺序说明
+
+实际执行顺序并非文档编号顺序。Topic 6 是在 4.10d 之后、4.2-4.6 之前执行的：
+
+```
+4.1 → 4.7-4.10 → 4.10a → 4.10b(partial) → 4.10c → 4.10d(W1-W3)
+                                                       ↓
+                                               6.1 → 6.2 → 6.3 → 6.4 → 6.5 → 6.6
+                                                                                  ↓
+                                                                          → 后续: 4.2-4.6 / 5.x
+```
+
 ## 1. 蓝图 delta 校验 ✅
 - [x] 1.1 确认 `blueprint/design.md` 中与 runtime 删除相关的正式约束仍成立
 - [x] 1.2 以 P4b / P4b.5 / P5 / P6 为既有基线，只列出本次审计新增的 delta，不重复复述已裁定结论
@@ -77,28 +102,53 @@ archive_ready: false
   > **共删** 2 个: test_context_checkpoints / test_runtime_failure_recovery
   > "保留等价覆盖" ≠ 原封不动搬，具体重写方式在 S4 按实际 kernel 接口决定
 
-## 4. 审计后删除
+## 4. 审计后删除 (⚠️ 部分完成 — 剩余项见"后续路线"节)
 - [x] 4.1 维护者已在 **2026-05-22** 确认采用 `target-state-first` 口径，并锁定本包后续删除范围以“先解耦保留面，再同步退场 runtime + legacy deep path”为准
-- [ ] 4.2 删除所有已批准的 `delete_now` 面（不含 kernel 保留模块）
-- [ ] 4.3 若采用 `target-state-first`，同步删除已批准的 `co-delete candidate` 及其对应 legacy consumer（不含 kernel 保留模块）
-- [ ] 4.4 记录每个删除项的依据、影响范围与验证结果
-- [ ] 4.5 明确哪些 `keep_for_legacy_runtime` / `blocking_full_retirement` 面留待后续包处理
-- [ ] 4.6 若采用 `target-state-first`，显式确认以下同步退场范围（不限于 `*_runtime.py`）：
-  - legacy `scripts/*_runtime.py` bridge/helper 退场：`clarification_bridge_runtime.py`、`decision_bridge_runtime.py`、`preferences_preload_runtime.py`、`plan_registry_runtime.py`
-  - 以下入口脚本 in-place cutover（路径名被 manifest/test 冻结 → 原地重写内容，不新建并行文件）：
-    - `scripts/runtime_gate.py` → in-place cutover: 原地重写为 thin shell (argparse → kernel → exit code)
-    - `scripts/sopify_runtime.py` → in-place cutover: guard/receipt 逻辑上移到内核，原地重写为 thin shell
-    - `scripts/develop_callback_runtime.py` → in-place cutover: 原地重写为 thin shell
-    - `scripts/go_plan_runtime.py` → 产品决策: 路径名被 manifest 冻结，若删除需同步改 manifest/test/doc
-  - `scripts/check-runtime-smoke.sh`、`scripts/sync-runtime-assets.sh`
-  - `scripts/check-prompt-runtime-gate-smoke.py` — co-delete: runtime smoke 脚本
-  - `scripts/check-install-payload-bundle-smoke.py` — cutover (release 联动): L159 冻结入口路径，改写路径期望值
-  - `scripts/check-skill-eval-gate.py` — cutover: 改为 kernel 接口或删除
-  - `scripts/generate-builtin-catalog.py` — cutover: 改为 sopify_contracts 或删除
-  - `scripts/release-preflight.sh` — cutover: 移除或改写 runtime smoke 调用
-  - `scripts/check-host-doc-contract.py`（按 runtime 依赖程度判定）
-  - `tests/test_runtime_*`、`tests/runtime_test_support.py`、`tests/test_bundle_smoke.py`（按 runtime import 判定）
-  - `installer/runtime_bundle.py`（pure legacy runtime bundle sync surface，直接退场）
+- [x] 4.2 删除所有已批准的 `delete_now` 面（不含 kernel 保留模块） ✅ 已通过 4.10d Wave 1-3 + 6.1 + 6.4 全部执行完
+- [x] 4.3 若采用 `target-state-first`，同步删除已批准的 `co-delete candidate` 及其对应 legacy consumer（不含 kernel 保留模块） ✅ 同上
+- [x] 4.4 记录每个删除项的依据、影响范围与验证结果 ✅ tasks.md 执行备注 + commit message = 删除记录; 不另开 delete ledger
+- [x] 4.5 明确哪些 `keep_for_legacy_runtime` / `blocking_full_retirement` 面留待后续包处理 ✅ 刷新至 6.6 后现实 (2026-05-24)
+  > **A2 判定表已同步** (见上方 4.10b A2 节):
+  > - skill_registry / skill_resolver: 已删 (6.4)
+  > - plan_registry: 6.5 裁定为独立治理层保留
+  > - plan_scaffold: blocker 从 engine.py → _planning.py; 结构决策归 4.10b
+  > - 5 个 retained 模块判定不变
+  > **当前 keep_for_legacy / blocking 面**: 不再有 runtime 模块级的 blocking 面; 剩余阻塞全在 scripts/installer 层 (→ 4.6)
+- [ ] 4.6 scripts / installer / evals legacy surface 退场 (2026-05-24 重新裁定)
+  > **裁定口径**: 不是主链路 (gate → machine truth → handoff → host consume) 就干掉。CI/release pipeline 引用是"活跃流程依赖"，不是"必须保留的产品能力"。
+  >
+  > ### 🟢 KEEP — 主链路或活跃 CI 硬约束 (3 个)
+  > | 文件 | 理由 |
+  > |------|------|
+  > | `scripts/runtime_gate.py` (129) | 产品 gate 入口，所有宿主第一跳 |
+  > | `scripts/release-preflight.sh` (196) | release 编排器，pre-commit hook 入口 |
+  > | `scripts/generate-builtin-catalog.py` (225) | CI 活跃 (ci.yml:44)，builtin_catalog.py 仍被 manifest 消费 |
+  >
+  > ### 🔴 DELETE — 已裁定为退场目标，执行时需同步删上游 release/install 依赖 (9 个)
+  > | 文件 | LOC | 联动清理 (执行时必须同步处理) |
+  > |------|-----|----------|
+  > | `scripts/check-host-doc-contract.py` | 74 | 无 |
+  > | `scripts/preferences_preload_runtime.py` | 72 | manifest.py + workspace_preflight.py + smoke + tests |
+  > | `scripts/plan_registry_runtime.py` | 109 | manifest.py + sync-assets + test |
+  > | `scripts/check-prompt-runtime-gate-smoke.py` | 369 | release-preflight.sh + test ref |
+  > | `scripts/check-install-payload-bundle-smoke.py` | ~200 | release-preflight.sh + test |
+  > | `installer/runtime_bundle.py` | ~80 | installer/payload.py import |
+  > | `scripts/sync-runtime-assets.sh` | 124 | co-delete with runtime_bundle |
+  > | `scripts/check-skill-eval-gate.py` | 305 | ci.yml step + release-preflight + CONTRIBUTING×2 + blueprint keep-list |
+  > | `evals/` (整组) | ~50 | co-delete with check-skill-eval-gate.py (baseline/slo/report 全是其数据面) |
+  > **check-skill-eval-gate.py + evals/ 退场理由**: discovery/navigation 永久 stub (6.4); selection 的 7 case 与 pytest route tests 功能重叠; 2/3 死代码不值得续命
+  >
+  > ### 🟡 CUTOVER — 路径名冻结太深，需先改引用者 (2 个)
+  > | 文件 | LOC | 阻塞 |
+  > |------|-----|------|
+  > | `scripts/sopify_runtime.py` | 157 | entry_guard.py + installer/bootstrap+validate + pre-commit + CONTRIBUTING |
+  > | `scripts/check-runtime-smoke.sh` | 239 | ci.yml:91 + release-preflight + installer/validate.py |
+  >
+  > ### 已删 (4.10d / 6.x 已执行)
+  > - ~~`clarification_bridge_runtime.py`~~ ✅ 4.10d W3
+  > - ~~`decision_bridge_runtime.py`~~ ✅ 4.10d W3
+  > - ~~`develop_callback_runtime.py`~~ ✅ 4.10d W2
+  > - ~~`go_plan_runtime.py`~~ ✅ 4.10d W3
 - [x] 4.7 对 retain-after-decoupling 五文件（`installer/validate.py`、`installer/bootstrap_workspace.py`、`installer/inspection.py`、`scripts/install_sopify.py`、`scripts/sopify_init.py`），在删除 runtime 前同步去除 runtime import 和 bundle 硬依赖，确保安装链路可用
   > **S4 Step 1 已完成**: validate/bootstrap 裁剪为 kernel-only bundle 验证，sopify_init/install_sopify 去除 preferences_preload。payload.py 同步裁剪 _REQUIRED_BUNDLE_CAPABILITIES。inspection.py 保留 resolve_context_snapshot（context_snapshot 已重分类为 kernel support）。75 installer tests pass。
 - [x] 4.8 `scripts/sopify_status.py` / `scripts/sopify_doctor.py` 不单列 cutover；仅验证其通过 `installer/inspection.py` 的改造继续可用
@@ -150,27 +200,27 @@ archive_ready: false
   > **第二层模块重分类** (原 S3.1 co-delete → 实际 retained):
   > | 模块 | LOC | 新分类 | 关键证据 |
   > |------|-----|--------|---------|
-  > | `archive_lifecycle.py` | 831 | **retain as module** ✅ 维护者确认 | _kernel_turn.py:53-59; 蓝图 canonical capability (blueprint/design.md:295,659,794) |
-  > | `kb.py` | 463 | **retain as module** ✅ 维护者确认 | _kernel_turn.py:63,534 bootstrap_kb |
-  > | `clarification.py` | 386 | **retain as module** ✅ 维护者确认 | router + checkpoint_request + handoff + _kernel_turn |
-  > | `decision.py` | 607 | **retain as module** ✅ 维护者确认 | router + handoff + _kernel_turn |
-  > | `context_recovery.py` | 93 | **retain as module** ✅ 维护者确认 | _kernel_turn.py:35 recover_context |
-  > | `plan_registry.py` | 1,012 | **pending / needs focused audit** | engine.py:47 (5 符号), archive_lifecycle:18, output.py:12, plan_scaffold:17; 消费者过硬不可直接删，但内联可行性待评估 |
-  > | `skill_registry.py` | 255 | **retain as module** | _kernel_turn.py:538 SkillRegistry.discover() |
-  > | `skill_resolver.py` | 111 | **retain as module** | router.py:775 resolve_route_candidate_skills() |
-  > | `plan_scaffold.py` | 464 | **delete candidate, blocked by engine.py** | 零直接 retained 消费者 |
-  > | `skill_runner.py` | 85 | **deleted** ✅ 2141ed6 | 悬空路径 |
+  > | `archive_lifecycle.py` | 832 | **retain as module** ✅ 维护者确认 | _kernel_turn.py:53-59; 蓝图 canonical capability |
+  > | `kb.py` | 464 | **retain as module** ✅ 维护者确认 | _kernel_turn.py:63,534 bootstrap_kb |
+  > | `clarification.py` | 387 | **retain as module** ✅ 维护者确认 | router + checkpoint_request + handoff + _kernel_turn |
+  > | `decision.py` | 605 | **retain as module** ✅ 维护者确认 | router + handoff + _kernel_turn |
+  > | `context_recovery.py` | 94 | **retain as module** ✅ 维护者确认 | _kernel_turn.py:35 recover_context |
+  > | `plan_registry.py` | 953 | **retain as independent governance layer** ✅ 6.5 裁定 | _planning.py + archive_lifecycle + output; YAML 写入已迁出到 _yaml.py |
+  > | `skill_registry.py` | — | **deleted** ✅ 6.4 | discovery 退场 |
+  > | `skill_resolver.py` | — | **deleted** ✅ 6.4 | resolve_route_candidate_skills 退场，candidate_skill_ids 改为静态 tuple |
+  > | `plan_scaffold.py` | 466 | **retain as single-purpose module** ✅ 维护者确认 | 6.6b 后 runtime 消费者仅 _planning.py; tests 消费者仍多。暂不内联，后续只做主链单职责瘦身 |
+  > | `skill_runner.py` | — | **deleted** ✅ 4.10b A3 | 悬空路径 |
   >
   > 5 个模块 (archive_lifecycle / kb / clarification / decision / context_recovery) 经维护者确认为 retain as module。
-  > plan_registry.py 消费者过硬（engine.py Tier 1 + 2 个 retained 模块），但结论暂不写死；需 focused audit 评估内联可行性。
-  > skill_registry / skill_resolver: 证据充分但维护者尚未显式确认。
-  > 保留的是 capability / contract，不是所有实现载体；legacy scripts/bridge/helper 仍可删。
+  > plan_registry.py 经 6.5 裁定为独立治理层保留; YAML 写入迁出到 _yaml.py。
+  > skill_registry / skill_resolver: 6.4 已删除 (discovery 退场)。
+  > plan_scaffold.py: 维护者确认**暂时保留独立模块**；不内联到 `_planning.py`。后续只允许收窄到 scaffold creation + artifact return，不再承载 planning/gate/state 判断。
   >
   > **A3: 立即删除面** ✅ 收口
   > - 已完成: runtime skill execution sidecar (-187 LOC) ✅ 2141ed6
   > - 否决: 38 项大内联方案（~1,655 LOC 搬进 _kernel_turn.py 是换文件名不收缩）
-  > - 剩余: plan_scaffold.py (464 LOC, blocked by engine.py _advance_planning_route → create_plan_scaffold)
-  > - engine.py: blocked shell，10 个 handler 仍被 _kernel_turn.py import，本包不承诺整体删除
+  > - 剩余: plan_scaffold.py (464 LOC) 保留独立模块；后续若继续瘦身，仅做职责收窄审计与测试收口，不再以“内联/删文件”为目标
+  > - engine.py: 6.6 完成后已瘦身至 343 LOC（conflict/cancel + activation + archive + run_runtime wrapper）；planning 主块已迁出到 _planning.py
   > - S3.1 大 co-delete 表不再作为执行清单；已降级为旧假设
 - [x] 4.10c Step 3 Package C: models.py bridge 退场 ✅ 完成 (2026-05-23)
   > **C1: retained 模块 rewire** ✅ 完成 (dbd1bc6)
@@ -182,7 +232,7 @@ archive_ready: false
   > 13 个 runtime 模块 + 3 个 test 文件 rewired to sopify_contracts.*
   > runtime/models.py 已删除 (-50 LOC): 仓库零消费者
   > C1+C2 合计: 22 个文件 rewired, 740 tests pass, 纯 import rewire, 零行为变更
-- [ ] 4.10d Step B: mainline-only slimming — 非主链功能层删除
+- [x] 4.10d Step B: mainline-only slimming — 非主链功能层删除 ✅ 完成 (2026-05-23)
   > 目标切换: 从 contract-preserving slimming 切到 mainline-only slimming
   > 明确接受退化: fail-close validator / context-checkpoint / future-boundary / observability
   > 2026-05-23 文档收口: canonical 主链改为 `gate → current_* machine truth → handoff → host consume rule`；
@@ -244,7 +294,7 @@ archive_ready: false
   > - 不新增 public surface / 抽象层
   > - 不做大规模重构
 
-## 5. 文档更新
+## 5. 文档更新 (⚠️ 部分完成 — 剩余项见"后续路线"节)
 - [ ] 5.1 按审计结果决定是否需要回写 `blueprint/tasks.md`
 - [x] 5.2 若形成稳定边界变化，再同步 `blueprint/design.md` 或 `project.md`
   > 已回写 `blueprint/design.md` / `blueprint/protocol.md`：冻结 mainline-only keep-list，明确 checkpoint 是主链分叉而非每轮必经主干
@@ -255,7 +305,7 @@ archive_ready: false
 - [ ] 5.6 文档验收：grep 验证 user-facing docs 不再宣称已删除的 runtime surface / deep runtime path / runtime bundle smoke
 - [ ] 5.7 完成后归档审计结论或继续拆下一实施包
 
-## 6. 下一轮收缩：contract 面清理与边缘能力裁定
+## 6. contract 面清理 + engine 重构 ✅ (原"下一轮收缩"，已全部完成)
 
 > 进入条件: 5427520 (mainline-only control plane) 已提交
 > 口径: 上一轮删的是代码/模块；这一轮清的是 legacy data contract + 边缘能力 contract + 结构重构
@@ -311,13 +361,11 @@ archive_ready: false
   > - authorized ActionProposal derive 仍依赖同一套 complexity heuristic
   > 上述两层待单独题处理；代码收口前不得先改协议宣称其已退役
 - [x] 6.5 **plan_registry 结构重构审计** (已完成)
-  > 范围: plan_registry.py (1,013 LOC) + plan_scaffold.py (464 LOC, blocked by engine.py)
-  > 消费者: engine.py:47 (5 符号) + archive_lifecycle.py:18 + output.py:12 + plan_scaffold.py:17
-  > 核心问题不是"能不能删文件"，而是:
-  > - plan registry 这项能力是否继续作为独立治理层存在
-  > - 还是拆回 engine / archive_lifecycle / output / plan_scaffold
-  > 与 engine 的关系: engine planning 主块（`_advance_planning_route` / `_resolve_plan_for_request` / `_apply_execution_gate_to_plan`）重度依赖 plan_registry + plan_scaffold；必须先定 6.5 的终态，后续 engine decomposition 才知道往哪拆
-  > 最后打；受益于前面题目的清理减少干扰变量
+  > 范围: plan_registry.py (1,013 LOC) + plan_scaffold.py (464 LOC)
+  > 裁定: plan_registry 作为独立治理层保留; YAML 写入 helper 迁出到 `_yaml.py`
+  > plan_scaffold.py: 6.6 之前 blocked by engine.py; **6.6b 之后消费者变为 `_planning.py`**（`_advance_planning_route → create_plan_scaffold`），不再被 engine.py 直接消费
+  > 消费者 (6.6 后): _planning.py (create_plan_scaffold) + archive_lifecycle.py + output.py
+  > 后续: plan_scaffold 保留独立模块，但需按主链单职责口径继续瘦身
 - [x] 6.6 **engine decomposition** (已完成)
   > 终态:
   > - `_planning.py` (1496 LOC): planning 主链 + resume + gate checkpoint + execution-resume
@@ -333,4 +381,53 @@ archive_ready: false
   > - _kernel_turn: store resolution, promotion, handoff ownership, result store selection, 总编排
   > - _planning: planning 主链, clarification/decision resume, execution-resume gate mutation
   > - engine: conflict/cancel, activation, archive, run_runtime deprecated wrapper
+
+## 后续路线 — 未完成项汇总
+
+> 以下按建议执行顺序排列。编号保留原文引用以便追溯。
+
+### Tier 1: 收口与阻塞解除
+
+| 编号 | 内容 | 当前状态 | 备注 |
+|------|------|----------|------|
+| 4.10b | plan_scaffold.py (466 LOC) 处置 | 暂时保留独立模块 | 后续仅做主链单职责瘦身：scaffold creation + artifact return，不承载 planning/gate/state 判断 |
+| 4.2 | 删除已批准的 `delete_now` 面 | ✅ 已关 | 4.10d Wave 1-3 + 6.1 + 6.4 全部执行完 |
+| 4.3 | co-delete candidate 同步删除 | ✅ 已关 | 同上 |
+| 4.4 | 记录删除依据 / 影响 / 验证结果 | ✅ 已关 | tasks.md + commit = 记录 |
+| 4.5 | 标记 legacy/blocking 面后续处理 | ✅ A2 表已刷新至 6.6 后现实 | |
+
+### Tier 2: Legacy scripts / installer / evals 退场 (P4.6)
+
+> 详见上方 4.6 节的三类判定表。
+>
+> **DELETE (9 个, ~1,400 LOC)**: check-host-doc-contract / preferences_preload_runtime / plan_registry_runtime / check-prompt-runtime-gate-smoke / check-install-payload-bundle-smoke / runtime_bundle.py / sync-runtime-assets.sh / **check-skill-eval-gate.py + evals/ 整组**
+>
+> **CUTOVER (2 个, ~400 LOC)**: sopify_runtime.py / check-runtime-smoke.sh
+>
+> **KEEP (3 个)**: runtime_gate.py / release-preflight.sh / generate-builtin-catalog.py
+
+### Tier 3: 验证与 polish
+
+| 编号 | 内容 | 当前状态 |
+|------|------|----------|
+| 4.11 | kernel 验证 (gate→route→handoff→checkpoint) | coverage audit 完成; `_kernel_turn` 直接测试仍缺 |
+| 4.12 | naming/comment polish | deferred — 进入条件: 模块集合稳定 |
+
+### Tier 4: 文档更新
+
+| 编号 | 内容 | 当前状态 |
+|------|------|----------|
+| 5.1 | 回写 `blueprint/tasks.md` | 未执行 |
+| 5.4 | `deferred` 语义统一 | 未执行; 可能另开 contract 决策项 |
+| 5.5 | user-facing docs 更新 (README / examples) | 未执行 |
+| 5.6 | 文档验收 grep | 未执行; 依赖 5.5 |
+| 5.7 | 归档审计结论或继续拆下一实施包 | 未执行; 全部收尾后 |
+
+### 已知技术债 (不在本包范围)
+
+- **bare-text ingress heuristic**: `_ACTION_KEYWORDS` / `estimate_complexity()` 仍在 router.py，待单独题处理
+- **run_runtime() wrapper**: engine.py 中 50+ test callers 仍经此入口，未删
+- **22 个 pre-existing test failures**: test_runtime_engine.py 中 develop_callback / bundle / go_plan_helper / plan_orchestrator 相关
+- **discovered_skills 空 tuple**: RuntimeResult 字段保留，值始终为空
+- **shell 层退场 (manifest / output / workspace_preflight)**: 属独立工作流，不在本包
 

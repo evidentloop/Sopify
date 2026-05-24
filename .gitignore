@@ -12,3 +12,4 @@ __pycache__/
 .sopify-skills/plan/_registry.yaml
 
 evals/skill_eval_report.json
+runtime/__init__.pyc
