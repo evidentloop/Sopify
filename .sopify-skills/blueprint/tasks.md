@@ -125,6 +125,8 @@ P0→P4c 主航道已全部完成。后续执行遵循以下原则：
 ## 流程与工具项
 
 - [ ] Runtime retirement cutover（`target-state-first` 已于 2026-05-22 拍板）：先解耦 `installer/validate.py`、`installer/bootstrap_workspace.py`、`installer/inspection.py`、`scripts/install_sopify.py`、`scripts/sopify_init.py`，再同步删除 `runtime/`、`installer/runtime_bundle.py` 与 legacy deep path
+  - Phase 1 已完成（方案包 `20260522_runtime_slimming_kernel_extraction`）：contract 面清理 −6,400 LOC + engine 重构 + 34 退役测试块清理 −1,400 LOC + installer bundle 纯 Python 重写 + legacy workspace marker 退场。runtime/ 从 ~22K LOC 收至 37 文件 / 16,286 LOC
+  - Phase 2 未启动：installer 5 文件解耦 + runtime/ 全删 + legacy deep path 退场
 - [ ] Plan intake checklist（后续新 plan 开包时手工回答以下问题）：
   1. 主命中哪个蓝图活跃分层？主线里程碑（P4d / P5 / P6）、证据型候选（Adoption Proof / Compliance Phase 2 / Convention 证明）、独立产品线（CrossReview）？若不命中以上任一，须显式标记为"流程工具项"或"延后项"，不强行归类
   2. 这次改动定义的是 contract acceptance boundary，还是 execution strategy / implementation wave？（前者进 blueprint，后者留方案包）
@@ -140,7 +142,7 @@ P0→P4c 主航道已全部完成。后续执行遵循以下原则：
 - [ ] 轻量化产品指标与 acceptance gate（首次上手步骤数、必需文件数、默认 workflow 必需 contract 数）
 - [ ] 产品层 ↔ 实现层 contract matrix 正式化（ownership / admission / lifecycle responsibilities）
 - [x] GitHub Release pipeline 建立（首次 release 创建 + tag 规范 + install 脚本端到端验证）
-- [x] 测试套件健康基线（pass rate ≥ 99%；当前基线 743 tests / 743 passed = 100%）
+- [x] 测试套件健康基线（pass rate ≥ 99%；当前基线 619 tests / 619 passed = 100%，含 49 subtests；退役 124 测试后仍保持 100% pass rate）
 
 ## 已关闭 / 已吸收项
 

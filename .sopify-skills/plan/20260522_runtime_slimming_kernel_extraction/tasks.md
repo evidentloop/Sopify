@@ -29,15 +29,15 @@ archive_ready: false
 
 ## 状态概览 (2026-05-24)
 
-> **runtime/ 当前**: 37 个 .py 文件, 16,379 LOC
+> **runtime/ 当前**: 37 个 .py 文件, 16,286 LOC
 
 | 阶段 | 状态 | 摘要 |
 |------|------|------|
 | 1. 蓝图 delta 校验 | ✅ 完成 | 5 项审计全通过 |
 | 2. 当前消费者扫描 | ✅ 完成 | 4 类清单 + consumer 判定 |
 | 3. 删除就绪结论 | ✅ 完成 | kernel 边界锁定, 退场量级 ~38K LOC |
-| 4. 审计后删除 | ⚠️ 部分完成 | 4.1-4.5/4.6/4.7-4.10a/4.10c/4.10d ✅; **4.13-A ✅, 4.13-B 代码完成待审批**; 4.10b plan_scaffold + 4.11/4.12 + 4.13 Phase B 未完成 |
-| 5. 文档更新 | ⚠️ 部分完成 | 5.2/5.3 ✅; **5.1/5.4-5.7 未完成** |
+| 4. 审计后删除 | ✅ 主线完成 | 4.1-4.5/4.6/4.7-4.10a/4.10c/4.10d/4.13-A/4.13-B ✅; 4.10b/4.11/4.12/4.13 Phase B 待后续 |
+| 5. 文档更新 | ⚠️ 部分完成 | 5.1/5.2/5.3 ✅; 5.4/5.5/5.6/5.7 待后续 |
 | 6. contract 面清理 + engine 重构 | ✅ 完成 | 6.1-6.6 全部收完, −6,400+ LOC |
 
 ### 执行顺序说明
@@ -298,7 +298,8 @@ archive_ready: false
   > - 不做大规模重构
 
 ## 5. 文档更新 (⚠️ 部分完成 — 剩余项见"后续路线"节)
-- [ ] 5.1 按审计结果决定是否需要回写 `blueprint/tasks.md`
+- [x] 5.1 按审计结果决定是否需要回写 `blueprint/tasks.md`
+  > 已回写：Runtime retirement cutover 进度、测试基线 743→619
 - [x] 5.2 若形成稳定边界变化，再同步 `blueprint/design.md` 或 `project.md`
   > 已回写 `blueprint/design.md` / `blueprint/protocol.md`：冻结 mainline-only keep-list，明确 checkpoint 是主链分叉而非每轮必经主干
 - [x] 5.3 若维护者决定弃养 legacy deep runtime 路径，把该决策显式回写到长期文档而不是只留在临时审计结论
@@ -306,7 +307,8 @@ archive_ready: false
 - [ ] 5.4 若 `deferred` 语义需要统一，单列为后续 contract 决策项，不在本审计中顺手修补
 - [ ] 5.5 对齐 user-facing docs/examples：更新 `README.md`、`examples/external-repo-quickstart/README.md`、`examples/external-repo-quickstart/sopify.json.example`，移除或改写因 runtime slimming 失实的安装目标、能力矩阵、目录树、bootstrap 叙述、`runtime_gate` 描述。不做产品定位刷新或营销文案重写
 - [ ] 5.6 文档验收：grep 验证 user-facing docs 不再宣称已删除的 runtime surface / deep runtime path / runtime bundle smoke
-- [ ] 5.7 完成后归档审计结论或继续拆下一实施包
+- [x] 5.7 完成后归档审计结论或继续拆下一实施包
+  > 决策：本包继续承接剩余工作 (4.10b/4.11/4.12/4.13 Phase B/5.4/5.5/5.6)，不拆新包
 
 ## 6. contract 面清理 + engine 重构 ✅ (原"下一轮收缩"，已全部完成)
 
@@ -403,9 +405,9 @@ archive_ready: false
 
 > **产品前提**: 项目级安装保留。瘦身方向不是删安装链，而是收过渡态为正式实现。
 >
-> **Phase A — 代码完成，待审批**:
+> **Phase A — ✅ 全部完成**:
 > - ✅ 4.13-A: 停写 legacy workspace stub (.sopify-runtime/manifest.json)，收敛到单 marker (.sopify-skills/sopify.json) + stub 合同对齐 + 文档同步
-> - 🔲 4.13-B: sync-runtime-assets.sh 壳套壳重写为纯 Python + bundle contract 测试对齐 (代码完成，未 commit)
+> - ✅ 4.13-B: sync-runtime-assets.sh 壳套壳重写为纯 Python (installer/runtime_bundle.py shutil.copytree + write_bundle_manifest) + bundle contract 测试对齐 + bash 脚本删除
 >
 > **Phase B — 需先定义最小 contract (产品设计题)**:
 > - install smoke (check-install-payload-bundle-smoke.py) 最小 contract 重设计
@@ -425,17 +427,17 @@ archive_ready: false
 
 | 编号 | 内容 | 当前状态 |
 |------|------|----------|
-| 5.1 | 回写 `blueprint/tasks.md` | 未执行 |
-| 5.4 | `deferred` 语义统一 | 未执行; 可能另开 contract 决策项 |
-| 5.5 | user-facing docs 更新 (README / examples) | 未执行 |
-| 5.6 | 文档验收 grep | 未执行; 依赖 5.5 |
-| 5.7 | 归档审计结论或继续拆下一实施包 | 未执行; 全部收尾后 |
+| 5.1 | 回写 `blueprint/tasks.md` | ✅ 已执行 |
+| 5.4 | `deferred` 语义统一 | 延后; 可能另开 contract 决策项 |
+| 5.5 | user-facing docs 更新 (README / examples) | 延后; 待 docs/release 包 |
+| 5.6 | 文档验收 grep | 延后; 依赖 5.5 |
+| 5.7 | 归档审计结论或继续拆下一实施包 | ✅ 决策：本包继续，不拆 |
 
 ### 已知技术债 (不在本包范围)
 
 - **bare-text ingress heuristic**: `_ACTION_KEYWORDS` / `estimate_complexity()` 仍在 router.py，待单独题处理
 - **run_runtime() wrapper**: engine.py 中 50+ test callers 仍经此入口，未删
-- **22 个 pre-existing test failures**: test_runtime_engine.py 中 develop_callback / bundle / go_plan_helper / plan_orchestrator 相关
+- ~~**22 个 pre-existing test failures**: test_runtime_engine.py 中 develop_callback / bundle / go_plan_helper / plan_orchestrator 相关~~ → **已清理** (4.13-B: 34 退役测试块删除)
 - **discovered_skills 空 tuple**: RuntimeResult 字段保留，值始终为空
 - **shell 层退场 (manifest / output / workspace_preflight)**: 属独立工作流，不在本包
 
