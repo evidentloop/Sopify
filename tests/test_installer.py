@@ -227,7 +227,6 @@ class PayloadInstallTests(unittest.TestCase):
             self.assertEqual(result.root, payload_root)
             payload_manifest = json.loads((payload_root / "payload-manifest.json").read_text(encoding="utf-8"))
             bundle_root = payload_root / "bundles" / payload_manifest["active_version"]
-            self.assertTrue((bundle_root / "scripts" / "preferences_preload_runtime.py").exists())
             self.assertTrue((bundle_root / "scripts" / "runtime_gate.py").exists())
             self.assertEqual(payload_manifest["bundle_manifest"], f"bundles/{payload_manifest['active_version']}/manifest.json")
             self.assertEqual(payload_manifest["dependency_model"]["mode"], "stdlib_only")

@@ -433,25 +433,31 @@ Step 4: 用等价覆盖测试守住 contract
 <!-- 7 co-delete + 4 cutover (release 联动) + 3 in-place cutover + 1 产品决策
      advisor 修正: 原表漏了 check-install-payload-bundle-smoke / check-skill-eval-gate / generate-builtin-catalog
      这些脚本在 release 主链上，cutover 工作量被低估。
-     entry→新 shell 表述也不准确 — 若 manifest/test 冻结了路径名，实际是 in-place cutover，不是改名退场。-->
+     entry→新 shell 表述也不准确 — 若 manifest/test 冻结了路径名，实际是 in-place cutover，不是改名退场。
+
+     2026-05-25 P4.6-A 后更新:
+     - 6 个 co-delete 已执行 (bridges/helpers/eval)
+     - check-prompt-runtime-gate-smoke / check-install-payload-bundle-smoke / sync-runtime-assets.sh 从 co-delete → REWRITE (产品决策: 项目级安装保留)
+     - installer/runtime_bundle.py 同上 → REWRITE
+     - 以上 4 个移入 4.13 installer 瘦身 -->
 
 | 分类 | 文件 | LOC | 说明 |
 |------|------|-----|------|
-| **co-delete** | `clarification_bridge_runtime.py` | 160 | legacy bridge |
-| **co-delete** | `decision_bridge_runtime.py` | 171 | legacy bridge |
-| **co-delete** | `preferences_preload_runtime.py` | 72 | legacy helper |
-| **co-delete** | `plan_registry_runtime.py` | 109 | legacy helper |
-| **co-delete** | `check-prompt-runtime-gate-smoke.py` | 369 | runtime smoke 脚本 |
-| **co-delete** | `check-runtime-smoke.sh` | 268 | runtime bundle smoke |
-| **co-delete** | `sync-runtime-assets.sh` | 137 | runtime 资产同步 |
-| **cutover (release 联动)** | `check-install-payload-bundle-smoke.py` | ~369 | L144+ 强校验 sopify_runtime.py/go_plan_runtime.py/runtime_gate.py 存在；release-preflight.sh 调用 |
-| **cutover (release 联动)** | `check-skill-eval-gate.py` | ~100 | L17 直接 import runtime.config/router/skill_registry |
+| ~~co-delete~~ **deleted (4.10d W3)** | `clarification_bridge_runtime.py` | 160 | legacy bridge，已删 |
+| ~~co-delete~~ **deleted (4.10d W3)** | `decision_bridge_runtime.py` | 171 | legacy bridge，已删 |
+| ~~co-delete~~ **deleted (P4.6-A)** | `preferences_preload_runtime.py` | 72 | legacy helper，已删 |
+| ~~co-delete~~ **deleted (P4.6-A)** | `plan_registry_runtime.py` | 109 | legacy helper，已删 |
+| ~~co-delete~~ → **KEEP+SLIM (→ 4.13)** | `check-prompt-runtime-gate-smoke.py` | 369 | release gate 活跃依赖，项目级安装保留 |
+| **CUTOVER** | `check-runtime-smoke.sh` | 268 | ci.yml + release-preflight 活跃依赖 |
+| ~~co-delete~~ → **REWRITE (→ 4.13)** | `sync-runtime-assets.sh` | 137 | 壳套壳 (Python→bash→rsync)，能力保留实现重写 |
+| ~~cutover~~ → **KEEP+SLIM (→ 4.13)** | `check-install-payload-bundle-smoke.py` | ~369 | release gate 活跃依赖，项目级安装保留 |
+| ~~cutover~~ **deleted (P4.6-A)** | `check-skill-eval-gate.py` | ~100 | eval gate 整组退场，已删 |
 | **cutover (release 联动)** | `generate-builtin-catalog.py` | ~100 | L17 直接 import runtime._yaml/runtime.skill_schema |
 | **cutover (release 联动)** | `release-preflight.sh` | 83 | L75-77 串联上述脚本；是 release 主链，不是"待评估" |
 | **in-place cutover** | `runtime_gate.py` | 129 | manifest/test 冻结路径名 → 原地重写为 thin shell，不改名 |
 | **in-place cutover** | `sopify_runtime.py` | 157 | manifest/test 冻结路径名 → 原地重写为 thin shell，不改名 |
-| **in-place cutover** | `develop_callback_runtime.py` | 123 | 原地重写为 thin shell |
-| **产品决策** | `go_plan_runtime.py` | 76 | manifest 冻结路径名；若删除需同步改 manifest/test/doc |
+| ~~in-place cutover~~ **deleted (4.10d W2)** | `develop_callback_runtime.py` | 123 | 已删 |
+| ~~产品决策~~ **deleted (4.10d W3)** | `go_plan_runtime.py` | 76 | 已删 |
 
 ### tests/ 退场清单
 
@@ -536,7 +542,7 @@ Step 4: 用等价覆盖测试守住 contract
 | `test_runtime_engine.py` 可能嵌入 kernel 不变量 | `test_runtime_engine.py` | Step 4 逐 case 人工审查 |
 | release-preflight.sh 串联 runtime smoke 脚本 | `release-preflight.sh` L75-77 | Step 1b cutover: 移除或改写 runtime smoke 调用 |
 | check-install-payload-bundle-smoke.py 冻结 runtime 脚本路径 | `check-install-payload-bundle-smoke.py` L144+ | Step 1b cutover: 改写路径期望值 |
-| check-skill-eval-gate.py import runtime 模块 | `check-skill-eval-gate.py` L17 | Step 1b cutover: 改为 kernel 接口或删除 |
+| ~~check-skill-eval-gate.py import runtime 模块~~ | ~~`check-skill-eval-gate.py` L17~~ | ~~Step 1b cutover~~ → **P4.6-A 已删，阻塞自然解除** |
 | generate-builtin-catalog.py import runtime 模块 | `generate-builtin-catalog.py` L17 | Step 1b cutover: 改为 sopify_contracts 或删除 |
 | 非 test_runtime_* 测试冻结 runtime 路径/能力 | `test_installer.py`, `test_installer_status_doctor.py`, `test_action_intent.py` | Step 1b cutover: 同步改写期望值 |
 | models.py 被 8 个内核模块 import | `models.py` | rewrite-first: 先改 8 个内核模块(core 5 + support 3)的 `from .models` → `from sopify_contracts`，再删；context_snapshot(优先拆分)也需同步改 |
@@ -684,7 +690,7 @@ retain-after-decoupling 的已知耦合点：
 
 额外判定：
 
-1. `installer/runtime_bundle.py` 是 pure legacy runtime bundle surface，不属于 retain-after-decoupling，应在 runtime 退场时直接同步删除
+1. `installer/runtime_bundle.py` ~~是 pure legacy runtime bundle surface，不属于 retain-after-decoupling，应在 runtime 退场时直接同步删除~~ → **REWRITE (→ 4.13)**: 产品决策项目级安装保留，壳套壳实现需重写为纯 Python，但能力本身保留
 2. `scripts/sopify_status.py` / `scripts/sopify_doctor.py` 不列入独立解耦清单；它们只是 `installer/inspection.py` 的薄入口，变化应由 inspection cutover 吸收
 
 ### Step 2 Cutover 表（5 文件）
@@ -700,7 +706,7 @@ retain-after-decoupling 的已知耦合点：
 Step 2 的边界故意收紧：
 
 1. 只处理上表 5 个文件
-2. 不把 `installer/runtime_bundle.py` 放进“解耦后保留”
+2. `installer/runtime_bundle.py` 不在 Step 2 cutover 范围，归入 4.13 installer 瘦身
 3. 不单独列 `scripts/sopify_status.py` / `scripts/sopify_doctor.py`
 4. 不在这一阶段保留任何 legacy `*_runtime.py`；若 kernel 仍需 host-facing 最小链路，只允许新增全新薄壳入口，不沿用旧 bridge/helper
 

@@ -225,12 +225,6 @@ if [[ "$GATE_OUTPUT" != *'"runtime_gate_entry": "scripts/runtime_gate.py"'* ]]; 
   exit 1
 fi
 
-if [[ "$GATE_OUTPUT" != *'"preferences_preload_entry": "scripts/preferences_preload_runtime.py"'* ]]; then
-  echo "Smoke check failed: runtime gate did not project preferences_preload_entry from the selected bundle." >&2
-  printf '%s\n' "$GATE_OUTPUT" >&2
-  exit 1
-fi
-
 echo "Runtime smoke check passed:"
 echo "  bundle root: $BUNDLE_ROOT"
 echo "  manifest:    $MANIFEST_FILE"

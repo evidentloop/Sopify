@@ -58,8 +58,6 @@ required_paths=(
   "$CANONICAL_WRITER_SRC"
   "$SCRIPTS_SRC/sopify_runtime.py"
   "$SCRIPTS_SRC/runtime_gate.py"
-  "$SCRIPTS_SRC/plan_registry_runtime.py"
-  "$SCRIPTS_SRC/preferences_preload_runtime.py"
   "$SCRIPTS_SRC/check-runtime-smoke.sh"
   "$SCRIPTS_SRC/sync-runtime-assets.sh"
   "$TESTS_SRC/test_bundle_smoke.py"
@@ -82,8 +80,6 @@ mkdir -p "$BUNDLE_DIR/scripts"
 rsync -a --delete --prune-empty-dirs \
   --include='sopify_runtime.py' \
   --include='runtime_gate.py' \
-  --include='plan_registry_runtime.py' \
-  --include='preferences_preload_runtime.py' \
   --include='check-runtime-smoke.sh' \
   --include='sync-runtime-assets.sh' \
   --exclude='*' \
@@ -105,8 +101,6 @@ PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}" \
 chmod +x \
   "$BUNDLE_DIR/scripts/sopify_runtime.py" \
   "$BUNDLE_DIR/scripts/runtime_gate.py" \
-  "$BUNDLE_DIR/scripts/plan_registry_runtime.py" \
-  "$BUNDLE_DIR/scripts/preferences_preload_runtime.py" \
   "$BUNDLE_DIR/scripts/check-runtime-smoke.sh" \
   "$BUNDLE_DIR/scripts/sync-runtime-assets.sh"
 

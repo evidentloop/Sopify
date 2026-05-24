@@ -11,7 +11,6 @@ Run release preflight checks before bumping Sopify version:
   1) Sync Codex -> Claude skills mirrors
   2) Verify mirrors and version consistency
   3) Run runtime unit tests + installer/runtime smoke checks
-  4) Run skill eval quality gate
 EOF
 }
 
@@ -74,9 +73,5 @@ fi
 run_step "Run install/payload bootstrap smoke" python3 "$ROOT_DIR/scripts/check-install-payload-bundle-smoke.py"
 run_step "Run prompt runtime gate smoke" python3 "$ROOT_DIR/scripts/check-prompt-runtime-gate-smoke.py"
 run_step "Run bundle runtime smoke check" bash "$ROOT_DIR/scripts/check-runtime-smoke.sh"
-
-if [[ -f "$ROOT_DIR/scripts/check-skill-eval-gate.py" ]]; then
-  run_step "Run skill eval quality gate" python3 "$ROOT_DIR/scripts/check-skill-eval-gate.py"
-fi
 
 echo "[release-preflight] All checks passed."

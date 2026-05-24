@@ -733,11 +733,9 @@ class RuntimeGateTests(unittest.TestCase):
             pinned_manifest["bundle_version"] = pinned_version
             limits = dict(pinned_manifest.get("limits") or {})
             limits["runtime_gate_entry"] = "scripts/runtime_gate_pinned.py"
-            limits["preferences_preload_entry"] = "scripts/preferences_preload_pinned.py"
             pinned_manifest["limits"] = limits
             pinned_manifest_path.write_text(json.dumps(pinned_manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
             (pinned_bundle_root / "scripts" / "runtime_gate_pinned.py").write_text("", encoding="utf-8")
-            (pinned_bundle_root / "scripts" / "preferences_preload_pinned.py").write_text("", encoding="utf-8")
 
             workspace_manifest_path = workspace / ".sopify-runtime" / "manifest.json"
             workspace_manifest_path.parent.mkdir(parents=True, exist_ok=True)
@@ -748,7 +746,7 @@ class RuntimeGateTests(unittest.TestCase):
                         "stub_version": "1",
                         "bundle_version": pinned_version,
                         "locator_mode": "global_first",
-                        "required_capabilities": ["runtime_gate", "preferences_preload"],
+                        "required_capabilities": ["runtime_gate"],
                         "ignore_mode": "noop",
                         "written_by_host": True,
                     },
@@ -769,7 +767,6 @@ class RuntimeGateTests(unittest.TestCase):
             self.assertEqual(Path(result["bundle_manifest_path"]).resolve(), (pinned_bundle_root / "manifest.json").resolve())
             self.assertEqual(Path(result["global_bundle_root"]).resolve(), pinned_bundle_root.resolve())
             self.assertEqual(result["runtime_gate_entry"], "scripts/runtime_gate_pinned.py")
-            self.assertEqual(result["preferences_preload_entry"], "scripts/preferences_preload_pinned.py")
 
     @pytest.mark.implementation_mirror
 
@@ -817,7 +814,6 @@ class RuntimeGateTests(unittest.TestCase):
             self.assertTrue(result["bundle_manifest_path"].endswith(f"/bundles/{selected_version}/manifest.json"))
             self.assertTrue(result["global_bundle_root"].endswith(f"/bundles/{selected_version}"))
             self.assertEqual(result["runtime_gate_entry"], "scripts/runtime_gate.py")
-            self.assertEqual(result["preferences_preload_entry"], "scripts/preferences_preload_runtime.py")
 
     def test_gate_preflight_brake_layer_blocks_first_write_even_for_go_command(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1267,7 +1263,6 @@ class RuntimeGateTests(unittest.TestCase):
             )
             self.assertTrue(result["preflight"]["global_bundle_root"].endswith(f"/bundles/{active_version}"))
             self.assertEqual(result["preflight"]["runtime_gate_entry"], "scripts/runtime_gate.py")
-            self.assertEqual(result["preflight"]["preferences_preload_entry"], "scripts/preferences_preload_runtime.py")
 
     def test_gate_preflight_maps_missing_active_version_to_workspace_preflight_failed(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

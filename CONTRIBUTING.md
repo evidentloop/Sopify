@@ -104,7 +104,6 @@ bash scripts/sync-skills.sh
 bash scripts/check-skills-sync.sh
 bash scripts/check-version-consistency.sh
 python3 scripts/generate-builtin-catalog.py
-python3 scripts/check-skill-eval-gate.py
 python3 -m pytest tests -v
 ```
 

@@ -36,7 +36,7 @@ archive_ready: false
 | 1. 蓝图 delta 校验 | ✅ 完成 | 5 项审计全通过 |
 | 2. 当前消费者扫描 | ✅ 完成 | 4 类清单 + consumer 判定 |
 | 3. 删除就绪结论 | ✅ 完成 | kernel 边界锁定, 退场量级 ~38K LOC |
-| 4. 审计后删除 | ⚠️ 部分完成 | 4.1-4.5/4.7-4.10a/4.10c/4.10d ✅; **4.6 scripts cutover + 4.10b plan_scaffold + 4.11/4.12 未完成** |
+| 4. 审计后删除 | ⚠️ 部分完成 | 4.1-4.5/4.6/4.7-4.10a/4.10c/4.10d ✅; **4.10b plan_scaffold + 4.11/4.12 + 4.13 installer 瘦身 未完成** |
 | 5. 文档更新 | ⚠️ 部分完成 | 5.2/5.3 ✅; **5.1/5.4-5.7 未完成** |
 | 6. contract 面清理 + engine 重构 | ✅ 完成 | 6.1-6.6 全部收完, −6,400+ LOC |
 
@@ -49,7 +49,7 @@ archive_ready: false
                                                        ↓
                                                6.1 → 6.2 → 6.3 → 6.4 → 6.5 → 6.6
                                                                                   ↓
-                                                                          → 后续: 4.2-4.6 / 5.x
+                                                                           → 后续: 4.10b / 4.13 / 5.x
 ```
 
 ## 1. 蓝图 delta 校验 ✅
@@ -113,8 +113,8 @@ archive_ready: false
   > - plan_registry: 6.5 裁定为独立治理层保留
   > - plan_scaffold: blocker 从 engine.py → _planning.py; 结构决策归 4.10b
   > - 5 个 retained 模块判定不变
-  > **当前 keep_for_legacy / blocking 面**: 不再有 runtime 模块级的 blocking 面; 剩余阻塞全在 scripts/installer 层 (→ 4.6)
-- [ ] 4.6 scripts / installer / evals legacy surface 退场 (2026-05-24 重新裁定)
+  > **当前 keep_for_legacy / blocking 面**: 不再有 runtime 模块级的 blocking 面; scripts/installer 层剩余阻塞已移入 4.13 installer 瘦身
+- [x] 4.6 scripts / installer / evals legacy surface 退场 (2026-05-24 裁定; 2026-05-25 P4.6-A 执行完毕)
   > **裁定口径**: 不是主链路 (gate → machine truth → handoff → host consume) 就干掉。CI/release pipeline 引用是"活跃流程依赖"，不是"必须保留的产品能力"。
   >
   > ### 🟢 KEEP — 主链路或活跃 CI 硬约束 (3 个)
@@ -124,21 +124,24 @@ archive_ready: false
   > | `scripts/release-preflight.sh` (196) | release 编排器，pre-commit hook 入口 |
   > | `scripts/generate-builtin-catalog.py` (225) | CI 活跃 (ci.yml:44)，builtin_catalog.py 仍被 manifest 消费 |
   >
-  > ### 🔴 DELETE — 已裁定为退场目标，执行时需同步删上游 release/install 依赖 (9 个)
-  > | 文件 | LOC | 联动清理 (执行时必须同步处理) |
+  > ### 🔴 P4.6-A 已执行 — 独立死面退场 ✅ (5 个目标, 7 文件, −251 LOC)
+  > | 文件 | LOC | 执行结果 |
   > |------|-----|----------|
-  > | `scripts/check-host-doc-contract.py` | 74 | 无 |
-  > | `scripts/preferences_preload_runtime.py` | 72 | manifest.py + workspace_preflight.py + smoke + tests |
-  > | `scripts/plan_registry_runtime.py` | 109 | manifest.py + sync-assets + test |
-  > | `scripts/check-prompt-runtime-gate-smoke.py` | 369 | release-preflight.sh + test ref |
-  > | `scripts/check-install-payload-bundle-smoke.py` | ~200 | release-preflight.sh + test |
-  > | `installer/runtime_bundle.py` | ~80 | installer/payload.py import |
-  > | `scripts/sync-runtime-assets.sh` | 124 | co-delete with runtime_bundle |
-  > | `scripts/check-skill-eval-gate.py` | 305 | ci.yml step + release-preflight + CONTRIBUTING×2 + blueprint keep-list |
-  > | `evals/` (整组) | ~50 | co-delete with check-skill-eval-gate.py (baseline/slo/report 全是其数据面) |
-  > **check-skill-eval-gate.py + evals/ 退场理由**: discovery/navigation 永久 stub (6.4); selection 的 7 case 与 pytest route tests 功能重叠; 2/3 死代码不值得续命
+  > | `scripts/check-host-doc-contract.py` | 74 | ✅ 已删 |
+  > | `scripts/preferences_preload_runtime.py` | 72 | ✅ 已删 + manifest/preflight/smoke/tests 联动清理 |
+  > | `scripts/plan_registry_runtime.py` | 109 | ✅ 已删 + manifest/sync-assets/tests 联动清理 |
+  > | `scripts/check-skill-eval-gate.py` | 305 | ✅ 已删 + ci.yml/release-preflight/CONTRIBUTING×2/blueprint 联动清理 |
+  > | `evals/` (整组) | ~50 | ✅ 已删 (baseline/slo + untracked report) |
   >
-  > ### 🟡 CUTOVER — 路径名冻结太深，需先改引用者 (2 个)
+  > ### ➡️ 原 P4.6-B 目标 → 移入 4.13 installer 瘦身
+  > | 文件 | 原裁定 | 新状态 | 理由 |
+  > |------|--------|--------|------|
+  > | `scripts/check-prompt-runtime-gate-smoke.py` (369) | DELETE | KEEP+SLIM | release gate 活跃依赖，产品决策: 项目级安装保留 |
+  > | `scripts/check-install-payload-bundle-smoke.py` (~200) | DELETE | KEEP+SLIM | 同上 |
+  > | `installer/runtime_bundle.py` (~80) | DELETE | REWRITE | 壳套壳 (Python→bash→rsync)，能力保留实现重写 |
+  > | `scripts/sync-runtime-assets.sh` (124) | DELETE | REWRITE | 同上，co-rewrite with runtime_bundle.py |
+  >
+  > ### 🟡 CUTOVER — 路径名冻结太深，需先改引用者 (2 个, 不变)
   > | 文件 | LOC | 阻塞 |
   > |------|-----|------|
   > | `scripts/sopify_runtime.py` | 157 | entry_guard.py + installer/bootstrap+validate + pre-commit + CONTRIBUTING |
@@ -396,15 +399,21 @@ archive_ready: false
 | 4.4 | 记录删除依据 / 影响 / 验证结果 | ✅ 已关 | tasks.md + commit = 记录 |
 | 4.5 | 标记 legacy/blocking 面后续处理 | ✅ A2 表已刷新至 6.6 后现实 | |
 
-### Tier 2: Legacy scripts / installer / evals 退场 (P4.6)
+### Tier 2: Installer 瘦身 (4.13, 新立项)
 
-> 详见上方 4.6 节的三类判定表。
+> **产品前提**: 项目级安装保留。瘦身方向不是删安装链，而是收过渡态为正式实现。
 >
-> **DELETE (9 个, ~1,400 LOC)**: check-host-doc-contract / preferences_preload_runtime / plan_registry_runtime / check-prompt-runtime-gate-smoke / check-install-payload-bundle-smoke / runtime_bundle.py / sync-runtime-assets.sh / **check-skill-eval-gate.py + evals/ 整组**
+> **Phase A — 可直接执行 (无产品口径依赖)**:
+> - 停写 legacy workspace stub (.sopify-runtime/manifest.json)，收敛到单 marker (.sopify-skills/sopify.json)
+> - sync-runtime-assets.sh + installer/runtime_bundle.py 壳套壳重写为纯 Python
+> - 相关 installer/validate/bootstrap 回归验证
 >
-> **CUTOVER (2 个, ~400 LOC)**: sopify_runtime.py / check-runtime-smoke.sh
+> **Phase B — 需先定义最小 contract (产品设计题)**:
+> - install smoke (check-install-payload-bundle-smoke.py) 最小 contract 重设计
+> - prompt smoke (check-prompt-runtime-gate-smoke.py) 最小 contract 重设计
+> - legacy_fallback 退役 (双 marker Phase 1 完成后自然死亡)
 >
-> **KEEP (3 个)**: runtime_gate.py / release-preflight.sh / generate-builtin-catalog.py
+> **风险**: 改 bootstrap_workspace.py (1507 LOC) 核心逻辑，不是边缘脚本
 
 ### Tier 3: 验证与 polish
 

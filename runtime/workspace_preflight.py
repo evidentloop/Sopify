@@ -254,7 +254,6 @@ except ModuleNotFoundError as exc:
         return payload
 
 _LEGACY_WORKSPACE_RUNTIME_GATE_ENTRY = "scripts/runtime_gate.py"
-_LEGACY_WORKSPACE_PREFERENCES_PRELOAD_ENTRY = "scripts/preferences_preload_runtime.py"
 
 
 class WorkspacePreflightError(RuntimeError):
@@ -509,17 +508,11 @@ def preflight_workspace_runtime(
             runtime_gate_entry = _legacy_workspace_entry(legacy_bundle_root, _LEGACY_WORKSPACE_RUNTIME_GATE_ENTRY)
             if runtime_gate_entry is not None:
                 payload.setdefault("runtime_gate_entry", runtime_gate_entry)
-            preferences_preload_entry = _legacy_workspace_entry(legacy_bundle_root, _LEGACY_WORKSPACE_PREFERENCES_PRELOAD_ENTRY)
-            if preferences_preload_entry is not None:
-                payload.setdefault("preferences_preload_entry", preferences_preload_entry)
         else:
             selected_bundle_manifest = _read_json_object(selected_bundle_manifest_path, error_prefix="Invalid bundle manifest")
             runtime_gate_entry = _bundle_limit_entry(selected_bundle_manifest, "runtime_gate_entry")
             if runtime_gate_entry is not None:
                 payload.setdefault("runtime_gate_entry", runtime_gate_entry)
-            preferences_preload_entry = _bundle_limit_entry(selected_bundle_manifest, "preferences_preload_entry")
-            if preferences_preload_entry is not None:
-                payload.setdefault("preferences_preload_entry", preferences_preload_entry)
     payload.setdefault("helper_path", str(helper_path))
     payload.setdefault("helper_argv_mode", helper_argv_mode)
     if detected_host_id:

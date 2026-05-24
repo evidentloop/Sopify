@@ -2467,11 +2467,6 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertTrue((bundle_root / "runtime" / "gate.py").exists())
             self.assertTrue((bundle_root / "runtime" / "workspace_preflight.py").exists())
             self.assertTrue((bundle_root / "scripts" / "check-runtime-smoke.sh").exists())
-            self.assertTrue((bundle_root / "scripts" / "clarification_bridge_runtime.py").exists())
-            self.assertTrue((bundle_root / "scripts" / "develop_callback_runtime.py").exists())
-            self.assertTrue((bundle_root / "scripts" / "decision_bridge_runtime.py").exists())
-            self.assertTrue((bundle_root / "scripts" / "plan_registry_runtime.py").exists())
-            self.assertTrue((bundle_root / "scripts" / "preferences_preload_runtime.py").exists())
             self.assertTrue((bundle_root / "scripts" / "runtime_gate.py").exists())
             self.assertTrue((bundle_root / "tests" / "test_runtime.py").exists())
             self.assertTrue(manifest_path.exists())
@@ -2585,64 +2580,6 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertIn("working_summary", manifest["limits"]["develop_resume_context_required_fields"])
             self.assertIn("continue_host_develop", manifest["limits"]["develop_resume_after_actions"])
             self.assertEqual(manifest["limits"]["develop_quality_contract_version"], "1")
-            self.assertEqual(manifest["limits"]["plan_registry_entry"], "scripts/plan_registry_runtime.py")
-            self.assertEqual(manifest["limits"]["plan_registry_hosts"]["cli"]["preferred_mode"], "inspect_only_summary")
-            self.assertEqual(
-                manifest["limits"]["plan_registry_hosts"]["cli"]["trigger_points"],
-                ["post_plan_review", "manual_plan_registry_review"],
-            )
-            self.assertEqual(manifest["limits"]["plan_registry_hosts"]["cli"]["mount_scope"], "review_only")
-            self.assertEqual(manifest["limits"]["plan_registry_hosts"]["cli"]["blocked_scopes"], ["develop", "execute"])
-            self.assertEqual(manifest["limits"]["plan_registry_hosts"]["cli"]["default_surface"], "inspect_contract")
-            self.assertEqual(manifest["limits"]["plan_registry_hosts"]["cli"]["confirm_priority_trigger"], "explicit_user_action")
-            self.assertEqual(
-                manifest["limits"]["plan_registry_hosts"]["cli"]["display_fields"],
-                ["current_plan", "selected_plan", "recommendations", "drift_notice", "execution_truth"],
-            )
-            self.assertEqual(
-                manifest["limits"]["plan_registry_hosts"]["cli"]["allowed_actions"],
-                ["confirm_suggested", "set_p1", "set_p2", "set_p3", "dismiss"],
-            )
-            self.assertTrue(manifest["limits"]["plan_registry_hosts"]["cli"]["note_optional"])
-            self.assertEqual(
-                manifest["limits"]["plan_registry_hosts"]["cli"]["confirm_payload_fields"],
-                ["plan_id", "priority", "note"],
-            )
-            self.assertEqual(
-                manifest["limits"]["plan_registry_hosts"]["cli"]["success_behavior"],
-                {
-                    "refresh_scope": "selected_card",
-                    "stay_in_context": "review",
-                    "auto_execute": False,
-                    "auto_switch_current_plan": False,
-                },
-            )
-            self.assertEqual(
-                manifest["limits"]["plan_registry_hosts"]["cli"]["failure_behavior"],
-                {
-                    "inspect_failure": "hide_card_non_blocking",
-                    "confirm_failure": "show_retryable_error",
-                },
-            )
-            self.assertEqual(
-                manifest["limits"]["plan_registry_hosts"]["cli"]["copy"],
-                {
-                    "title": "Plan 优先级建议",
-                    "summary": "当前 active plan、当前评审 plan 与建议优先级",
-                    "boundary_notice": "确认优先级只会更新 registry，不会切换 current_plan",
-                    "success_notice": "已记录到 plan registry",
-                    "pending_notice": "已保留系统建议，暂未写入最终优先级",
-                },
-            )
-            self.assertEqual(manifest["limits"]["plan_registry_hosts"]["cli"]["raw_registry_visibility"], "advanced_only")
-            self.assertTrue(manifest["limits"]["plan_registry_hosts"]["cli"]["observe_only"])
-            self.assertEqual(manifest["limits"]["plan_registry_hosts"]["cli"]["execution_truth"], "current_plan")
-            self.assertEqual(manifest["limits"]["preferences_preload_entry"], "scripts/preferences_preload_runtime.py")
-            self.assertEqual(manifest["limits"]["preferences_preload_contract_version"], "1")
-            self.assertEqual(
-                manifest["limits"]["preferences_preload_statuses"],
-                ["loaded", "missing", "invalid", "read_error"],
-            )
             self.assertEqual(manifest["limits"]["runtime_gate_entry"], "scripts/runtime_gate.py")
             self.assertEqual(manifest["limits"]["runtime_gate_contract_version"], "1")
             self.assertEqual(
@@ -2670,24 +2607,6 @@ class EngineIntegrationTests(unittest.TestCase):
                 check=False,
             )
             self.assertEqual(completed.returncode, 0, msg=completed.stderr)
-
-            preferences_script = bundle_root / "scripts" / "preferences_preload_runtime.py"
-            preferences_workspace = temp_root / "preferences-workspace"
-            preferences_workspace.mkdir()
-            preference_file = preferences_workspace / ".sopify-skills" / "user" / "preferences.md"
-            preference_file.parent.mkdir(parents=True, exist_ok=True)
-            preference_file.write_text("# 用户长期偏好\n\n- 严谨输出。\n", encoding="utf-8")
-            preloaded = subprocess.run(
-                [sys.executable, str(preferences_script), "--workspace-root", str(preferences_workspace), "inspect"],
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            self.assertEqual(preloaded.returncode, 0, msg=preloaded.stderr)
-            preload_payload = json.loads(preloaded.stdout)
-            self.assertEqual(preload_payload["status"], "ready")
-            self.assertEqual(preload_payload["preferences"]["status"], "loaded")
-            self.assertIn("严谨输出。", preload_payload["preferences"]["injection_text"])
 
             runtime_gate_script = bundle_root / "scripts" / "runtime_gate.py"
             gated = subprocess.run(

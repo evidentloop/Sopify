@@ -445,7 +445,6 @@ runtime 执行后，若 `.sopify-skills/state/current_handoff.json` 存在，宿
 |---|---|
 | `scripts/sopify_runtime.py` | 默认 repo-local raw-input entry |
 | `scripts/runtime_gate.py enter` | runtime gate，宿主第一跳 |
-| `scripts/preferences_preload_runtime.py` | 长期偏好 preload helper |
 | `~/.codex/sopify/payload-manifest.json` | 全局 payload metadata |
 | `~/.codex/sopify/helpers/bootstrap_workspace.py` | workspace bootstrap helper |
 | `.sopify-runtime/manifest.json` | vendored bundle machine contract |
