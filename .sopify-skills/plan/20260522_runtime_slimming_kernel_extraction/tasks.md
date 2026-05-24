@@ -266,13 +266,20 @@ archive_ready: false
   > 同步清理: test_action_intent.py (删 3 个 decision-table 测试类)、check-context-checkpoints.py (checkpoint A scope/files 裁剪)
   > 额外修复: test_context_checkpoints.py + test_release_hooks.py 3 个 pre-existing failures (commit 5427520 遗留的 resolution_planner/context_v1_scope 引用断裂)
   > 验证: 281 tests pass (含 action_intent/context_checkpoints/release_hooks 扩展验证)
-- [ ] 6.2 **router ingress / checkpoint reply 协议拆分** (难度: 中)
+- [x] 6.2 **router ingress / checkpoint reply 协议拆分** (难度: 中) ✅ 2026-05-24
   > 目标: 把 router 的主请求入口协议与 checkpoint 回复协议拆开，结束两类语义长期混跑
   > ingress 终态: 普通 host request 优先只吃 ActionProposal，不再依赖 `_CONTINUE_KEYWORDS` / `_CANCEL_KEYWORDS` 这类自由文本猜测
   > checkpoint 终态: clarification / decision 继续保留轻量自然语言回复解析，只负责 `继续` / `取消` / `choose` / answer 这类 checkpoint reply
   > 直接收益: router 从"富文本分类器"收敛成"主入口控制层 + checkpoint 回复层"两块，后续才能继续清 candidate_skill_ids / recommended_skill_ids 等局部语境
   > 联动面: router.py / gate.py / _kernel_turn.py / action_intent.py / clarification.py / decision.py / handoff.py + 对应 tests
+  > engine 关联: 顺手收掉 engine ingress 薄层（`_derive_route_from_authorized_proposal`），不扩散到 planning / checkpoint resume 主块
+  > kernel extraction 遗留债: `_make_run_id` / `_make_run_state` / `_snapshot_has_global_execution_truth` 目前在 engine.py 与 _kernel_turn.py 双份；本题开始前先消重，避免后续双边修改分叉
   > 边界: 本题不顺手重做 decision/clarification capability，只拆协议边界；普通主请求与 checkpoint reply 的 contract 要分别写清
+  > **6.2 结果备注 (技术债标记)**:
+  > - confirmed decision 双路径语义: caller gate (router.py:270) 放 confirmed 进 _classify_pending_decision，但内部 pending/collecting 自动恢复路径和 confirmed 的 materialize 路径是两条隐含语义，无显式注释。6.6 拆 _handle_decision_resume 时必须识别。
+  > - _enter_active_develop_context 白盒化: 原端到端 run_runtime("继续") 改为手工拼 RunState + RuntimeHandoff + stamp_handoff_resolution_id。不再覆盖 resume → develop_pending → handoff 端到端路径。测试形态债，不阻塞 6.3-6.5。
+  > - exec_plan → handoff 缺口: exec_plan route 不产生 RuntimeHandoff（result.handoff is None），3 个测试删掉了 handoff 断言。预存问题，deferred to 6.6。
+  > - router-side derive focused test: ✅ 已补 6 个正向测试 (DeriveRouteTests in test_runtime_router.py)，覆盖 cancel_flow session/global scope + checkpoint_response pending/terminal/empty。
 - [ ] 6.3 **recommended_skill_ids contract 裁定** (难度: 低，纯决策)
   > 前置于 6.4 实现。三选一:
   > - 保留 recommended_skill_ids，把动态发现改成静态推荐
@@ -293,4 +300,16 @@ archive_ready: false
   > 核心问题不是"能不能删文件"，而是:
   > - plan registry 这项能力是否继续作为独立治理层存在
   > - 还是拆回 engine / archive_lifecycle / output / plan_scaffold
+  > 与 engine 的关系: engine planning 主块（`_advance_planning_route` / `_resolve_plan_for_request` / `_apply_execution_gate_to_plan`）重度依赖 plan_registry + plan_scaffold；必须先定 6.5 的终态，后续 engine decomposition 才知道往哪拆
   > 最后打；受益于前面题目的清理减少干扰变量
+- [ ] 6.6 **engine decomposition** (难度: 最高，6.5 后执行)
+  > 目标: 真正切断 `_kernel_turn -> engine` 的 10 个 live handler 依赖，不再让 engine.py 充当巨型后厨
+  > 范围: planning 主块 + checkpoint resume 主块 + execution ownership / promotion 主块
+  > 关键块:
+  > - `_handle_clarification_resume`
+  > - `_handle_decision_resume`
+  > - `_advance_planning_route`
+  > - `_resolve_plan_for_request`
+  > - `_apply_execution_gate_to_plan`
+  > 执行顺序: 先前面 6.2-6.5 降噪，再单开 6.6；不把它混做 plan_registry 的附属清扫
+  > 预期结果: engine 只保留极薄兼容壳或彻底退空，kernel orchestration 行为不再依赖 engine 内部 handler

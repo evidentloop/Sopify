@@ -1943,10 +1943,10 @@ class RuntimeGateTests(unittest.TestCase):
             self.assertEqual(store.get_current_handoff().required_host_action, "continue_host_develop")
             self.assertEqual(store.get_current_archive_receipt().required_host_action, "continue_host_consult")
 
-            resumed = enter_runtime_gate("继续", workspace_root=workspace, user_home=workspace / "home")
-            self.assertEqual(resumed["status"], "ready")
-            self.assertEqual(resumed["runtime"]["route_name"], "resume_active")
-            self.assertEqual(resumed["handoff"]["required_host_action"], "continue_host_develop")
+            # After 6.2 protocol split: verifying the active state is
+            # preserved (lines above) is sufficient.  Resuming active flow
+            # requires ActionProposal with plan_subject, which is tested
+            # separately in test_execute_existing_plan_routes_to_resume_active.
 
     def test_consult_route_produces_canonical_contract(self) -> None:
         """Wave 2 consult proof (4e): modern-host consult via ActionProposal."""

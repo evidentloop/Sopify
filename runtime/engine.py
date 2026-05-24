@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from hashlib import sha1
 from pathlib import Path
 import re
 from typing import Any, Mapping, Optional
@@ -13,7 +12,14 @@ from .checkpoint_materializer import materialize_checkpoint_request
 from .checkpoint_request import checkpoint_request_from_clarification_state, checkpoint_request_from_decision_state
 from .clarification import build_clarification_state, has_submitted_clarification, merge_clarification_request, parse_clarification_response, stale_clarification
 from .config import load_runtime_config
-from .context_snapshot import ContextResolvedSnapshot, resolve_context_snapshot
+from .context_snapshot import (
+    ContextResolvedSnapshot,
+    GLOBAL_EXECUTION_ROUTES,
+    PROMOTABLE_REVIEW_STAGES,
+    resolve_context_snapshot,
+    snapshot_has_global_execution_truth,
+    snapshot_review_run,
+)
 from .context_recovery import recover_context
 from .decision import (
     ACTIVE_PLAN_ATTACH_OPTION_ID,
@@ -57,8 +63,7 @@ from .plan_scaffold import (
     reserve_plan_identity,
     request_explicitly_wants_new_plan,
 )
-from .router import Router, estimate_complexity
-from .skill_resolver import resolve_route_candidate_skills
+from .router import Router
 from .action_intent import (
     ActionProposal,
     ActionValidator,
@@ -75,6 +80,8 @@ from .state import (
     local_display_now,
     local_iso_now,
     local_timezone_name,
+    make_run_id,
+    make_run_state,
     stable_request_sha1,
     summarize_request_text,
 )
@@ -131,202 +138,6 @@ _ABORTABLE_RUN_STAGES = frozenset(
         "decision_pending",
     }
 )
-# These routes operate on the single root-scoped execution truth once review
-# state is explicitly promoted out of a session.
-_GLOBAL_EXECUTION_ROUTES = frozenset({"resume_active", "exec_plan", "archive_lifecycle"})
-# Only stable review checkpoints may be promoted into the global execution
-# truth consumed by resume and archive lifecycle.
-_PROMOTABLE_REVIEW_STAGES = frozenset({"plan_generated", "ready_for_execution", "develop_pending"})
-
-# -- Phase B: action_type → route mapping for authorized proposals -----------
-
-_ACTION_TYPE_TO_ROUTE: dict[str, str] = {
-    "consult_readonly": "consult",
-    "propose_plan": "plan_only",
-    "execute_existing_plan": "resume_active",
-    # cancel_flow handled inline (needs snapshot for cancel_scope).
-}
-
-
-def _derive_route_from_authorized_proposal(
-    proposal: ActionProposal,
-    user_input: str,
-    *,
-    skills: tuple[SkillMeta, ...],
-    config: RuntimeConfig,
-    snapshot: ContextResolvedSnapshot | None,
-) -> RouteDecision:
-    """Deterministically map an authorized ActionProposal to a RouteDecision.
-
-    Called only when ``validation_decision.decision == DECISION_AUTHORIZE``
-    and there is no ``route_override``.  Falls through to Router.classify()
-    is NOT expected — every recognized action_type produces a route here.
-    """
-    action = proposal.action_type
-
-    # --- cancel_flow: snapshot-driven cancel_scope ---
-    if action == "cancel_flow":
-        has_global = _snapshot_global_execution_run(snapshot) is not None
-        route = RouteDecision(
-            route_name="cancel_active",
-            request_text=user_input,
-            reason="action_proposal_derive: cancel_flow",
-            complexity="simple",
-            should_recover_context=True,
-            active_run_action="cancel",
-            artifacts={"cancel_scope": "global" if has_global else "session"},
-        )
-    # --- checkpoint_response: snapshot-driven ---
-    elif action == "checkpoint_response":
-        route = _derive_checkpoint_response_route(user_input, snapshot=snapshot, skills=skills)
-    # --- modify_files: complexity-driven ---
-    elif action == "modify_files":
-        route = _derive_modify_files_route(user_input, skills=skills)
-    # --- propose_plan: complexity for plan_level, immediate materialization ---
-    elif action == "propose_plan":
-        signal = estimate_complexity(user_input)
-        route = RouteDecision(
-            route_name="plan_only",
-            request_text=user_input,
-            reason=f"action_proposal_derive: propose_plan ({signal.reason})",
-            complexity="complex",
-            plan_level=signal.plan_level or "standard",
-            plan_package_policy="immediate",
-            candidate_skill_ids=resolve_route_candidate_skills(
-                "plan_only", skills, fallback_preferred=("analyze", "design"),
-            ),
-        )
-    else:
-        # --- static mappings ---
-        route_name = _ACTION_TYPE_TO_ROUTE.get(action)
-        if route_name is not None:
-            route = _build_static_route(route_name, action, user_input, skills=skills)
-        else:
-            # Unreachable for valid ACTION_TYPES (archive_plan handled by route_override).
-            route = RouteDecision(
-                route_name="consult",
-                request_text=user_input,
-                reason=f"action_proposal_derive: unknown action_type {action!r}, falling back to consult",
-                complexity="simple",
-            )
-
-    return route
-
-
-def _derive_checkpoint_response_route(
-    user_input: str,
-    *,
-    snapshot: ContextResolvedSnapshot | None,
-    skills: tuple[SkillMeta, ...],
-) -> RouteDecision:
-    """Route checkpoint_response based on active checkpoint state in snapshot."""
-    if snapshot is not None:
-        clarification = snapshot.current_clarification
-        if clarification is not None and clarification.status == "pending":
-            return RouteDecision(
-                route_name="clarification_resume",
-                request_text=user_input,
-                reason="action_proposal_derive: checkpoint_response with pending clarification",
-                complexity="medium",
-                should_recover_context=True,
-                candidate_skill_ids=resolve_route_candidate_skills(
-                    "clarification_resume", skills, fallback_preferred=("analyze", "design"),
-                ),
-                active_run_action="clarification_response",
-            )
-        decision = snapshot.current_decision
-        if decision is not None and decision.status in {"pending", "collecting"}:
-            return RouteDecision(
-                route_name="decision_resume",
-                request_text=user_input,
-                reason="action_proposal_derive: checkpoint_response with active decision",
-                complexity="medium",
-                should_recover_context=True,
-                candidate_skill_ids=resolve_route_candidate_skills(
-                    "decision_resume", skills, fallback_preferred=("design",),
-                ),
-                active_run_action="decision_response",
-            )
-    # No active checkpoint → REJECT (fail-closed)
-    return RouteDecision(
-        route_name="proposal_rejected",
-        request_text=user_input,
-        reason="action_proposal_derive: checkpoint_response but no active pending/collecting checkpoint",
-        complexity="simple",
-        should_recover_context=False,
-        artifacts={"reject_reason_code": "checkpoint_response.no_active_checkpoint"},
-    )
-
-
-def _derive_modify_files_route(
-    user_input: str,
-    *,
-    skills: tuple[SkillMeta, ...],
-) -> RouteDecision:
-    """Route modify_files based on text complexity analysis."""
-    signal = estimate_complexity(user_input)
-    if signal.level == "simple":
-        return RouteDecision(
-            route_name="quick_fix",
-            request_text=user_input,
-            reason=f"action_proposal_derive: modify_files ({signal.reason})",
-            complexity=signal.level,
-            candidate_skill_ids=resolve_route_candidate_skills(
-                "quick_fix", skills, fallback_preferred=("develop",),
-            ),
-        )
-    if signal.level == "medium":
-        return RouteDecision(
-            route_name="light_iterate",
-            request_text=user_input,
-            reason=f"action_proposal_derive: modify_files ({signal.reason})",
-            complexity=signal.level,
-            plan_level=signal.plan_level,
-            plan_package_policy="authorized_only",
-            candidate_skill_ids=resolve_route_candidate_skills(
-                "light_iterate", skills, fallback_preferred=("design", "develop"),
-            ),
-        )
-    return RouteDecision(
-        route_name="workflow",
-        request_text=user_input,
-        reason=f"action_proposal_derive: modify_files ({signal.reason})",
-        complexity=signal.level,
-        plan_level=signal.plan_level,
-        plan_package_policy="authorized_only",
-        candidate_skill_ids=resolve_route_candidate_skills(
-            "workflow", skills, fallback_preferred=("analyze", "design", "develop"),
-        ),
-    )
-
-
-def _build_static_route(
-    route_name: str,
-    action_type: str,
-    user_input: str,
-    *,
-    skills: tuple[SkillMeta, ...],
-) -> RouteDecision:
-    """Build a RouteDecision for action types with a fixed route mapping."""
-    if route_name in {"cancel_active", "resume_active"}:
-        return RouteDecision(
-            route_name=route_name,
-            request_text=user_input,
-            reason=f"action_proposal_derive: {action_type}",
-            complexity="simple" if route_name == "cancel_active" else "medium",
-            should_recover_context=True,
-            active_run_action="cancel" if route_name == "cancel_active" else "resume",
-            candidate_skill_ids=resolve_route_candidate_skills(
-                route_name, skills, fallback_preferred=("develop",),
-            ) if route_name == "resume_active" else (),
-        )
-    # consult_readonly
-    return RouteDecision(
-        route_name="consult",
-        request_text=user_input,
-        reason=f"action_proposal_derive: {action_type}",
-        complexity="simple",
-    )
 
 
 @dataclass(frozen=True)
@@ -365,41 +176,6 @@ def _capture_planning_context(state_store: StateStore) -> _PlanningContext:
     )
 
 
-
-
-def _snapshot_has_global_execution_truth(snapshot: ContextResolvedSnapshot | None) -> bool:
-    if snapshot is None:
-        return False
-    return snapshot.preferred_state_scope == "global" and snapshot.execution_active_run is not None
-
-
-def _snapshot_global_execution_run(snapshot: ContextResolvedSnapshot | None) -> RunState | None:
-    if not _snapshot_has_global_execution_truth(snapshot):
-        return None
-    return snapshot.execution_active_run
-
-
-def _snapshot_review_run(snapshot: ContextResolvedSnapshot | None) -> RunState | None:
-    if snapshot is None or snapshot.current_run is None:
-        return None
-    global_run = _snapshot_global_execution_run(snapshot)
-    if global_run is not None and snapshot.current_run == global_run:
-        return None
-    return snapshot.current_run
-
-
-def _recovery_store_for_route(
-    decision: RouteDecision,
-    *,
-    review_store: StateStore,
-    global_store: StateStore,
-    snapshot: ContextResolvedSnapshot | None = None,
-) -> StateStore:
-    if decision.route_name == "state_conflict" and snapshot is not None and snapshot.preferred_state_scope == "global":
-        return global_store
-    if decision.route_name in _GLOBAL_EXECUTION_ROUTES and _snapshot_has_global_execution_truth(snapshot):
-        return global_store
-    return review_store
 
 
 def _handle_cancel_active(
@@ -605,7 +381,7 @@ def _promote_review_state_to_global_execution(
         return (False, [])
     if review_plan is None or review_run is None:
         return (False, [])
-    if review_run.stage not in _PROMOTABLE_REVIEW_STAGES:
+    if review_run.stage not in PROMOTABLE_REVIEW_STAGES:
         return (False, [])
 
     notes: list[str] = []
@@ -783,7 +559,7 @@ def _result_state_store_for_route(
         return canceled_store
     if decision.route_name == "state_conflict" and snapshot is not None and snapshot.preferred_state_scope == "global":
         return global_store
-    if decision.route_name in _GLOBAL_EXECUTION_ROUTES:
+    if decision.route_name in GLOBAL_EXECUTION_ROUTES:
         return global_store
     if decision.route_name in {"decision_pending", "decision_resume"}:
         if current_decision is not None and current_decision.phase in {"execution_gate", "develop"}:
@@ -932,39 +708,10 @@ def _registry_file_should_be_reported(
     return entry_result.entry is not None
 
 
-def _make_run_state(
-    decision: RouteDecision,
-    plan_artifact: PlanArtifact,
-    *,
-    stage: str = "plan_generated",
-    execution_gate: ExecutionGate | None = None,
-    execution_authorization_receipt: Mapping[str, Any] | None = None,
-) -> RunState:
-    now = iso_now()
-    return RunState(
-        run_id=_make_run_id(decision.request_text),
-        status="active",
-        stage=stage,
-        route_name=decision.route_name,
-        title=plan_artifact.title,
-        created_at=now,
-        updated_at=now,
-        plan_id=plan_artifact.plan_id,
-        plan_path=plan_artifact.path,
-        execution_gate=execution_gate,
-        execution_authorization_receipt=execution_authorization_receipt,
-        request_excerpt=summarize_request_text(decision.request_text),
-        request_sha1=stable_request_sha1(decision.request_text),
-        owner_session_id="",
-        owner_host="",
-        owner_run_id="",
-    )
-
-
 def _make_decision_run_state(decision: RouteDecision, decision_state: DecisionState, *, execution_gate: ExecutionGate | None = None) -> RunState:
     now = iso_now()
     return RunState(
-        run_id=_make_run_id(decision.request_text),
+        run_id=make_run_id(decision.request_text),
         status="active",
         stage="decision_pending",
         route_name=decision_state.resume_route or decision.route_name,
@@ -990,7 +737,7 @@ def _make_clarification_run_state(
 ) -> RunState:
     now = iso_now()
     return RunState(
-        run_id=_make_run_id(decision.request_text),
+        run_id=make_run_id(decision.request_text),
         status="active",
         stage="clarification_pending",
         route_name=clarification_state.resume_route or decision.route_name,
@@ -1006,15 +753,6 @@ def _make_clarification_run_state(
         owner_host="",
         owner_run_id="",
     )
-
-
-
-
-def _make_run_id(request_text: str) -> str:
-    timestamp = iso_now().replace(":", "").replace("-", "")[:15]
-    digest = sha1(request_text.encode("utf-8")).hexdigest()[:6]
-    return f"{timestamp}_{digest}"
-
 
 
 
@@ -1038,7 +776,7 @@ def _build_skill_activation(
         activated_local_day=local_day_now(),
         display_time=local_display_now(),
         activation_source="runtime_skill" if decision.runtime_skill_id else "route_phase",
-        run_id=run_state.run_id if run_state is not None else _make_run_id(decision.request_text),
+        run_id=run_state.run_id if run_state is not None else make_run_id(decision.request_text),
         route_name=decision.route_name,
         timezone=local_timezone_name(),
     )
@@ -1636,7 +1374,7 @@ def _advance_planning_route(
             current_run = context.current_run
             state_store.set_current_run(
                 RunState(
-                    run_id=current_run.run_id if current_run is not None else _make_run_id(decision.request_text),
+                    run_id=current_run.run_id if current_run is not None else make_run_id(decision.request_text),
                     status="active",
                     stage="decision_pending",
                     route_name=decision.route_name,
@@ -1958,7 +1696,7 @@ def _apply_execution_gate_to_plan(
             notes=("Attached the new request to the current plan; review and update that plan before execution continues.",),
         )
         state_store.set_current_run(
-            _make_run_state(
+            make_run_state(
                 _plan_review_route(
                     decision,
                     reason="Attached request to the current plan and returned it to plan review",
@@ -1994,7 +1732,7 @@ def _apply_execution_gate_to_plan(
 
     if gate.gate_status == "decision_required" and gate.blocking_reason != "unresolved_decision":
         next_run_state = RunState(
-            run_id=_make_run_id(decision.request_text),
+            run_id=make_run_id(decision.request_text),
             status="active",
             stage="decision_pending",
             route_name=decision.route_name,
@@ -2034,7 +1772,7 @@ def _apply_execution_gate_to_plan(
 
     stage = "ready_for_execution" if gate.gate_status == "ready" else "plan_generated"
     state_store.set_current_run(
-        _make_run_state(
+        make_run_state(
             review_route,
             plan_artifact,
             stage=stage,

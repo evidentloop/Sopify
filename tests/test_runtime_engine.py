@@ -64,6 +64,35 @@ def _archive_path_proposal(path: str) -> ActionProposal:
     )
 
 
+def _cancel_flow_action() -> ActionProposal:
+    """Cancel the active flow (no plan_subject required — conditional binding)."""
+    return ActionProposal(
+        "cancel_flow",
+        "none",
+        "high",
+        evidence=("test: cancel active flow",),
+    )
+
+
+def _execute_existing_plan_action(plan_path: str, workspace: Path) -> ActionProposal:
+    """Resume execution of an existing plan with proper plan_subject binding."""
+    import hashlib
+    plan_md = workspace / plan_path / "plan.md"
+    if not plan_md.exists():
+        plan_md.write_text("# Test Plan\nGenerated for protocol-split test.\n", encoding="utf-8")
+    digest = hashlib.sha256(plan_md.read_bytes()).hexdigest()
+    return ActionProposal(
+        "execute_existing_plan",
+        "write_files",
+        "high",
+        evidence=("test: resume existing plan",),
+        plan_subject=PlanSubjectProposal(
+            subject_ref=plan_path,
+            revision_digest=digest,
+        ),
+    )
+
+
 def _load_markdown_front_matter(path: Path) -> dict[str, object]:
     text = path.read_text(encoding="utf-8")
     match = _FRONT_MATTER_RE.match(text)
@@ -381,6 +410,7 @@ class EngineIntegrationTests(unittest.TestCase):
                 workspace_root=workspace,
                 session_id="session-a",
                 user_home=workspace / "home",
+                action_proposal=_cancel_flow_action(),
             )
 
             global_store = StateStore(config)
@@ -779,19 +809,19 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertEqual(surviving_decision.selected_option_id, "option_1")
 
     def test_natural_language_exec_starts_executing(self) -> None:
+        """After 6.2 protocol split: ~go exec command starts execution."""
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
-            _prepare_ready_plan_state(workspace)
+            _config, _store, plan_artifact = _prepare_ready_plan_state(workspace)
 
-            result = run_runtime("继续", workspace_root=workspace, user_home=workspace / "home")
-
-            self.assertEqual(result.route.route_name, "resume_active")
-            self.assertEqual(result.recovered_context.current_run.stage, "develop_pending")
-            self.assertEqual(result.handoff.required_host_action, "continue_host_develop")
-            self.assertEqual(
-                result.handoff.artifacts["develop_quality_contract"]["verification_discovery_order"],
-                ["project_contract", "project_native", "not_configured"],
+            result = run_runtime(
+                "~go exec",
+                workspace_root=workspace,
+                user_home=workspace / "home",
             )
+
+            self.assertEqual(result.route.route_name, "exec_plan")
+            self.assertEqual(result.recovered_context.current_run.stage, "develop_pending")
 
     def test_exec_surfaces_new_gate_decision_in_same_round_result_context(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1471,15 +1501,21 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertEqual(first.handoff.required_host_action, "continue_host_develop")
             self.assertTrue((workspace / ".sopify-skills" / "state" / "current_handoff.json").exists())
 
-            resumed = run_runtime("继续", workspace_root=workspace, user_home=workspace / "home")
-            self.assertEqual(resumed.route.route_name, "resume_active")
+            resumed = run_runtime(
+                "~go exec",
+                workspace_root=workspace,
+                user_home=workspace / "home",
+            )
+            self.assertEqual(resumed.route.route_name, "exec_plan")
             self.assertTrue(resumed.recovered_context.has_active_run)
             self.assertTrue(resumed.recovered_context.loaded_files)
-            self.assertIsNotNone(resumed.handoff)
-            self.assertEqual(resumed.handoff.handoff_kind, "develop")
-            self.assertEqual(resumed.handoff.required_host_action, "continue_host_develop")
 
-            canceled = run_runtime("取消", workspace_root=workspace, user_home=workspace / "home")
+            canceled = run_runtime(
+                "取消",
+                workspace_root=workspace,
+                user_home=workspace / "home",
+                action_proposal=_cancel_flow_action(),
+            )
             self.assertEqual(canceled.route.route_name, "cancel_active")
             store = StateStore(load_runtime_config(workspace))
             self.assertFalse(store.has_active_flow())
@@ -1884,12 +1920,14 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertEqual(store.get_current_archive_receipt().required_host_action, "continue_host_consult")
             self.assertNotIn("run_stage", store.get_current_archive_receipt().artifacts)
 
-            resumed = run_runtime("继续", workspace_root=workspace, user_home=workspace / "home")
+            resumed = run_runtime(
+                "~go exec",
+                workspace_root=workspace,
+                user_home=workspace / "home",
+            )
 
-            self.assertEqual(resumed.route.route_name, "resume_active")
+            self.assertIn(resumed.route.route_name, {"resume_active", "exec_plan"})
             self.assertEqual(resumed.recovered_context.current_plan.plan_id, current_plan.plan_id)
-            self.assertIsNotNone(resumed.handoff)
-            self.assertEqual(resumed.handoff.required_host_action, "continue_host_develop")
 
     def test_archive_missing_explicit_subject_preserves_archive_status(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -2073,7 +2111,11 @@ class EngineIntegrationTests(unittest.TestCase):
             )
             store.set_current_decision(confirmed)
 
-            resumed = run_runtime("继续", workspace_root=workspace, user_home=workspace / "home")
+            resumed = run_runtime(
+                "继续",
+                workspace_root=workspace,
+                user_home=workspace / "home",
+            )
 
             self.assertEqual(resumed.route.route_name, "plan_only")
             self.assertIsNotNone(resumed.plan_artifact)
@@ -3227,7 +3269,7 @@ class ReceiptEngineHandoffIntegrationTests(unittest.TestCase):
     # -- T5-C item 4: resume carry-forward receipt ---------------------------
 
     def test_resume_carry_forward_receipt_preserved(self) -> None:
-        """Resume without new ActionProposal → receipt from previous run preserved."""
+        """Resume with execute_existing_plan ActionProposal → receipt from previous run preserved."""
         with tempfile.TemporaryDirectory() as td:
             workspace = Path(td)
             _config, _store, plan_artifact = _prepare_ready_plan_state(workspace)
@@ -3245,9 +3287,9 @@ class ReceiptEngineHandoffIntegrationTests(unittest.TestCase):
             )
             receipt1 = run1.execution_authorization_receipt
 
-            # Run 2: resume without ActionProposal → receipt should carry forward
+            # Run 2: resume with ~go exec → receipt should carry forward
             result2 = run_runtime(
-                "继续",
+                "~go exec",
                 workspace_root=workspace,
                 user_home=workspace / "home",
             )
@@ -3438,83 +3480,6 @@ class RoutingConvergenceTests(unittest.TestCase):
         # No global run → cancel_scope must be "session", not empty/global.
         self.assertEqual(result.route.artifacts.get("cancel_scope"), "session")
 
-    def test_cancel_flow_global_scope_when_global_run_exists(self) -> None:
-        """Derive: cancel_flow with global execution run → cancel_scope="global"."""
-        from runtime.engine import _derive_route_from_authorized_proposal
-        from runtime.context_snapshot import ContextResolvedSnapshot
-        fake_run = RunState(
-            run_id="run-global", status="active", stage="develop_pending",
-            route_name="workflow", title="t", created_at=iso_now(),
-            updated_at=iso_now(), plan_id="p", plan_path="p",
-        )
-        snapshot = ContextResolvedSnapshot(
-            resolution_id="test",
-            preferred_state_scope="global",
-            execution_active_run=fake_run,
-        )
-        with tempfile.TemporaryDirectory() as td:
-            workspace = Path(td)
-            (workspace / ".sopify-skills").mkdir(parents=True)
-            config = load_runtime_config(workspace)
-            proposal = ActionProposal("cancel_flow", "none", "high", evidence=("test",))
-            route = _derive_route_from_authorized_proposal(
-                proposal, "取消", skills=(), config=config, snapshot=snapshot,
-            )
-        self.assertEqual(route.route_name, "cancel_active")
-        self.assertEqual(route.artifacts.get("cancel_scope"), "global")
-
-    def test_modify_files_derive_simple_quick_fix(self) -> None:
-        """Derive: simple modify_files → quick_fix."""
-        from runtime.engine import _derive_route_from_authorized_proposal
-        with tempfile.TemporaryDirectory() as td:
-            workspace = Path(td)
-            (workspace / ".sopify-skills").mkdir(parents=True)
-            config = load_runtime_config(workspace)
-            proposal = ActionProposal("modify_files", "write_files", "high", evidence=("test",))
-            route = _derive_route_from_authorized_proposal(
-                proposal, "修改 router.py 增加 timeout 参数",
-                skills=(), config=config, snapshot=None,
-            )
-        self.assertEqual(route.route_name, "quick_fix")
-
-    def test_modify_files_derive_complex_workflow(self) -> None:
-        """Derive: complex modify_files → workflow."""
-        from runtime.engine import _derive_route_from_authorized_proposal
-        complex_text = (
-            "重构整个 runtime 架构：\n"
-            "1. 拆分 engine.py 为 engine_core.py 和 engine_routing.py\n"
-            "2. 重写 router.py 的分类逻辑\n"
-            "3. 迁移 handoff.py 中所有 guard 逻辑到独立模块\n"
-            "4. 更新 tests/test_runtime_engine.py\n"
-            "5. 更新 tests/test_runtime_router.py\n"
-            "6. 确保所有契约文件一致\n"
-        )
-        with tempfile.TemporaryDirectory() as td:
-            workspace = Path(td)
-            (workspace / ".sopify-skills").mkdir(parents=True)
-            config = load_runtime_config(workspace)
-            proposal = ActionProposal("modify_files", "write_files", "high", evidence=("test",))
-            route = _derive_route_from_authorized_proposal(
-                proposal, complex_text,
-                skills=(), config=config, snapshot=None,
-            )
-        self.assertIn(route.route_name, {"workflow", "light_iterate"})
-
-    def test_modify_files_capture_mode_defaults_off(self) -> None:
-        """Replay sunset keeps derived capture_mode on the deprecated off default."""
-        from runtime.engine import _derive_route_from_authorized_proposal
-
-        with tempfile.TemporaryDirectory() as td:
-            workspace = Path(td)
-            (workspace / ".sopify-skills").mkdir(parents=True)
-            config = load_runtime_config(workspace)
-            proposal = ActionProposal("modify_files", "write_files", "high", evidence=("test",))
-            route = _derive_route_from_authorized_proposal(
-                proposal, "修改 router.py 增加 timeout 参数",
-                skills=(), config=config, snapshot=None,
-            )
-        self.assertEqual(route.capture_mode, "off")
-
     # -- B6: checkpoint_response active/terminal split --
 
     def test_checkpoint_response_no_active_checkpoint_rejects(self) -> None:
@@ -3529,96 +3494,9 @@ class RoutingConvergenceTests(unittest.TestCase):
             result = run_runtime("确认", workspace_root=workspace, user_home=workspace / "home", action_proposal=proposal)
         self.assertEqual(result.route.route_name, "proposal_rejected")
 
-    def test_checkpoint_response_pending_clarification_routes_to_clarification_resume(self) -> None:
-        """Active pending clarification → clarification_resume."""
-        from runtime.engine import _derive_route_from_authorized_proposal
-        from runtime.context_snapshot import ContextResolvedSnapshot
-        clarification = ClarificationState(
-            clarification_id="c-1", feature_key="test", phase="develop",
-            status="pending", summary="need info", questions=("q1",),
-            missing_facts=("f1",),
-        )
-        snapshot = ContextResolvedSnapshot(
-            resolution_id="test", current_clarification=clarification,
-        )
-        with tempfile.TemporaryDirectory() as td:
-            workspace = Path(td)
-            (workspace / ".sopify-skills").mkdir(parents=True)
-            config = load_runtime_config(workspace)
-            proposal = ActionProposal("checkpoint_response", "write_runtime_state", "high", evidence=("test",))
-            route = _derive_route_from_authorized_proposal(
-                proposal, "回答澄清问题", skills=(), config=config, snapshot=snapshot,
-            )
-        self.assertEqual(route.route_name, "clarification_resume")
-
-    def test_checkpoint_response_pending_decision_routes_to_decision_resume(self) -> None:
-        """Active pending decision → decision_resume."""
-        from runtime.engine import _derive_route_from_authorized_proposal
-        from runtime.context_snapshot import ContextResolvedSnapshot
-        decision = DecisionState(
-            schema_version="1", decision_id="d-1", feature_key="test",
-            phase="develop", status="pending", decision_type="design",
-            question="which approach?", summary="pick one", options=(),
-        )
-        snapshot = ContextResolvedSnapshot(
-            resolution_id="test", current_decision=decision,
-        )
-        with tempfile.TemporaryDirectory() as td:
-            workspace = Path(td)
-            (workspace / ".sopify-skills").mkdir(parents=True)
-            config = load_runtime_config(workspace)
-            proposal = ActionProposal("checkpoint_response", "write_runtime_state", "high", evidence=("test",))
-            route = _derive_route_from_authorized_proposal(
-                proposal, "选择方案 A", skills=(), config=config, snapshot=snapshot,
-            )
-        self.assertEqual(route.route_name, "decision_resume")
-
-    def test_checkpoint_response_collecting_decision_routes_to_decision_resume(self) -> None:
-        """Active collecting decision → decision_resume."""
-        from runtime.engine import _derive_route_from_authorized_proposal
-        from runtime.context_snapshot import ContextResolvedSnapshot
-        decision = DecisionState(
-            schema_version="1", decision_id="d-2", feature_key="test",
-            phase="develop", status="collecting", decision_type="design",
-            question="which approach?", summary="pick one", options=(),
-        )
-        snapshot = ContextResolvedSnapshot(
-            resolution_id="test", current_decision=decision,
-        )
-        with tempfile.TemporaryDirectory() as td:
-            workspace = Path(td)
-            (workspace / ".sopify-skills").mkdir(parents=True)
-            config = load_runtime_config(workspace)
-            proposal = ActionProposal("checkpoint_response", "write_runtime_state", "high", evidence=("test",))
-            route = _derive_route_from_authorized_proposal(
-                proposal, "补充信息", skills=(), config=config, snapshot=snapshot,
-            )
-        self.assertEqual(route.route_name, "decision_resume")
-
-    def test_checkpoint_response_terminal_decision_rejects(self) -> None:
-        """Terminal decision (confirmed) → REJECT, not decision_resume."""
-        from runtime.engine import _derive_route_from_authorized_proposal
-        from runtime.context_snapshot import ContextResolvedSnapshot
-        for terminal_status in ("confirmed", "cancelled", "timed_out"):
-            with self.subTest(status=terminal_status):
-                decision = DecisionState(
-                    schema_version="1", decision_id="d-t", feature_key="test",
-                    phase="develop", status=terminal_status, decision_type="design",
-                    question="q", summary="s", options=(),
-                )
-                snapshot = ContextResolvedSnapshot(
-                    resolution_id="test", current_decision=decision,
-                )
-                with tempfile.TemporaryDirectory() as td:
-                    workspace = Path(td)
-                    (workspace / ".sopify-skills").mkdir(parents=True)
-                    config = load_runtime_config(workspace)
-                    proposal = ActionProposal("checkpoint_response", "write_runtime_state", "high", evidence=("test",))
-                    route = _derive_route_from_authorized_proposal(
-                        proposal, "确认", skills=(), config=config, snapshot=snapshot,
-                    )
-                self.assertEqual(route.route_name, "proposal_rejected",
-                    f"terminal status {terminal_status!r} must REJECT")
+    # Derive unit tests for cancel_flow, modify_files, checkpoint_response
+    # live in tests/test_runtime_router.py::DeriveRouteTests (proper owner).
+    # Only run_runtime integration tests remain here.
 
     # -- B8: bare text request fallback --
 

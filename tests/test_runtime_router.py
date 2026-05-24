@@ -152,13 +152,16 @@ class RouterTests(unittest.TestCase):
                 updated_at=iso_now(),
             )
             store.set_current_run(run_state)
+            # After 6.2 protocol split: bare text "继续" / "取消" no longer
+            # triggers resume/cancel on general ingress.  These intents must
+            # come through ActionProposal (execute_existing_plan / cancel_flow).
+            # Router classifies them as normal requests.
             resume_route = router.classify("继续", skills=skills)
             cancel_route = router.classify("取消", skills=skills)
             consult_route = router.classify("这个方案为什么要这样拆？", skills=skills)
 
-            self.assertEqual(resume_route.route_name, "resume_active")
-            self.assertTrue(resume_route.should_recover_context)
-            self.assertEqual(cancel_route.route_name, "cancel_active")
+            self.assertNotEqual(resume_route.route_name, "resume_active")
+            self.assertNotEqual(cancel_route.route_name, "cancel_active")
             self.assertEqual(consult_route.route_name, "consult")
 
     def test_consult_guard_for_process_semantics_forces_runtime_first(self) -> None:
@@ -649,3 +652,206 @@ class RouterTests(unittest.TestCase):
             self.assertIn("补 runtime gate 骨架", current_handoff_payload["observability"]["request_excerpt"])
             self.assertTrue(current_handoff_payload["observability"]["request_sha1"])
             self.assertEqual(current_handoff_payload["observability"]["state_kind"], "current_handoff")
+
+
+class DeriveRouteTests(unittest.TestCase):
+    """Router-side focused tests for _derive_route_from_authorized_proposal.
+
+    These verify that derive logic — moved from engine.py to router.py in
+    6.2 — is positively tested by the module that now owns it.
+    """
+
+    def test_cancel_flow_without_global_run_yields_session_scope(self) -> None:
+        from runtime.router import _derive_route_from_authorized_proposal
+        from runtime.context_snapshot import ContextResolvedSnapshot
+
+        snapshot = ContextResolvedSnapshot(resolution_id="test")
+        with tempfile.TemporaryDirectory() as td:
+            workspace = Path(td)
+            (workspace / ".sopify-skills").mkdir(parents=True)
+            config = load_runtime_config(workspace)
+            proposal = ActionProposal("cancel_flow", "none", "high", evidence=("test",))
+            route = _derive_route_from_authorized_proposal(
+                proposal, "取消", skills=(), config=config, snapshot=snapshot,
+            )
+        self.assertEqual(route.route_name, "cancel_active")
+        self.assertEqual(route.artifacts.get("cancel_scope"), "session")
+
+    def test_cancel_flow_with_global_run_yields_global_scope(self) -> None:
+        from runtime.router import _derive_route_from_authorized_proposal
+        from runtime.context_snapshot import ContextResolvedSnapshot
+
+        fake_run = RunState(
+            run_id="run-g", status="active", stage="develop_pending",
+            route_name="workflow", title="t", created_at=iso_now(), updated_at=iso_now(),
+        )
+        snapshot = ContextResolvedSnapshot(
+            resolution_id="test", execution_active_run=fake_run,
+            preferred_state_scope="global",
+        )
+        with tempfile.TemporaryDirectory() as td:
+            workspace = Path(td)
+            (workspace / ".sopify-skills").mkdir(parents=True)
+            config = load_runtime_config(workspace)
+            proposal = ActionProposal("cancel_flow", "none", "high", evidence=("test",))
+            route = _derive_route_from_authorized_proposal(
+                proposal, "取消", skills=(), config=config, snapshot=snapshot,
+            )
+        self.assertEqual(route.route_name, "cancel_active")
+        self.assertEqual(route.artifacts.get("cancel_scope"), "global")
+
+    def test_checkpoint_response_pending_clarification(self) -> None:
+        from runtime.router import _derive_route_from_authorized_proposal
+        from runtime.context_snapshot import ContextResolvedSnapshot
+
+        clarification = ClarificationState(
+            clarification_id="c-1", feature_key="test", phase="develop",
+            status="pending", summary="need info", questions=("q1",),
+            missing_facts=("f1",),
+        )
+        snapshot = ContextResolvedSnapshot(
+            resolution_id="test", current_clarification=clarification,
+        )
+        with tempfile.TemporaryDirectory() as td:
+            workspace = Path(td)
+            (workspace / ".sopify-skills").mkdir(parents=True)
+            config = load_runtime_config(workspace)
+            proposal = ActionProposal("checkpoint_response", "write_runtime_state", "high", evidence=("test",))
+            route = _derive_route_from_authorized_proposal(
+                proposal, "回答问题", skills=(), config=config, snapshot=snapshot,
+            )
+        self.assertEqual(route.route_name, "clarification_resume")
+
+    def test_checkpoint_response_pending_decision(self) -> None:
+        from runtime.router import _derive_route_from_authorized_proposal
+        from runtime.context_snapshot import ContextResolvedSnapshot
+
+        decision = DecisionState(
+            schema_version="1", decision_id="d-1", feature_key="test",
+            phase="develop", status="pending", decision_type="design",
+            question="which?", summary="pick", options=(),
+        )
+        snapshot = ContextResolvedSnapshot(
+            resolution_id="test", current_decision=decision,
+        )
+        with tempfile.TemporaryDirectory() as td:
+            workspace = Path(td)
+            (workspace / ".sopify-skills").mkdir(parents=True)
+            config = load_runtime_config(workspace)
+            proposal = ActionProposal("checkpoint_response", "write_runtime_state", "high", evidence=("test",))
+            route = _derive_route_from_authorized_proposal(
+                proposal, "选方案 A", skills=(), config=config, snapshot=snapshot,
+            )
+        self.assertEqual(route.route_name, "decision_resume")
+
+    def test_checkpoint_response_no_active_checkpoint_rejects(self) -> None:
+        from runtime.router import _derive_route_from_authorized_proposal
+        from runtime.context_snapshot import ContextResolvedSnapshot
+
+        snapshot = ContextResolvedSnapshot(resolution_id="test")
+        with tempfile.TemporaryDirectory() as td:
+            workspace = Path(td)
+            (workspace / ".sopify-skills").mkdir(parents=True)
+            config = load_runtime_config(workspace)
+            proposal = ActionProposal("checkpoint_response", "write_runtime_state", "high", evidence=("test",))
+            route = _derive_route_from_authorized_proposal(
+                proposal, "确认", skills=(), config=config, snapshot=snapshot,
+            )
+        self.assertEqual(route.route_name, "proposal_rejected")
+
+    def test_checkpoint_response_terminal_decision_rejects(self) -> None:
+        from runtime.router import _derive_route_from_authorized_proposal
+        from runtime.context_snapshot import ContextResolvedSnapshot
+
+        for status in ("confirmed", "cancelled", "timed_out"):
+            with self.subTest(status=status):
+                decision = DecisionState(
+                    schema_version="1", decision_id="d-t", feature_key="test",
+                    phase="develop", status=status, decision_type="design",
+                    question="q", summary="s", options=(),
+                )
+                snapshot = ContextResolvedSnapshot(
+                    resolution_id="test", current_decision=decision,
+                )
+                with tempfile.TemporaryDirectory() as td:
+                    workspace = Path(td)
+                    (workspace / ".sopify-skills").mkdir(parents=True)
+                    config = load_runtime_config(workspace)
+                    proposal = ActionProposal("checkpoint_response", "write_runtime_state", "high", evidence=("test",))
+                    route = _derive_route_from_authorized_proposal(
+                        proposal, "确认", skills=(), config=config, snapshot=snapshot,
+                    )
+                self.assertEqual(route.route_name, "proposal_rejected",
+                    f"terminal status {status!r} must reject")
+
+    def test_checkpoint_response_collecting_decision(self) -> None:
+        from runtime.router import _derive_route_from_authorized_proposal
+        from runtime.context_snapshot import ContextResolvedSnapshot
+
+        decision = DecisionState(
+            schema_version="1", decision_id="d-2", feature_key="test",
+            phase="develop", status="collecting", decision_type="design",
+            question="which?", summary="pick", options=(),
+        )
+        snapshot = ContextResolvedSnapshot(
+            resolution_id="test", current_decision=decision,
+        )
+        with tempfile.TemporaryDirectory() as td:
+            workspace = Path(td)
+            (workspace / ".sopify-skills").mkdir(parents=True)
+            config = load_runtime_config(workspace)
+            proposal = ActionProposal("checkpoint_response", "write_runtime_state", "high", evidence=("test",))
+            route = _derive_route_from_authorized_proposal(
+                proposal, "补充信息", skills=(), config=config, snapshot=snapshot,
+            )
+        self.assertEqual(route.route_name, "decision_resume")
+
+    def test_modify_files_simple_yields_quick_fix(self) -> None:
+        from runtime.router import _derive_route_from_authorized_proposal
+
+        with tempfile.TemporaryDirectory() as td:
+            workspace = Path(td)
+            (workspace / ".sopify-skills").mkdir(parents=True)
+            config = load_runtime_config(workspace)
+            proposal = ActionProposal("modify_files", "write_files", "high", evidence=("test",))
+            route = _derive_route_from_authorized_proposal(
+                proposal, "修改 router.py 增加 timeout 参数",
+                skills=(), config=config, snapshot=None,
+            )
+        self.assertEqual(route.route_name, "quick_fix")
+
+    def test_modify_files_complex_yields_workflow(self) -> None:
+        from runtime.router import _derive_route_from_authorized_proposal
+
+        complex_text = (
+            "重构整个 runtime 架构：\n"
+            "1. 拆分 engine.py 为 engine_core.py 和 engine_routing.py\n"
+            "2. 重写 router.py 的分类逻辑\n"
+            "3. 迁移 handoff.py 中所有 guard 逻辑到独立模块\n"
+            "4. 更新 tests/test_runtime_engine.py\n"
+            "5. 更新 tests/test_runtime_router.py\n"
+            "6. 确保所有契约文件一致\n"
+        )
+        with tempfile.TemporaryDirectory() as td:
+            workspace = Path(td)
+            (workspace / ".sopify-skills").mkdir(parents=True)
+            config = load_runtime_config(workspace)
+            proposal = ActionProposal("modify_files", "write_files", "high", evidence=("test",))
+            route = _derive_route_from_authorized_proposal(
+                proposal, complex_text, skills=(), config=config, snapshot=None,
+            )
+        self.assertIn(route.route_name, {"workflow", "light_iterate"})
+
+    def test_modify_files_capture_mode_defaults_off(self) -> None:
+        from runtime.router import _derive_route_from_authorized_proposal
+
+        with tempfile.TemporaryDirectory() as td:
+            workspace = Path(td)
+            (workspace / ".sopify-skills").mkdir(parents=True)
+            config = load_runtime_config(workspace)
+            proposal = ActionProposal("modify_files", "write_files", "high", evidence=("test",))
+            route = _derive_route_from_authorized_proposal(
+                proposal, "修改 router.py 增加 timeout 参数",
+                skills=(), config=config, snapshot=None,
+            )
+        self.assertEqual(route.capture_mode, "off")

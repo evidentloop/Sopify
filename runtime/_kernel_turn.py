@@ -16,7 +16,6 @@ Remaining engine dependency:
 from __future__ import annotations
 
 from dataclasses import replace
-from hashlib import sha1
 from pathlib import Path
 from typing import Any, Mapping, Optional
 from uuid import uuid4
@@ -33,11 +32,20 @@ from .action_intent import (
 )
 from .config import load_runtime_config
 from .context_recovery import recover_context
-from .context_snapshot import ContextResolvedSnapshot, resolve_context_snapshot
+from .context_snapshot import (
+    ContextResolvedSnapshot,
+    GLOBAL_EXECUTION_ROUTES,
+    PROMOTABLE_REVIEW_STAGES,
+    recovery_store_for_route,
+    resolve_context_snapshot,
+    snapshot_global_execution_run,
+    snapshot_has_global_execution_truth,
+    snapshot_review_run,
+)
 from .execution_gate import evaluate_execution_gate
 from .handoff import build_runtime_handoff
 from .router import Router
-from .state import stable_request_sha1, summarize_request_text
+from .state import make_run_id, make_run_state, stable_request_sha1, summarize_request_text
 from canonical_writer import StateStore, iso_now
 from canonical_writer.invariants import stamp_handoff_resolution_id
 from sopify_contracts.artifacts import KbArtifact, PlanArtifact
@@ -67,47 +75,10 @@ from .skill_registry import SkillRegistry
 
 _HOST_FACING_TRUTH_KIND_ENGINE_RUNTIME_HANDOFF = "engine_runtime_handoff"
 _HOST_FACING_TRUTH_KIND_PROMOTION_GLOBAL_EXECUTION = "promotion_global_execution"
-_GLOBAL_EXECUTION_ROUTES = frozenset({"resume_active", "exec_plan", "archive_lifecycle"})
-_PROMOTABLE_REVIEW_STAGES = frozenset({"plan_generated", "ready_for_execution", "develop_pending"})
 
 
 def _new_resolution_id() -> str:
     return uuid4().hex
-
-
-def _make_run_id(request_text: str) -> str:
-    timestamp = iso_now().replace(":", "").replace("-", "")[:15]
-    digest = sha1(request_text.encode("utf-8")).hexdigest()[:6]
-    return f"{timestamp}_{digest}"
-
-
-def _make_run_state(
-    decision: RouteDecision,
-    plan_artifact: PlanArtifact,
-    *,
-    stage: str = "plan_generated",
-    execution_gate: ExecutionGate | None = None,
-    execution_authorization_receipt: Mapping[str, Any] | None = None,
-) -> RunState:
-    now = iso_now()
-    return RunState(
-        run_id=_make_run_id(decision.request_text),
-        status="active",
-        stage=stage,
-        route_name=decision.route_name,
-        title=plan_artifact.title,
-        created_at=now,
-        updated_at=now,
-        plan_id=plan_artifact.plan_id,
-        plan_path=plan_artifact.path,
-        execution_gate=execution_gate,
-        execution_authorization_receipt=execution_authorization_receipt,
-        request_excerpt=summarize_request_text(decision.request_text),
-        request_sha1=stable_request_sha1(decision.request_text),
-        owner_session_id="",
-        owner_host="",
-        owner_run_id="",
-    )
 
 
 def _with_route_artifacts(decision: RouteDecision, artifacts: Mapping[str, Any]) -> RouteDecision:
@@ -214,41 +185,6 @@ def _derived_resolution_id(
     return _new_resolution_id()
 
 
-def _snapshot_has_global_execution_truth(snapshot: ContextResolvedSnapshot | None) -> bool:
-    if snapshot is None:
-        return False
-    return snapshot.preferred_state_scope == "global" and snapshot.execution_active_run is not None
-
-
-def _snapshot_global_execution_run(snapshot: ContextResolvedSnapshot | None) -> RunState | None:
-    if not _snapshot_has_global_execution_truth(snapshot):
-        return None
-    return snapshot.execution_active_run
-
-
-def _snapshot_review_run(snapshot: ContextResolvedSnapshot | None) -> RunState | None:
-    if snapshot is None or snapshot.current_run is None:
-        return None
-    global_run = _snapshot_global_execution_run(snapshot)
-    if global_run is not None and snapshot.current_run == global_run:
-        return None
-    return snapshot.current_run
-
-
-def _recovery_store_for_route(
-    decision: RouteDecision,
-    *,
-    review_store: StateStore,
-    global_store: StateStore,
-    snapshot: ContextResolvedSnapshot | None = None,
-) -> StateStore:
-    if decision.route_name == "state_conflict" and snapshot is not None and snapshot.preferred_state_scope == "global":
-        return global_store
-    if decision.route_name in _GLOBAL_EXECUTION_ROUTES and _snapshot_has_global_execution_truth(snapshot):
-        return global_store
-    return review_store
-
-
 def _soft_execution_ownership_warning(
     *,
     existing_global_run: RunState | None,
@@ -282,7 +218,7 @@ def _promote_review_state_to_global_execution(
         return (False, [])
     if review_plan is None or review_run is None:
         return (False, [])
-    if review_run.stage not in _PROMOTABLE_REVIEW_STAGES:
+    if review_run.stage not in PROMOTABLE_REVIEW_STAGES:
         return (False, [])
 
     notes: list[str] = []
@@ -367,7 +303,7 @@ def _result_state_store_for_route(
         return canceled_store
     if decision.route_name == "state_conflict" and snapshot is not None and snapshot.preferred_state_scope == "global":
         return global_store
-    if decision.route_name in _GLOBAL_EXECUTION_ROUTES:
+    if decision.route_name in GLOBAL_EXECUTION_ROUTES:
         return global_store
     if decision.route_name in {"decision_pending", "decision_resume"}:
         if current_decision is not None and current_decision.phase in {"execution_gate", "develop"}:
@@ -493,12 +429,12 @@ from .engine import (
     _archive_state_store_for_current_plan,
     _augment_generated_files,
     _build_skill_activation,
-    _derive_route_from_authorized_proposal,
     _handle_cancel_active,
     _handle_clarification_resume,
     _handle_decision_resume,
     _handle_state_conflict,
 )
+from .router import _derive_route_from_authorized_proposal
 
 
 def execute_kernel_turn(
@@ -628,13 +564,15 @@ def execute_kernel_turn(
         )
     else:
         # Legacy text-classification path: used when no ActionProposal is
-        # provided (bare text requests).  Will be removed when all hosts
-        # emit ActionProposal.
+        # provided (bare text requests).  Router.classify() no longer guesses
+        # cancel/continue intent from free text — those must come through
+        # ActionProposal (cancel_flow / execute_existing_plan) or checkpoint
+        # reply.  Will be removed when all hosts emit ActionProposal.
         classified_route = router.classify(user_input, skills=skills, snapshot=snapshot)
     recovered = recover_context(
         classified_route,
         config=config,
-        state_store=_recovery_store_for_route(
+        state_store=recovery_store_for_route(
             classified_route,
             review_store=review_store,
             global_store=global_store,
@@ -686,8 +624,8 @@ def execute_kernel_turn(
             effective_route,
             review_store=review_store,
             global_store=global_store,
-            review_run=_snapshot_review_run(snapshot),
-            global_run=_snapshot_global_execution_run(snapshot),
+            review_run=snapshot_review_run(snapshot),
+            global_run=snapshot_global_execution_run(snapshot),
         )
         notes.extend(cancel_notes)
     elif effective_route.route_name == "archive_lifecycle":
@@ -859,7 +797,7 @@ def execute_kernel_turn(
                 if gate.gate_status == "decision_required" and gate.blocking_reason != "unresolved_decision":
                     current_run = execution_recovered.current_run
                     next_run_state = RunState(
-                        run_id=current_run.run_id if current_run is not None else _make_run_id(effective_route.request_text),
+                        run_id=current_run.run_id if current_run is not None else make_run_id(effective_route.request_text),
                         status="active",
                         stage="decision_pending",
                         route_name=effective_route.route_name,
@@ -898,7 +836,7 @@ def execute_kernel_turn(
                 elif gate.gate_status != "ready":
                     _set_execution_run_state(
                         execution_store,
-                        _make_run_state(
+                        make_run_state(
                             effective_route,
                             current_plan,
                             stage="plan_generated",
@@ -914,7 +852,7 @@ def execute_kernel_turn(
                     _set_execution_run_state(
                         execution_store,
                         RunState(
-                            run_id=current_run.run_id if current_run is not None else _make_run_id(effective_route.request_text),
+                            run_id=current_run.run_id if current_run is not None else make_run_id(effective_route.request_text),
                             status="active",
                             stage="develop_pending",
                             route_name=effective_route.route_name,
@@ -997,9 +935,9 @@ def execute_kernel_turn(
             config=config,
             decision=effective_route,
             run_id=(
-                _make_run_id(effective_route.request_text)
+                make_run_id(effective_route.request_text)
                 if effective_route.route_name == "archive_lifecycle"
-                else (current_run.run_id if current_run is not None else _make_run_id(effective_route.request_text))
+                else (current_run.run_id if current_run is not None else make_run_id(effective_route.request_text))
             ),
             resolved_context=handoff_context,
             current_plan=current_plan,

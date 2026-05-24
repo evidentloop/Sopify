@@ -31,7 +31,7 @@ from runtime.decision import build_decision_state, build_execution_gate_decision
 from runtime.engine import run_runtime
 from runtime.entry_guard import DIRECT_EDIT_BLOCKED_RUNTIME_REQUIRED_REASON_CODE
 from runtime.execution_gate import evaluate_execution_gate
-from runtime.action_intent import ActionProposal, ArchiveSubjectProposal
+from runtime.action_intent import ActionProposal, ArchiveSubjectProposal, PlanSubjectProposal
 from runtime.handoff import build_runtime_handoff
 from runtime.kb import bootstrap_kb, ensure_blueprint_index
 from runtime.knowledge_layout import materialization_stage, resolve_context_profile
@@ -51,7 +51,7 @@ from runtime.router import Router
 from runtime.skill_registry import SkillRegistry
 from canonical_writer import StateStore, iso_now
 from canonical_writer.invariants import HOST_FACING_TRUTH_WRITE_KINDS, InvariantViolationError
-from runtime.state import local_day_now
+from runtime.state import local_day_now, stable_request_sha1
 from sopify_contracts.artifacts import PlanArtifact
 from sopify_contracts.core import ExecutionGate, RouteDecision, RunState, SkillMeta
 from sopify_contracts.decision import (
@@ -174,10 +174,43 @@ def _prepare_ready_plan_state(
 
 
 def _enter_active_develop_context(workspace: Path) -> None:
-    _prepare_ready_plan_state(workspace)
-    result = run_runtime("继续", workspace_root=workspace, user_home=workspace / "home")
-    assert result.handoff is not None
-    assert result.handoff.required_host_action == "continue_host_develop"
+    """Put workspace into active develop state: run at develop_pending with handoff."""
+    from canonical_writer.invariants import stamp_handoff_resolution_id
+    from runtime.entry_guard import build_entry_guard_contract
+    from runtime.state import make_run_id
+
+    config, store, plan_artifact = _prepare_ready_plan_state(workspace)
+    run_id = make_run_id("test-develop-context")
+    resolution_id = f"handoff-resolution-{run_id[:8]}"
+    run = RunState(
+        run_id=run_id,
+        status="active",
+        stage="develop_pending",
+        route_name="resume_active",
+        title=plan_artifact.title,
+        created_at=iso_now(),
+        updated_at=iso_now(),
+        plan_id=plan_artifact.plan_id,
+        plan_path=plan_artifact.path,
+        resolution_id=resolution_id,
+    )
+    store.set_current_run(run)
+    entry_guard = build_entry_guard_contract(required_host_action="continue_host_develop")
+    handoff = RuntimeHandoff(
+        schema_version="1",
+        route_name="resume_active",
+        run_id=run_id,
+        handoff_kind="develop",
+        required_host_action="continue_host_develop",
+        artifacts={"entry_guard": entry_guard},
+        observability={
+            "generated_at": iso_now(),
+            "request_excerpt": "test",
+            "request_sha1": stable_request_sha1("test"),
+        },
+    )
+    handoff = stamp_handoff_resolution_id(handoff, resolution_id=resolution_id)
+    store.set_current_handoff(handoff)
 
 
 def _git_subprocess_env() -> dict[str, str]:
