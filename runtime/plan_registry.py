@@ -4,13 +4,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
-import json
 from pathlib import Path
 import re
 from tempfile import NamedTemporaryFile
 from typing import Any, Mapping, Sequence
 
-from ._yaml import YamlParseError, load_yaml
+from ._yaml import YamlParseError, dump_yaml, load_yaml
 from sopify_contracts.artifacts import PlanArtifact
 from sopify_contracts.core import RuntimeConfig
 from canonical_writer import StateStore, iso_now
@@ -451,70 +450,11 @@ def _read_registry(path: Path) -> dict[str, Any]:
 
 def _write_registry(path: Path, payload: Mapping[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    serialized = "\n".join(_dump_yaml(_clone_registry(payload))) + "\n"
+    serialized = "\n".join(dump_yaml(_clone_registry(payload))) + "\n"
     with NamedTemporaryFile("w", delete=False, dir=path.parent, encoding="utf-8") as handle:
         handle.write(serialized)
         temp_path = Path(handle.name)
     temp_path.replace(path)
-
-
-def _dump_yaml(value: Any, *, indent: int = 0) -> list[str]:
-    prefix = " " * indent
-    if isinstance(value, Mapping):
-        lines: list[str] = []
-        for key, item in value.items():
-            key_text = str(key)
-            if _is_scalar(item):
-                lines.append(f"{prefix}{key_text}: {_yaml_scalar(item)}")
-            else:
-                lines.append(f"{prefix}{key_text}:")
-                lines.extend(_dump_yaml(item, indent=indent + 2))
-        return lines
-    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
-        lines = []
-        for item in value:
-            if isinstance(item, Mapping):
-                mapping_items = list(item.items())
-                if not mapping_items:
-                    lines.append(f"{prefix}- {{}}")
-                    continue
-                first_key, first_value = mapping_items[0]
-                if _is_scalar(first_value):
-                    lines.append(f"{prefix}- {first_key}: {_yaml_scalar(first_value)}")
-                else:
-                    lines.append(f"{prefix}- {first_key}:")
-                    lines.extend(_dump_yaml(first_value, indent=indent + 4))
-                for key, value_item in mapping_items[1:]:
-                    child_prefix = " " * (indent + 2)
-                    if _is_scalar(value_item):
-                        lines.append(f"{child_prefix}{key}: {_yaml_scalar(value_item)}")
-                    else:
-                        lines.append(f"{child_prefix}{key}:")
-                        lines.extend(_dump_yaml(value_item, indent=indent + 4))
-                continue
-            if _is_scalar(item):
-                lines.append(f"{prefix}- {_yaml_scalar(item)}")
-            else:
-                lines.append(f"{prefix}-")
-                lines.extend(_dump_yaml(item, indent=indent + 2))
-        return lines
-    return [f"{prefix}{_yaml_scalar(value)}"]
-
-
-def _is_scalar(value: Any) -> bool:
-    return not isinstance(value, Mapping) and not (
-        isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray))
-    )
-
-
-def _yaml_scalar(value: Any) -> str:
-    if value is None:
-        return "null"
-    if isinstance(value, bool):
-        return "true" if value else "false"
-    if isinstance(value, (int, float)):
-        return str(value)
-    return json.dumps(str(value), ensure_ascii=False)
 
 
 def _normalize_snapshot(raw: Any) -> dict[str, Any]:
