@@ -36,8 +36,6 @@ from runtime.action_intent import (
     ValidationDecision,
     resolve_action_proposal,
 )
-from runtime.decision_tables import load_default_decision_tables
-
 
 # ---------------------------------------------------------------------------
 # P0-B: ActionValidator deterministic tests
@@ -339,90 +337,6 @@ class ActionProposalSerializationTests(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# P0-E: Side-effect mapping row ordering (post-Wave-3a)
-# ---------------------------------------------------------------------------
-
-
-class SideEffectMappingRowOrderingTests(unittest.TestCase):
-    """Verify row ordering after Wave 3a proposal removal."""
-
-    @classmethod
-    def setUpClass(cls) -> None:
-        cls.tables = load_default_decision_tables()
-        cls.rows = cls.tables["side_effect_mapping_table"]["rows"]
-
-    def _find_row(self, resolved_action: str, checkpoint_kind: str) -> dict:
-        for row in self.rows:
-            if (
-                row["resolved_action"] == resolved_action
-                and row["checkpoint_kind"] == checkpoint_kind
-            ):
-                return row
-        self.fail(
-            f"No side_effect_mapping row for "
-            f"resolved_action={resolved_action}, checkpoint_kind={checkpoint_kind}"
-        )
-
-    def test_existing_decision_row_unchanged(self) -> None:
-        """Existing switch_to_consult_readonly for confirm_decision is preserved."""
-        row = self._find_row("switch_to_consult_readonly", "confirm_decision")
-        self.assertEqual(row["handoff_protocol"]["required_host_action"], "continue_host_consult")
-        self.assertEqual(row["handoff_protocol"]["resume_route"], "decision_pending")
-
-    def test_row_ordering_preserved(self) -> None:
-        """Rows must follow frozen ordered_resolved_actions order."""
-        actions = [r["resolved_action"] for r in self.rows]
-        ordered = [
-            "switch_to_consult_readonly",
-        ]
-        self.assertEqual(actions, ordered)
-
-
-# ---------------------------------------------------------------------------
-# Duplicate (resolved_action, checkpoint_kind) guard
-# ---------------------------------------------------------------------------
-
-
-class DuplicateRowGuardTests(unittest.TestCase):
-    """Verify that duplicate (resolved_action, checkpoint_kind) pairs are rejected."""
-
-    def test_duplicate_pair_rejected(self) -> None:
-        import tempfile
-        from runtime.decision_tables import DecisionTableError, load_decision_tables
-
-        # Build a minimal YAML with two identical (action, checkpoint) pairs.
-        yaml_text = _build_duplicate_row_yaml()
-        with tempfile.TemporaryDirectory() as tmp:
-            asset = Path(tmp) / "decision_tables.yaml"
-            asset.write_text(yaml_text, encoding="utf-8")
-            with self.assertRaisesRegex(DecisionTableError, r"duplicate"):
-                load_decision_tables(asset)
-
-
-def _build_duplicate_row_yaml() -> str:
-    """Minimal decision_tables asset with a duplicate side_effect_mapping row.
-
-    Duplicates the first side_effect_mapping row by text insertion,
-    preserving the custom YAML parser's expected format.
-    """
-    from runtime.decision_tables import DEFAULT_DECISION_TABLES_PATH
-
-    original = DEFAULT_DECISION_TABLES_PATH.read_text(encoding="utf-8")
-    marker = "    - resolved_action: switch_to_consult_readonly\n"
-    first_pos = original.index(marker)
-    # Find where this row block ends: next line not indented by 6+ spaces.
-    end_pos = first_pos + len(marker)
-    while end_pos < len(original):
-        line_end = original.index("\n", end_pos) + 1 if "\n" in original[end_pos:] else len(original)
-        line = original[end_pos:line_end]
-        if line.strip() and not line.startswith("      "):
-            break
-        end_pos = line_end
-    first_row_block = original[first_pos:end_pos]
-    return original[:end_pos] + first_row_block + original[end_pos:]
-
-
-# ---------------------------------------------------------------------------
 # P0-C: Gate receives --action-proposal-json / --action-proposal-capability
 # ---------------------------------------------------------------------------
 
@@ -674,7 +588,7 @@ class EnginePreRouteInterceptorTests(unittest.TestCase):
 
     def test_route_decision_construction_from_override(self) -> None:
         """Verify RouteDecision can be constructed from validator output."""
-        from runtime.models import RouteDecision
+        from sopify_contracts.core import RouteDecision
         proposal = ActionProposal("consult_readonly", "none", "high")
         validator = ActionValidator()
         decision = validator.validate(proposal, ValidationContext())
@@ -791,7 +705,7 @@ def _setup_workspace_for_gate_integration(
             "  'action': 'skipped', 'state': 'READY',",
             "  'reason_code': 'WORKSPACE_BUNDLE_READY',",
             "  'workspace_root': str(w),",
-            "  'bundle_root': str(w / '.sopify-runtime'),",
+            "  'bundle_root': str(w / '.sopify-skills'),",
             "  'from_version': None, 'to_version': None,",
             "  'message': 'legacy helper fallback'",
             "}, ensure_ascii=False))",

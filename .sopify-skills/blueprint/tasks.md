@@ -124,6 +124,7 @@ P0→P4c 主航道已全部完成。后续执行遵循以下原则：
 
 ## 流程与工具项
 
+- [ ] Runtime retirement cutover（`target-state-first` 已于 2026-05-22 拍板）：先解耦 `installer/validate.py`、`installer/bootstrap_workspace.py`、`installer/inspection.py`、`scripts/install_sopify.py`、`scripts/sopify_init.py`，再同步删除 `runtime/`、`installer/runtime_bundle.py` 与 legacy deep path
 - [ ] Plan intake checklist（后续新 plan 开包时手工回答以下问题）：
   1. 主命中哪个蓝图活跃分层？主线里程碑（P4d / P5 / P6）、证据型候选（Adoption Proof / Compliance Phase 2 / Convention 证明）、独立产品线（CrossReview）？若不命中以上任一，须显式标记为"流程工具项"或"延后项"，不强行归类
   2. 这次改动定义的是 contract acceptance boundary，还是 execution strategy / implementation wave？（前者进 blueprint，后者留方案包）

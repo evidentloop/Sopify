@@ -82,7 +82,7 @@ def _render_direct_entry_block(
         },
         "allowed_response_mode": ERROR_VISIBLE_RETRY,
         "evidence": {
-            "manifest_found": (workspace_root / ".sopify-runtime" / "manifest.json").is_file(),
+            "manifest_found": (workspace_root / ".sopify-skills" / "sopify.json").is_file(),
             "handoff_found": False,
             "strict_runtime_entry": False,
             "handoff_source_kind": "missing",

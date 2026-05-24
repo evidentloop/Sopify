@@ -47,10 +47,10 @@ python3 scripts/check-install-payload-bundle-smoke.py
 Bundle 规则：
 
 - 全局 payload 位于 `~/.codex/sopify/` 或 `~/.claude/sopify/`
-- 工作区内的 `.sopify-runtime/manifest.json` 只作为 thin stub，不再承诺携带 `limits.runtime_gate_entry / limits.preferences_preload_entry`
+- 工作区内的 `.sopify-skills/sopify.json` 是唯一 workspace activation marker，声明 `bundle_version / locator_mode / capabilities`
 - 宿主必须结合 workspace stub 与 payload manifest 解析 selected global bundle，再从选中 bundle contract 或等价 preflight contract 发现 helper 入口
 - 宿主第一跳统一走 selected bundle 的 `runtime_gate_entry`；只有 repo-local 开发态才直接调用 `scripts/runtime_gate.py enter`
-- clarification / decision / develop checkpoint helper 都是内部桥接 helper，不替代默认主入口
+- 所有 checkpoint helper（clarification、decision）都是 runtime gate 内部逻辑，宿主不直接调用
 
 ### Installer 入口与 Release Asset
 
@@ -110,7 +110,6 @@ bash scripts/sync-skills.sh
 bash scripts/check-skills-sync.sh
 bash scripts/check-version-consistency.sh
 python3 scripts/generate-builtin-catalog.py
-python3 scripts/check-skill-eval-gate.py
 python3 -m pytest tests -v
 ```
 
@@ -121,7 +120,6 @@ python3 scripts/sopify_runtime.py "重构数据库层"
 python3 scripts/runtime_gate.py enter --workspace-root . --request "重构数据库层"
 python3 scripts/sopify_runtime.py "~go plan 重构数据库层"
 python3 scripts/sopify_runtime.py "~go finalize"
-python3 scripts/go_plan_runtime.py "重构数据库层"
 bash scripts/check-runtime-smoke.sh
 ```
 

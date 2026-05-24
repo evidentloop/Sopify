@@ -36,7 +36,7 @@ class DecisionContractTests(unittest.TestCase):
     def test_decision_policy_keeps_current_planning_semantic_baseline(self) -> None:
         route = RouteDecision(
             route_name="plan_only",
-            request_text="payload 放 host root 还是 workspace/.sopify-runtime",
+            request_text="payload 放 host root 还是 workspace/.sopify-skills",
             reason="test",
             complexity="complex",
             plan_level="standard",
@@ -47,7 +47,7 @@ class DecisionContractTests(unittest.TestCase):
         self.assertIsNotNone(match)
         self.assertEqual(match.template_id, "strategy_pick")
         self.assertEqual(match.decision_type, "architecture_choice")
-        self.assertEqual(match.option_texts, ("payload 放 host root", "workspace/.sopify-runtime"))
+        self.assertEqual(match.option_texts, ("payload 放 host root", "workspace/.sopify-skills"))
 
     def test_decision_policy_ignores_non_architecture_alternatives(self) -> None:
         route = RouteDecision(
@@ -221,58 +221,6 @@ class DecisionContractTests(unittest.TestCase):
         self.assertEqual(rendered.checkpoint.fields[1].field_type, "textarea")
         self.assertEqual(rendered.checkpoint.fields[1].when[0].value, CUSTOM_OPTION_ID)
         self.assertEqual(rendered.checkpoint.fields[2].field_type, "input")
-
-    def test_cli_decision_bridge_exposes_interactive_contract_and_text_fallback(self) -> None:
-        rendered = build_strategy_pick_template(
-            checkpoint_id="decision_template_cli",
-            question="确认方案",
-            summary="请选择本轮方向",
-            options=(
-                DecisionOption(option_id="option_1", title="方案一", summary="保守路径", recommended=True),
-                DecisionOption(option_id="option_2", title="方案二", summary="激进路径"),
-            ),
-            language="zh-CN",
-            recommended_option_id="option_1",
-            default_option_id="option_1",
-            allow_custom_option=True,
-            constraint_field_type="confirm",
-        )
-        state_store = mock.Mock(spec=StateStore)
-        state_store.scope = "global"
-        state_store.session_id = None
-        state_store.current_handoff_path = Path(".sopify-skills/state/current_handoff.json")
-        state_store.current_decision_path = Path(".sopify-skills/state/current_decision.json")
-        state_store.relative_path.side_effect = lambda path: str(path)
-        context = DecisionBridgeContext(
-            state_store=state_store,
-            handoff=None,
-            decision_state=DecisionState(
-                schema_version="2",
-                decision_id="decision_template_cli",
-                feature_key="decision",
-                phase="design",
-                status="pending",
-                decision_type="architecture_choice",
-                question="确认方案",
-                summary="请选择本轮方向",
-                options=rendered.options,
-                checkpoint=rendered.checkpoint,
-                recommended_option_id=rendered.recommended_option_id,
-                default_option_id=rendered.default_option_id,
-            ),
-            checkpoint=rendered.checkpoint,
-            submission_state={"status": "empty", "has_answers": False, "answer_keys": []},
-        )
-
-        bridge = build_cli_decision_bridge(context, language="zh-CN")
-
-        self.assertEqual(bridge["host_kind"], "cli")
-        self.assertEqual(bridge["presentation"]["recommended_mode"], "interactive_form")
-        self.assertEqual(bridge["steps"][0]["renderer"], "cli.select")
-        self.assertEqual(bridge["steps"][0]["fallback_renderer"], "text")
-        self.assertEqual(bridge["steps"][1]["ui_kind"], "textarea")
-        self.assertEqual(bridge["steps"][1]["fallback_renderer"], "text")
-        self.assertEqual(bridge["steps"][2]["ui_kind"], "confirm")
 
     def test_decision_checkpoint_roundtrip_normalizes_contract_fields(self) -> None:
         checkpoint = DecisionCheckpoint(
@@ -492,7 +440,7 @@ class DecisionContractTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
             run_runtime(
-                "~go plan payload 放 host root 还是 workspace/.sopify-runtime",
+                "~go plan payload 放 host root 还是 workspace/.sopify-skills",
                 workspace_root=workspace,
                 user_home=workspace / "home",
             )
@@ -554,7 +502,7 @@ class DecisionContractTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
             pending = run_runtime(
-                "~go plan payload 放 host root 还是 workspace/.sopify-runtime",
+                "~go plan payload 放 host root 还是 workspace/.sopify-skills",
                 workspace_root=workspace,
                 user_home=workspace / "home",
             )
@@ -631,60 +579,6 @@ class DecisionContractTests(unittest.TestCase):
                 CHECKPOINT_REASON_MISSING_BUT_TRADEOFF_DETECTED,
             )
 
-    def test_cli_text_bridge_collects_submission_and_runtime_can_resume(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            workspace = Path(temp_dir)
-            run_runtime(
-                "~go plan payload 放 host root 还是 workspace/.sopify-runtime",
-                workspace_root=workspace,
-                user_home=workspace / "home",
-            )
-            config = load_runtime_config(workspace)
-            answers = iter(("1",))
-
-            submission, used_renderer = prompt_cli_decision_submission(
-                config=config,
-                renderer="auto",
-                input_reader=lambda _prompt: next(answers),
-                output_writer=lambda _message: None,
-            )
-
-            self.assertEqual(used_renderer, "text")
-            self.assertEqual(submission.answers["selected_option_id"], "option_1")
-            store = StateStore(config)
-            updated = store.get_current_decision()
-            self.assertIsNotNone(updated)
-            self.assertEqual(updated.submission.status, "submitted")
-            self.assertEqual(updated.submission.answers["selected_option_id"], "option_1")
-
-            resumed = run_runtime("继续", workspace_root=workspace, user_home=workspace / "home")
-
-            self.assertEqual(resumed.route.route_name, "plan_only")
-            self.assertIsNotNone(resumed.plan_artifact)
-            self.assertFalse((workspace / ".sopify-skills" / "state" / "current_decision.json").exists())
-
-    def test_cli_interactive_bridge_collects_submission_without_text_fallback(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            workspace = Path(temp_dir)
-            run_runtime(
-                "~go plan payload 放 host root 还是 workspace/.sopify-runtime",
-                workspace_root=workspace,
-                user_home=workspace / "home",
-            )
-            config = load_runtime_config(workspace)
-
-            submission, used_renderer = prompt_cli_decision_submission(
-                config=config,
-                renderer="interactive",
-                input_reader=lambda _prompt: "",
-                output_writer=lambda _message: None,
-                interactive_session_factory=lambda: _FakeInteractiveSession(single_choice="option_2"),
-            )
-
-            self.assertEqual(used_renderer, "interactive")
-            self.assertEqual(submission.answers["selected_option_id"], "option_2")
-            self.assertEqual(submission.source, "cli_interactive")
-
     def test_fake_interactive_session_confirm_is_available_for_confirm_fields(self) -> None:
         session = _FakeInteractiveSession(confirm_value=False)
 
@@ -697,319 +591,6 @@ class DecisionContractTests(unittest.TestCase):
                 instructions="请选择",
             )
         )
-
-    def test_decision_bridge_script_inspect_and_submit_for_cli(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            workspace = Path(temp_dir)
-            run_runtime(
-                "~go plan payload 放 host root 还是 workspace/.sopify-runtime",
-                workspace_root=workspace,
-                user_home=workspace / "home",
-            )
-            script_path = REPO_ROOT / "scripts" / "decision_bridge_runtime.py"
-
-            inspected = subprocess.run(
-                [
-                    sys.executable,
-                    str(script_path),
-                    "--workspace-root",
-                    str(workspace),
-                    "inspect",
-                ],
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-
-            self.assertEqual(inspected.returncode, 0, msg=inspected.stderr)
-            inspect_payload = json.loads(inspected.stdout)
-            self.assertEqual(inspect_payload["status"], "ready")
-            self.assertEqual(inspect_payload["bridge"]["host_kind"], "cli")
-            self.assertEqual(inspect_payload["bridge"]["steps"][0]["renderer"], "cli.select")
-
-            submitted = subprocess.run(
-                [
-                    sys.executable,
-                    str(script_path),
-                    "--workspace-root",
-                    str(workspace),
-                    "submit",
-                    "--answers-json",
-                    '{"selected_option_id":"option_1"}',
-                ],
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-
-            self.assertEqual(submitted.returncode, 0, msg=submitted.stderr)
-            submit_payload = json.loads(submitted.stdout)
-            self.assertEqual(submit_payload["status"], "written")
-            self.assertEqual(submit_payload["submission"]["answers"]["selected_option_id"], "option_1")
-
-            store = StateStore(load_runtime_config(workspace))
-            updated = store.get_current_decision()
-            self.assertIsNotNone(updated)
-            self.assertEqual(updated.submission.status, "submitted")
-            self.assertEqual(updated.submission.answers["selected_option_id"], "option_1")
-
-    def test_decision_bridge_script_allows_cancel_submission_without_selected_option(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            workspace = Path(temp_dir)
-            run_runtime(
-                "~go plan payload 放 host root 还是 workspace/.sopify-runtime",
-                workspace_root=workspace,
-                user_home=workspace / "home",
-            )
-            script_path = REPO_ROOT / "scripts" / "decision_bridge_runtime.py"
-
-            submitted = subprocess.run(
-                [
-                    sys.executable,
-                    str(script_path),
-                    "--workspace-root",
-                    str(workspace),
-                    "submit",
-                    "--answers-json",
-                    "{}",
-                    "--status",
-                    "cancelled",
-                    "--resume-action",
-                    "cancel",
-                    "--raw-input",
-                    "取消这个 checkpoint",
-                ],
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-
-            self.assertEqual(submitted.returncode, 0, msg=submitted.stderr)
-            submit_payload = json.loads(submitted.stdout)
-            self.assertEqual(submit_payload["status"], "written")
-            self.assertEqual(submit_payload["submission"]["status"], "cancelled")
-            self.assertEqual(submit_payload["submission"]["resume_action"], "cancel")
-            self.assertEqual(submit_payload["submission"]["answers"], {})
-
-            store = StateStore(load_runtime_config(workspace))
-            updated = store.get_current_decision()
-            self.assertIsNotNone(updated)
-            self.assertIsNotNone(updated.submission)
-            self.assertEqual(updated.submission.status, "cancelled")
-            self.assertEqual(updated.submission.resume_action, "cancel")
-            self.assertEqual(updated.submission.answers, {})
-            response = response_from_submission(updated)
-            self.assertIsNotNone(response)
-            self.assertEqual(response.action, "cancel")
-
-    def test_decision_bridge_rejects_handoff_without_strict_entry_guard_contract(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            workspace = Path(temp_dir)
-            run_runtime(
-                "~go plan payload 放 host root 还是 workspace/.sopify-runtime",
-                workspace_root=workspace,
-                user_home=workspace / "home",
-            )
-            config = load_runtime_config(workspace)
-            store = StateStore(config)
-            handoff = store.get_current_handoff()
-            self.assertIsNotNone(handoff)
-
-            payload = handoff.to_dict()
-            artifacts = dict(payload.get("artifacts") or {})
-            artifacts.pop("entry_guard", None)
-            payload["artifacts"] = artifacts
-            store.current_handoff_path.write_text(
-                json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
-
-            with self.assertRaisesRegex(DecisionBridgeError, "decision_bridge_handoff_mismatch"):
-                load_decision_bridge_context(config=config)
-
-    def test_clarification_bridge_rejects_handoff_with_mismatched_clarification_id(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            workspace = Path(temp_dir)
-            run_runtime("~go plan 优化一下", workspace_root=workspace, user_home=workspace / "home")
-            config = load_runtime_config(workspace)
-            store = StateStore(config)
-            handoff = store.get_current_handoff()
-            self.assertIsNotNone(handoff)
-
-            payload = handoff.to_dict()
-            artifacts = dict(payload.get("artifacts") or {})
-            artifacts["clarification_id"] = "clarification_fake_001"
-            payload["artifacts"] = artifacts
-            store.current_handoff_path.write_text(
-                json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
-
-            with self.assertRaisesRegex(ClarificationBridgeError, "clarification_bridge_handoff_mismatch"):
-                load_clarification_bridge_context(config=config)
-
-    def test_cli_clarification_bridge_exposes_interactive_contract(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            workspace = Path(temp_dir)
-            run_runtime("~go plan 优化一下", workspace_root=workspace, user_home=workspace / "home")
-            config = load_runtime_config(workspace)
-
-            context = load_clarification_bridge_context(config=config)
-            bridge = build_cli_clarification_bridge(context, language="zh-CN")
-
-            self.assertEqual(bridge["host_kind"], "cli")
-            self.assertEqual(bridge["required_host_action"], "answer_questions")
-            self.assertEqual(bridge["presentation"]["recommended_mode"], "interactive_form")
-            self.assertEqual([step["field_id"] for step in bridge["steps"]], ["target_scope", "expected_outcome"])
-            self.assertEqual(bridge["steps"][0]["renderer"], "cli.input")
-            self.assertEqual(bridge["steps"][1]["fallback_renderer"], "text")
-
-    def test_cli_clarification_bridge_collects_submission_and_runtime_can_resume(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            workspace = Path(temp_dir)
-            run_runtime("~go plan 优化一下", workspace_root=workspace, user_home=workspace / "home")
-            config = load_runtime_config(workspace)
-            answers = iter(("runtime/router.py", "补结构化 clarification bridge。", "."))
-
-            submission, used_renderer = prompt_cli_clarification_submission(
-                config=config,
-                renderer="auto",
-                input_reader=lambda _prompt: next(answers),
-                output_writer=lambda _message: None,
-            )
-
-            self.assertEqual(used_renderer, "text")
-            self.assertEqual(submission["response_fields"]["target_scope"], "runtime/router.py")
-            self.assertIn("预期结果", submission["response_text"])
-            store = StateStore(config)
-            updated = store.get_current_clarification()
-            self.assertIsNotNone(updated)
-            self.assertEqual(updated.response_source, "cli_text")
-            self.assertEqual(updated.response_fields["expected_outcome"], "补结构化 clarification bridge。")
-
-            resumed = run_runtime("继续", workspace_root=workspace, user_home=workspace / "home")
-
-            self.assertEqual(resumed.route.route_name, "plan_only")
-            self.assertIsNotNone(resumed.plan_artifact)
-            self.assertFalse((workspace / ".sopify-skills" / "state" / "current_clarification.json").exists())
-
-    def test_clarification_bridge_script_inspect_and_submit_for_cli(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            workspace = Path(temp_dir)
-            run_runtime("~go plan 优化一下", workspace_root=workspace, user_home=workspace / "home")
-            script_path = REPO_ROOT / "scripts" / "clarification_bridge_runtime.py"
-
-            inspected = subprocess.run(
-                [
-                    sys.executable,
-                    str(script_path),
-                    "--workspace-root",
-                    str(workspace),
-                    "inspect",
-                ],
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-
-            self.assertEqual(inspected.returncode, 0, msg=inspected.stderr)
-            inspect_payload = json.loads(inspected.stdout)
-            self.assertEqual(inspect_payload["status"], "ready")
-            self.assertEqual(inspect_payload["bridge"]["host_kind"], "cli")
-            self.assertEqual(inspect_payload["bridge"]["presentation"]["recommended_mode"], "interactive_form")
-
-            submitted = subprocess.run(
-                [
-                    sys.executable,
-                    str(script_path),
-                    "--workspace-root",
-                    str(workspace),
-                    "submit",
-                    "--answers-json",
-                    '{"target_scope":"runtime/router.py","expected_outcome":"补结构化 clarification bridge。"}',
-                ],
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-
-            self.assertEqual(submitted.returncode, 0, msg=submitted.stderr)
-            submit_payload = json.loads(submitted.stdout)
-            self.assertEqual(submit_payload["status"], "written")
-            self.assertEqual(submit_payload["submission"]["response_fields"]["target_scope"], "runtime/router.py")
-
-            store = StateStore(load_runtime_config(workspace))
-            updated = store.get_current_clarification()
-            self.assertIsNotNone(updated)
-            self.assertEqual(updated.response_source, "cli")
-            self.assertEqual(updated.response_fields["expected_outcome"], "补结构化 clarification bridge。")
-
-    def test_session_scoped_decision_bridge_reads_and_writes_review_state(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            workspace = Path(temp_dir)
-            session_id = "session-a"
-            run_runtime(
-                "~go plan payload 放 host root 还是 workspace/.sopify-runtime",
-                workspace_root=workspace,
-                session_id=session_id,
-                user_home=workspace / "home",
-            )
-            config = load_runtime_config(workspace)
-
-            context = load_decision_bridge_context(config=config, session_id=session_id)
-            bridge = build_cli_decision_bridge(context, language="zh-CN")
-
-            self.assertEqual(bridge["state_scope"], "session")
-            self.assertEqual(bridge["session_id"], session_id)
-            self.assertIn(f"/sessions/{session_id}/", bridge["decision_file"])
-
-            submission, used_renderer = prompt_cli_decision_submission(
-                config=config,
-                session_id=session_id,
-                renderer="text",
-                input_reader=lambda _prompt: "1",
-                output_writer=lambda _message: None,
-            )
-
-            self.assertEqual(used_renderer, "text")
-            self.assertEqual(submission.answers["selected_option_id"], "option_1")
-            updated = StateStore(config, session_id=session_id).get_current_decision()
-            self.assertIsNotNone(updated)
-            self.assertEqual(updated.submission.answers["selected_option_id"], "option_1")
-
-    def test_session_scoped_clarification_bridge_reads_and_writes_review_state(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            workspace = Path(temp_dir)
-            session_id = "session-b"
-            run_runtime(
-                "~go plan 优化一下",
-                workspace_root=workspace,
-                session_id=session_id,
-                user_home=workspace / "home",
-            )
-            config = load_runtime_config(workspace)
-
-            context = load_clarification_bridge_context(config=config, session_id=session_id)
-            bridge = build_cli_clarification_bridge(context, language="zh-CN")
-
-            self.assertEqual(bridge["state_scope"], "session")
-            self.assertEqual(bridge["session_id"], session_id)
-            self.assertIn(f"/sessions/{session_id}/", bridge["clarification_file"])
-
-            answers = iter(("runtime/router.py", "补结构化 clarification bridge。", "."))
-            submission, used_renderer = prompt_cli_clarification_submission(
-                config=config,
-                session_id=session_id,
-                renderer="text",
-                input_reader=lambda _prompt: next(answers),
-                output_writer=lambda _message: None,
-            )
-
-            self.assertEqual(used_renderer, "text")
-            self.assertEqual(submission["response_fields"]["target_scope"], "runtime/router.py")
-            updated = StateStore(config, session_id=session_id).get_current_clarification()
-            self.assertIsNotNone(updated)
-            self.assertEqual(updated.response_fields["expected_outcome"], "补结构化 clarification bridge。")
 
     def test_runtime_without_session_id_keeps_review_state_global(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1032,60 +613,3 @@ class DecisionContractTests(unittest.TestCase):
 
             with self.assertRaisesRegex(ValueError, "Session ID"):
                 StateStore(config, session_id="../escape")
-
-    def test_decision_bridge_falls_back_from_session_review_to_global_execution_state(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            workspace = Path(temp_dir)
-            session_id = "session-a"
-            config, _, _ = _prepare_ready_plan_state(workspace, session_id=session_id)
-            run_runtime(
-                "继续",
-                workspace_root=workspace,
-                session_id=session_id,
-                user_home=workspace / "home",
-            )
-
-            submit_develop_callback(
-                {
-                    "schema_version": "1",
-                    "checkpoint_kind": "decision",
-                    "question": "是否扩大本轮改动范围？",
-                    "summary": "开发中命中范围分叉，需要用户拍板。",
-                    "options": [
-                        {"id": "option_1", "title": "维持范围", "summary": "继续当前改动", "recommended": True},
-                        {"id": "option_2", "title": "扩大范围", "summary": "回退到 plan review"},
-                    ],
-                    "resume_context": {
-                        "active_run_stage": "executing",
-                        "current_plan_path": ".sopify-skills/plan/20260319_feature",
-                        "task_refs": ["3.1"],
-                        "changed_files": ["runtime/engine.py"],
-                        "working_summary": "用户反馈可能超出当前 plan 边界。",
-                        "verification_todo": ["回到 plan review 后重新整理任务"],
-                        "resume_after": "continue_host_develop",
-                        "resume_route": "plan_only",
-                    },
-                },
-                config=config,
-            )
-
-            context = load_decision_bridge_context(config=config, session_id=session_id)
-            bridge = build_cli_decision_bridge(context, language="zh-CN")
-            submission, used_renderer = prompt_cli_decision_submission(
-                config=config,
-                session_id=session_id,
-                renderer="text",
-                input_reader=lambda _prompt: "1",
-                output_writer=lambda _message: None,
-            )
-
-            self.assertEqual(context.state_store.scope, "global")
-            self.assertIsNone(context.state_store.session_id)
-            self.assertEqual(bridge["state_scope"], "global")
-            self.assertEqual(bridge["decision_file"], ".sopify-skills/state/current_decision.json")
-            self.assertEqual(used_renderer, "text")
-            self.assertEqual(submission.answers["selected_option_id"], "option_1")
-            updated = StateStore(config).get_current_decision()
-            self.assertIsNotNone(updated)
-            self.assertEqual(updated.submission.answers["selected_option_id"], "option_1")
-            self.assertIsNone(StateStore(config, session_id=session_id).get_current_decision())

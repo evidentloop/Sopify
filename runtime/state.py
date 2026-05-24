@@ -11,11 +11,13 @@ from hashlib import sha1
 import json
 from pathlib import Path
 import shutil
-from typing import Any, Optional
+from typing import Any, Mapping, Optional
 
 from canonical_writer.store import SESSIONS_DIRNAME
+from canonical_writer import iso_now
 
-from .models import RuntimeConfig
+from sopify_contracts.artifacts import PlanArtifact
+from sopify_contracts.core import ExecutionGate, RouteDecision, RunState, RuntimeConfig
 
 
 def stable_request_sha1(text: str) -> str:
@@ -135,3 +137,43 @@ def _read_json_file(path: Path) -> Optional[dict[str, Any]]:
     except (OSError, json.JSONDecodeError):
         return None
     return payload if isinstance(payload, dict) else None
+
+
+# -- Run state construction (consolidated from engine.py / _kernel_turn.py) ----
+
+
+def make_run_id(request_text: str) -> str:
+    """Generate a timestamp+digest run identifier."""
+    timestamp = iso_now().replace(":", "").replace("-", "")[:15]
+    digest = sha1(request_text.encode("utf-8")).hexdigest()[:6]
+    return f"{timestamp}_{digest}"
+
+
+def make_run_state(
+    decision: RouteDecision,
+    plan_artifact: PlanArtifact,
+    *,
+    stage: str = "plan_generated",
+    execution_gate: ExecutionGate | None = None,
+    execution_authorization_receipt: Mapping[str, Any] | None = None,
+) -> RunState:
+    """Construct a fresh RunState from a route decision and plan artifact."""
+    now = iso_now()
+    return RunState(
+        run_id=make_run_id(decision.request_text),
+        status="active",
+        stage=stage,
+        route_name=decision.route_name,
+        title=plan_artifact.title,
+        created_at=now,
+        updated_at=now,
+        plan_id=plan_artifact.plan_id,
+        plan_path=plan_artifact.path,
+        execution_gate=execution_gate,
+        execution_authorization_receipt=execution_authorization_receipt,
+        request_excerpt=summarize_request_text(decision.request_text),
+        request_sha1=stable_request_sha1(decision.request_text),
+        owner_session_id="",
+        owner_host="",
+        owner_run_id="",
+    )

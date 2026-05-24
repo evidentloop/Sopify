@@ -11,13 +11,11 @@ from uuid import uuid4
 
 
 def _workspace_manifest_found(workspace: Path) -> bool:
-    """Check for workspace activation marker (sopify.json or legacy manifest)."""
-    if (workspace / ".sopify-skills" / "sopify.json").is_file():
-        return True
-    return (workspace / ".sopify-runtime" / "manifest.json").is_file()
+    """Check for the workspace activation marker (.sopify-skills/sopify.json)."""
+    return (workspace / ".sopify-skills" / "sopify.json").is_file()
 
 from .config import ConfigError, load_runtime_config
-from .engine import run_runtime
+from ._kernel_turn import execute_kernel_turn
 from .entry_guard import ENTRY_GUARD_PENDING_ACTIONS
 from .action_intent import (
     ACTION_TYPES,
@@ -195,7 +193,7 @@ def enter_runtime_gate(
                 write_receipt=write_receipt,
             )
 
-        runtime_result = run_runtime(
+        runtime_result = execute_kernel_turn(
             request,
             workspace_root=workspace,
             global_config_path=global_config_path,

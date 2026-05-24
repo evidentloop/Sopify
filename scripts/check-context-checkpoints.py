@@ -37,81 +37,40 @@ CHECKPOINT_TASK_REQUIREMENTS = {
 
 CHECKPOINT_FILE_REQUIREMENTS = {
     "A": (
-        "runtime/contracts/decision_tables.yaml",
-        "runtime/contracts/decision_tables.schema.json",
-        "runtime/contracts/failure_recovery_table.schema.json",
-        "runtime/contracts/host_message_templates.schema.json",
-        "runtime/decision_tables.py",
-        "runtime/failure_recovery.py",
-        "runtime/message_templates.py",
         "runtime/state.py",
-        "scripts/check-fail-close-contract.py",
-        "tests/fixtures/context_fail_close_contract.yaml",
-        "tests/fixtures/fail_close_case_matrix.yaml",
-        "tests/test_runtime_decision_tables.py",
-        "tests/test_runtime_failure_recovery.py",
     ),
     "B": (
-        "runtime/context_v1_scope.py",
         "tests/fixtures/sample_invariant_gate_matrix.yaml",
-        "tests/test_context_v1_scope.py",
         "tests/test_runtime_engine.py",
-        "tests/test_runtime_sample_invariant_gate.py",
     ),
     "C": (
-        "runtime/action_projection.py",
-        "runtime/context_builder.py",
-        "runtime/context_v1_scope.py",
         "runtime/deterministic_guard.py",
         "runtime/handoff.py",
-        "runtime/resolution_planner.py",
-        "tests/test_context_v1_scope.py",
         "tests/test_runtime_engine.py",
     ),
     "D": (
-        "runtime/sidecar_classifier_boundary.py",
-        "runtime/vnext_phase_boundary.py",
     ),
 }
 
 CHECKPOINT_SCOPE_PATTERNS = {
     "A": (
         ".sopify-skills/plan/20260403_plan-a-risk-adaptive-interruption/",
-        "runtime/contracts/",
-        "runtime/decision_tables.py",
-        "runtime/failure_recovery.py",
-        "runtime/message_templates.py",
         "runtime/state.py",
-        "scripts/check-fail-close-contract.py",
-        "tests/fixtures/context_fail_close_contract.yaml",
-        "tests/fixtures/fail_close_case_matrix.yaml",
-        "tests/test_runtime_decision_tables.py",
-        "tests/test_runtime_failure_recovery.py",
     ),
     "B": (
         ".sopify-skills/plan/20260403_plan-a-risk-adaptive-interruption/",
         "runtime/handoff.py",
-        "runtime/context_v1_scope.py",
         "tests/fixtures/sample_invariant_gate_matrix.yaml",
-        "tests/test_context_v1_scope.py",
         "tests/test_runtime_engine.py",
-        "tests/test_runtime_sample_invariant_gate.py",
     ),
     "C": (
         ".sopify-skills/plan/20260403_plan-a-risk-adaptive-interruption/",
-        "runtime/action_projection.py",
-        "runtime/context_builder.py",
-        "runtime/context_v1_scope.py",
         "runtime/deterministic_guard.py",
         "runtime/handoff.py",
-        "runtime/resolution_planner.py",
-        "tests/test_context_v1_scope.py",
         "tests/test_runtime_engine.py",
     ),
     "D": (
         ".sopify-skills/plan/20260403_plan-a-risk-adaptive-interruption/",
-        "runtime/sidecar_classifier_boundary.py",
-        "runtime/vnext_phase_boundary.py",
     ),
 }
 

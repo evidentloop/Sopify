@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 from typing import Any, Mapping
 
-from .models import SkillMeta
+from sopify_contracts.core import SkillMeta
 
 _DEFAULT_CONTRACT_VERSION = "1"
 _SOPIFY_DOC_ROOT = ("Codex", "Skills")

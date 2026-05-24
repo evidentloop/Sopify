@@ -386,7 +386,7 @@ ExecutionAuthorizationReceipt 是 execute_existing_plan 授权通过后生成的
 
 **入口解析**：
 - Repo-local 开发态：`scripts/runtime_gate.py enter --workspace-root <cwd> --request "<raw user request>"`
-- Vendored 模式：工作区 `.sopify-runtime/manifest.json` 只是 thin stub（声明 `bundle_version / locator_mode / ignore_mode`）；宿主结合 `~/.codex/sopify/payload-manifest.json` 解析 selected global bundle，从 bundle contract 或 workspace-preflight contract 消费 `runtime_gate_entry`
+- Vendored 模式：工作区 `.sopify-skills/sopify.json` 是唯一 workspace activation marker（声明 `bundle_version / locator_mode / ignore_mode / capabilities`）；宿主结合 `~/.codex/sopify/payload-manifest.json` 解析 selected global bundle，从 bundle contract 或 workspace-preflight contract 消费 `runtime_gate_entry`
 - 若工作区缺少兼容 manifest，宿主先调 `~/.codex/sopify/helpers/bootstrap_workspace.py --workspace-root <cwd>`
 
 **Gate 通过条件**：仅当 `status == ready` ∧ `gate_passed == true` ∧ `evidence.handoff_found == true` ∧ `evidence.strict_runtime_entry == true` 时，宿主才可进入后续阶段。
@@ -407,7 +407,9 @@ ExecutionAuthorizationReceipt 是 execute_existing_plan 授权通过后生成的
 
 ### 8.2 Post-Run Handoff 消费
 
-runtime 执行后，若 `.sopify-skills/state/current_handoff.json` 存在，宿主必须优先按其中的 `required_host_action`、`recommended_skill_ids`、`artifacts` 决定下一步。渲染层 `Next:` 行仅为人类摘要，不作为唯一机器依据。
+runtime 执行后，若 `.sopify-skills/state/current_handoff.json` 存在，宿主必须优先按其中的 `required_host_action`、`artifacts` 及当前 `current_*` machine truth 决定下一步。渲染层 `Next:` 行仅为人类摘要，不作为唯一机器依据。
+
+> **Mainline-only 解释**：宿主的最小接续主链是 `gate → current_* machine truth → handoff → host consume rule`。`route` 是 runtime 内部分流实现；`checkpoint` 只在 clarification / decision 暂停时出现，是主链分叉，不是每轮必经步骤。宿主需要稳定消费的是 gate/handoff/state contract，而不是 runtime 内部模块划分。
 
 **`required_host_action` 值域**：
 
@@ -415,12 +417,19 @@ runtime 执行后，若 `.sopify-skills/state/current_handoff.json` 存在，宿
 |---|---|
 | `answer_questions` | 读 `.sopify-skills/state/current_clarification.json`，向用户展示 `missing_facts` / `questions`，等待补充后重入 default runtime entry。不得自行物化 plan 或跳到 `~go exec` |
 | `confirm_decision` | 优先读 `current_handoff.json.artifacts.decision_checkpoint` + `decision_submission_state`；回退到 `.sopify-skills/state/current_decision.json`。展示 `question` / `options` / `recommended_option_id`，等待用户确认后重入。不得自行生成 plan |
-| `continue_host_develop` | 宿主继续代码修改；若遇用户分叉（需补事实/拍板），必须调 `scripts/develop_callback_runtime.py submit --payload-json ...`（vendored: `.sopify-runtime/scripts/develop_callback_runtime.py`），payload 含 `checkpoint_kind` + `resume_context` |
+| `continue_host_develop` | 宿主继续代码修改。develop_callback 回调机制已退役（mainline-only slimming），宿主不再支持中途回调 runtime 触发 clarification/decision 分叉 |
 | `continue_host_consult` | 在已消费当前回合 gate contract 前提下继续问答；不得自行路由，不得重判 consult / 非 consult |
 
 **execution_gate**：若 `current_handoff.json.artifacts.execution_gate` 存在，结合 `.sopify-skills/state/current_run.json.stage` 判断 plan 状态（已生成 vs `ready_for_execution`）。
 
 **偏好注入**：gate 内部执行 preferences preload（通过 `preferences_preload_entry`）。宿主只消费 gate 暴露的 `preferences` 结果，不得自行拼装。优先级固定为：当前任务明确要求 > `preferences.md` > 默认规则。
+
+**跨宿主接续最小读取集**：
+
+- 必读：`current_gate_receipt.json`（当前回合）、`current_handoff.json`
+- 接续配套：`current_run.json`、`current_plan.json`
+- 仅在挂起交互时读取：`current_clarification.json`、`current_decision.json`
+- 审计补强：`ExecutionAuthorizationReceipt`、`current_archive_receipt.json`
 
 ### 8.3 宿主行为边界
 
@@ -436,13 +445,9 @@ runtime 执行后，若 `.sopify-skills/state/current_handoff.json` 存在，宿
 |---|---|
 | `scripts/sopify_runtime.py` | 默认 repo-local raw-input entry |
 | `scripts/runtime_gate.py enter` | runtime gate，宿主第一跳 |
-| `scripts/go_plan_runtime.py` | plan-only 切片 helper |
-| `scripts/develop_callback_runtime.py` | `continue_host_develop` 中用户分叉回调 |
-| `scripts/decision_bridge_runtime.py` | `confirm_decision` host bridge helper |
-| `scripts/preferences_preload_runtime.py` | 长期偏好 preload helper |
 | `~/.codex/sopify/payload-manifest.json` | 全局 payload metadata |
 | `~/.codex/sopify/helpers/bootstrap_workspace.py` | workspace bootstrap helper |
-| `.sopify-runtime/manifest.json` | vendored bundle machine contract |
+| `.sopify-skills/sopify.json` | workspace activation marker (唯一 stub) |
 
 ### 8.5 State 文件索引
 
@@ -450,9 +455,11 @@ runtime 执行后，若 `.sopify-skills/state/current_handoff.json` 存在，宿
 |---|---|
 | `.sopify-skills/state/current_handoff.json` | 运行时交接事实，宿主执行后优先消费 |
 | `.sopify-skills/state/current_run.json` | 活跃 run 状态（stage, execution_gate） |
+| `.sopify-skills/state/current_plan.json` | 活动 plan 绑定（跨宿主接续锚点） |
 | `.sopify-skills/state/current_clarification.json` | 澄清 checkpoint 状态 |
 | `.sopify-skills/state/current_decision.json` | 决策 checkpoint 回退状态 |
 | `.sopify-skills/state/current_gate_receipt.json` | gate receipt（仅当轮有效） |
+| `.sopify-skills/state/current_archive_receipt.json` | archive receipt（审计补强；非每轮主链必读） |
 
 ## 非目标
 

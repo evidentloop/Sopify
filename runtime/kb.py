@@ -6,7 +6,8 @@ from pathlib import Path
 import re
 
 from .knowledge_layout import materialization_stage
-from .models import KbArtifact, RuntimeConfig
+from sopify_contracts.artifacts import KbArtifact
+from sopify_contracts.core import RuntimeConfig
 from .preferences import preferences_have_confirmed_entries, resolve_feedback_path, resolve_preferences_path
 from canonical_writer import iso_now
 

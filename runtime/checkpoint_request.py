@@ -11,17 +11,9 @@ from dataclasses import dataclass
 from typing import Any, Mapping, Optional
 
 from .clarification import build_scope_clarification_form
-from .models import (
-    ClarificationState,
-    DecisionCheckpoint,
-    DecisionOption,
-    DecisionRecommendation,
-    DecisionState,
-    ExecutionSummary,
-    PlanArtifact,
-    RouteDecision,
-    RuntimeConfig,
-)
+from sopify_contracts.artifacts import PlanArtifact
+from sopify_contracts.core import ExecutionSummary, RouteDecision, RuntimeConfig
+from sopify_contracts.decision import ClarificationState, DecisionCheckpoint, DecisionOption, DecisionRecommendation, DecisionState
 
 from canonical_writer._resume import CheckpointRequestError, validate_develop_resume_context
 

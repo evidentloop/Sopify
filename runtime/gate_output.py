@@ -21,12 +21,11 @@ except ModuleNotFoundError as exc:
 
 _HINTS = {
     "stub_selected": "Selected global bundle is ready for this workspace.",
-    "stub_invalid": "Repair or recreate the workspace activation manifest (`.sopify-skills/sopify.json` or legacy `.sopify-runtime/manifest.json`), then retry.",
+    "stub_invalid": "Repair or recreate the workspace activation manifest (`.sopify-skills/sopify.json`), then retry.",
     "missing_bundle": "Trigger Sopify in this workspace with `~go` to bootstrap on demand.",
     "global_bundle_missing": "Refresh the installed payload because the selected global bundle is missing.",
     "global_bundle_incompatible": "Refresh the installed payload because the selected global bundle is incomplete or incompatible.",
     "global_index_corrupted": "Refresh the installed payload because the global bundle index is invalid or inconsistent.",
-    "legacy_fallback_selected": "The workspace is still running through the legacy bundle layout; refresh the payload to migrate.",
     "payload_manifest_not_found": "Install Sopify for this host, or pass payload_root explicitly when running runtime_gate.",
     "host_mismatch": "Use the matching payload_root for this host, or omit host_id.",
     "ingress_contract_invalid": "Fix the invalid ingress arguments and rerun runtime_gate.",

@@ -5,7 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from .models import PlanArtifact, RuntimeConfig
+from sopify_contracts.artifacts import PlanArtifact
+from sopify_contracts.core import RuntimeConfig
 
 KB_LAYOUT_VERSION = "2"
 _RUNTIME_RELATIVE_PATHS = {

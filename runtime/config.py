@@ -9,7 +9,7 @@ import re
 from typing import Any, Mapping, Optional
 
 from ._yaml import YamlParseError, load_yaml
-from .models import RuntimeConfig
+from sopify_contracts.core import RuntimeConfig
 
 try:  # pragma: no cover - optional dependency
     import yaml  # type: ignore

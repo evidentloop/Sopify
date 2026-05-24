@@ -8,15 +8,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .models import (
-    ClarificationState,
-    DecisionCheckpoint,
-    DecisionField,
-    DecisionRecommendation,
-    DecisionState,
-    ExecutionSummary,
-    RuntimeConfig,
-)
+from sopify_contracts.core import ExecutionSummary, RuntimeConfig
+from sopify_contracts.decision import ClarificationState, DecisionCheckpoint, DecisionField, DecisionRecommendation, DecisionState
 from canonical_writer import iso_now
 from .checkpoint_request import CheckpointRequest, normalize_checkpoint_request
 

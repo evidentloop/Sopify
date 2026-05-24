@@ -37,10 +37,9 @@ except ModuleNotFoundError as exc:
     }
     _FALLBACK_STUB_LOCATOR_MODES = {"global_first", "global_only"}
     _FALLBACK_STUB_IGNORE_MODES = {"exclude", "gitignore", "noop"}
-    _FALLBACK_STUB_REQUIRED_CAPABILITIES = {"runtime_gate", "preferences_preload"}
+    _FALLBACK_STUB_REQUIRED_CAPABILITIES = {"runtime_gate"}
     _FALLBACK_EXACT_BUNDLE_VERSION_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
     _FALLBACK_DEFAULT_VERSIONED_BUNDLES_DIR = Path("bundles")
-    _FALLBACK_LEGACY_BUNDLE_MANIFEST_PATH = Path("bundle") / "manifest.json"
 
     def resolve_host_payload_root(*, home_root: Path, host_id: str) -> Path:
         try:
@@ -76,7 +75,7 @@ except ModuleNotFoundError as exc:
         return _fallback_legacy_bundle_manifest_path(payload_root, dict(payload_manifest))
 
     def validate_workspace_stub_manifest(bundle_root: Path) -> tuple[Path, dict[str, Any]]:
-        manifest_path = bundle_root / "manifest.json"
+        manifest_path = bundle_root / "sopify.json"
         manifest = _fallback_read_json_object(manifest_path)
         workspace_root = bundle_root.parent
         normalized = dict(manifest)
@@ -84,10 +83,12 @@ except ModuleNotFoundError as exc:
         normalized["stub_version"] = _fallback_normalize_stub_version(normalized.get("stub_version"))
         normalized["locator_mode"] = _fallback_normalize_locator_mode(normalized.get("locator_mode"))
         normalized["bundle_version"] = _fallback_normalize_bundle_version(normalized.get("bundle_version"))
-        normalized["required_capabilities"] = _fallback_normalize_required_capabilities(normalized.get("required_capabilities"))
-        normalized["legacy_fallback"] = bool(normalized.get("legacy_fallback", False))
-        if normalized["locator_mode"] == "global_only" and normalized["legacy_fallback"]:
-            raise InstallError(f"Stub verification failed: {manifest_path}")
+        raw_capabilities = normalized.get("required_capabilities")
+        if raw_capabilities is None:
+            sopify_json_caps = normalized.get("capabilities")
+            if isinstance(sopify_json_caps, (list, tuple)):
+                raw_capabilities = sopify_json_caps
+        normalized["required_capabilities"] = _fallback_normalize_required_capabilities(raw_capabilities)
         normalized["ignore_mode"] = _fallback_normalize_ignore_mode(normalized.get("ignore_mode"), workspace_root=workspace_root)
         normalized["written_by_host"] = bool(normalized.get("written_by_host", False))
         return (manifest_path, normalized)
@@ -138,7 +139,7 @@ except ModuleNotFoundError as exc:
         relative = _fallback_resolve_payload_relative_path(payload_root, payload_manifest.get("bundle_manifest"), field_name="bundle_manifest")
         if relative is not None:
             return payload_root / relative
-        return payload_root / _FALLBACK_LEGACY_BUNDLE_MANIFEST_PATH
+        return payload_root / Path("bundle") / "manifest.json"
 
     def _fallback_normalize_locator_mode(value: Any) -> str:
         normalized = str(value or "global_first").strip() or "global_first"
@@ -170,7 +171,7 @@ except ModuleNotFoundError as exc:
 
     def _fallback_normalize_required_capabilities(value: Any) -> list[str]:
         if value in (None, ""):
-            return ["runtime_gate", "preferences_preload"]
+            return ["runtime_gate"]
         if not isinstance(value, (list, tuple)):
             raise InstallError("Stub verification failed: required_capabilities")
         normalized: list[str] = []
@@ -179,7 +180,7 @@ except ModuleNotFoundError as exc:
             if capability not in _FALLBACK_STUB_REQUIRED_CAPABILITIES or capability in normalized:
                 raise InstallError("Stub verification failed: required_capabilities")
             normalized.append(capability)
-        return normalized or ["runtime_gate", "preferences_preload"]
+        return normalized or ["runtime_gate"]
 
     def _fallback_normalize_ignore_mode(value: Any, *, workspace_root: Path) -> str:
         normalized = str(value or "").strip()
@@ -198,7 +199,6 @@ except ModuleNotFoundError as exc:
             "GLOBAL_BUNDLE_MISSING": "global_bundle_missing",
             "GLOBAL_BUNDLE_INCOMPATIBLE": "global_bundle_incompatible",
             "GLOBAL_INDEX_CORRUPTED": "global_index_corrupted",
-            "LEGACY_FALLBACK_SELECTED": "legacy_fallback_selected",
             "PAYLOAD_MANIFEST_NOT_FOUND": "payload_manifest_not_found",
             "HOST_MISMATCH": "host_mismatch",
             "INGRESS_CONTRACT_INVALID": "ingress_contract_invalid",
@@ -217,7 +217,6 @@ except ModuleNotFoundError as exc:
             "global_bundle_missing": "fail_closed",
             "global_bundle_incompatible": "fail_closed",
             "global_index_corrupted": "fail_closed",
-            "legacy_fallback_selected": "warn",
             "payload_manifest_not_found": "warn",
             "host_mismatch": "fail_closed",
             "ingress_contract_invalid": "fail_closed",
@@ -252,10 +251,6 @@ except ModuleNotFoundError as exc:
         if normalized_hint:
             payload.setdefault("message_hint", normalized_hint)
         return payload
-
-_LEGACY_WORKSPACE_RUNTIME_GATE_ENTRY = "scripts/runtime_gate.py"
-_LEGACY_WORKSPACE_PREFERENCES_PRELOAD_ENTRY = "scripts/preferences_preload_runtime.py"
-
 
 class WorkspacePreflightError(RuntimeError):
     """Raised when workspace runtime preflight cannot complete safely."""
@@ -404,10 +399,9 @@ def preflight_workspace_runtime(
         activation_root_path = explicit_activation_root.resolve()
     repo_root = Path(__file__).resolve().parents[1]
     bundle_root = resolved_workspace_root / ".sopify-skills"
-    legacy_bundle_root = resolved_workspace_root / ".sopify-runtime"
     requested_root_path = Path(requested_root).expanduser().resolve() if requested_root is not None else resolved_workspace_root
     root_resolution_source = "cwd"
-    if repo_root in (bundle_root, legacy_bundle_root):
+    if repo_root == bundle_root:
         return annotate_outcome_payload({
             "action": "skipped",
             "reason_code": "RUNNING_FROM_WORKSPACE_BUNDLE",
@@ -449,7 +443,7 @@ def preflight_workspace_runtime(
     helper_entry = str(payload_manifest.get("helper_entry") or "").strip()
     if not helper_entry:
         raise WorkspacePreflightError(f"Payload manifest is missing helper_entry: {payload_manifest_file}")
-    preflight_bundle_version = _workspace_selected_bundle_version(bundle_root) or _workspace_selected_bundle_version(legacy_bundle_root)
+    preflight_bundle_version = _workspace_selected_bundle_version(bundle_root)
     try:
         resolve_payload_bundle_manifest_path(payload_root, payload_manifest, bundle_version=preflight_bundle_version)
     except InstallError as exc:
@@ -500,26 +494,14 @@ def preflight_workspace_runtime(
         payload_root=payload_root,
         payload_manifest=payload_manifest,
         workspace_bundle_root=bundle_root,
-        legacy_workspace_bundle_root=legacy_bundle_root,
     )
     if selected_bundle_manifest_path is not None:
         payload.setdefault("bundle_manifest_path", str(selected_bundle_manifest_path))
         payload.setdefault("global_bundle_root", str(selected_bundle_manifest_path.parent))
-        if str(payload.get("reason_code") or "").strip() == "LEGACY_FALLBACK_SELECTED":
-            runtime_gate_entry = _legacy_workspace_entry(legacy_bundle_root, _LEGACY_WORKSPACE_RUNTIME_GATE_ENTRY)
-            if runtime_gate_entry is not None:
-                payload.setdefault("runtime_gate_entry", runtime_gate_entry)
-            preferences_preload_entry = _legacy_workspace_entry(legacy_bundle_root, _LEGACY_WORKSPACE_PREFERENCES_PRELOAD_ENTRY)
-            if preferences_preload_entry is not None:
-                payload.setdefault("preferences_preload_entry", preferences_preload_entry)
-        else:
-            selected_bundle_manifest = _read_json_object(selected_bundle_manifest_path, error_prefix="Invalid bundle manifest")
-            runtime_gate_entry = _bundle_limit_entry(selected_bundle_manifest, "runtime_gate_entry")
-            if runtime_gate_entry is not None:
-                payload.setdefault("runtime_gate_entry", runtime_gate_entry)
-            preferences_preload_entry = _bundle_limit_entry(selected_bundle_manifest, "preferences_preload_entry")
-            if preferences_preload_entry is not None:
-                payload.setdefault("preferences_preload_entry", preferences_preload_entry)
+        selected_bundle_manifest = _read_json_object(selected_bundle_manifest_path, error_prefix="Invalid bundle manifest")
+        runtime_gate_entry = _bundle_limit_entry(selected_bundle_manifest, "runtime_gate_entry")
+        if runtime_gate_entry is not None:
+            payload.setdefault("runtime_gate_entry", runtime_gate_entry)
     payload.setdefault("helper_path", str(helper_path))
     payload.setdefault("helper_argv_mode", helper_argv_mode)
     if detected_host_id:
@@ -817,15 +799,6 @@ def _bundle_limit_entry(bundle_manifest: Mapping[str, Any], field_name: str) -> 
     return normalized or None
 
 
-def _legacy_workspace_entry(bundle_root: Path, relative_path: str) -> str | None:
-    normalized = str(relative_path or "").strip()
-    if not normalized:
-        return None
-    if not (bundle_root / normalized).is_file():
-        return None
-    return normalized
-
-
 def _read_json_object(path: Path, *, error_prefix: str) -> dict[str, Any]:
     if not path.is_file():
         raise WorkspacePreflightError(f"{error_prefix}: {path}")
@@ -839,7 +812,7 @@ def _read_json_object(path: Path, *, error_prefix: str) -> dict[str, Any]:
 
 
 def _workspace_selected_bundle_version(bundle_root: Path) -> str | None:
-    manifest_path = bundle_root / "manifest.json"
+    manifest_path = bundle_root / "sopify.json"
     if not manifest_path.is_file():
         return None
     try:
@@ -854,11 +827,8 @@ def _selected_bundle_manifest_path(
     payload_root: Path,
     payload_manifest: Mapping[str, Any],
     workspace_bundle_root: Path,
-    legacy_workspace_bundle_root: Path | None = None,
 ) -> Path | None:
     selected_bundle_version = _workspace_selected_bundle_version(workspace_bundle_root)
-    if selected_bundle_version is None and legacy_workspace_bundle_root is not None:
-        selected_bundle_version = _workspace_selected_bundle_version(legacy_workspace_bundle_root)
     try:
         return resolve_payload_bundle_manifest_path(
             payload_root,
@@ -917,7 +887,7 @@ def _run_bootstrap_helper_with_compatibility(
         text=True,
         check=False,
     )
-    return (legacy_completed, "legacy_fallback")
+    return (legacy_completed, "minimal_argv")
 
 
 def _looks_like_legacy_argparse_error(completed: subprocess.CompletedProcess[str]) -> bool:

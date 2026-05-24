@@ -89,6 +89,3 @@ jobs:
 
       - name: Run runtime smoke check
         run: bash scripts/check-runtime-smoke.sh
-
-      - name: Run skill eval quality gate
-        run: python3 scripts/check-skill-eval-gate.py

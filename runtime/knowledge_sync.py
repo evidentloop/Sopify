@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from .knowledge_layout import resolve_path
-from .models import RuntimeConfig
+from sopify_contracts.core import RuntimeConfig
 
 KNOWLEDGE_SYNC_KEYS = ("project", "background", "design", "tasks")
 KNOWLEDGE_SYNC_MODES = {"skip", "review", "required"}

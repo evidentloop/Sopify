@@ -28,8 +28,8 @@ Key constraints:
 Use these commands when you need maintainer-level control over the vendored runtime bundle:
 
 ```bash
-# Sync runtime assets into a target workspace
-bash scripts/sync-runtime-assets.sh /path/to/project
+# Sync runtime assets into a target workspace (maintainer command)
+python3 -c "from installer.runtime_bundle import sync_runtime_bundle; from pathlib import Path; sync_runtime_bundle(Path('.'), Path('/path/to/project'))"
 
 # Validate the raw input entry in the target workspace
 python3 /path/to/project/.sopify-runtime/scripts/sopify_runtime.py \
@@ -43,9 +43,9 @@ bash /path/to/project/.sopify-runtime/scripts/check-runtime-smoke.sh
 Bundle rules:
 
 - The global payload lives under `~/.codex/sopify/` or `~/.claude/sopify/`.
-- Hosts must read `.sopify-runtime/manifest.json` before falling back to fixed helper paths.
+- Hosts must read `.sopify-skills/sopify.json` to detect workspace activation and resolve the selected global bundle.
 - The first host hop goes through `.sopify-runtime/scripts/runtime_gate.py enter`.
-- Clarification, decision, and develop checkpoint helpers are internal bridge helpers, not replacement main entries.
+- All checkpoint helpers (clarification, decision) are internal to the runtime gate; hosts do not call them directly.
 
 ### Installer Entry Points and Release Assets
 
@@ -104,7 +104,6 @@ bash scripts/sync-skills.sh
 bash scripts/check-skills-sync.sh
 bash scripts/check-version-consistency.sh
 python3 scripts/generate-builtin-catalog.py
-python3 scripts/check-skill-eval-gate.py
 python3 -m pytest tests -v
 ```
 
@@ -115,7 +114,6 @@ python3 scripts/sopify_runtime.py "Refactor the database layer"
 python3 scripts/runtime_gate.py enter --workspace-root . --request "Refactor the database layer"
 python3 scripts/sopify_runtime.py "~go plan Refactor the database layer"
 python3 scripts/sopify_runtime.py "~go finalize"
-python3 scripts/go_plan_runtime.py "Refactor the database layer"
 bash scripts/check-runtime-smoke.sh
 ```
 

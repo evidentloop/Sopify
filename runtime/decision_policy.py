@@ -6,7 +6,8 @@ from dataclasses import dataclass
 import re
 from typing import Any, Mapping
 
-from .models import DecisionOption, RouteDecision
+from sopify_contracts.core import RouteDecision
+from sopify_contracts.decision import DecisionOption
 
 PLANNING_DECISION_ROUTES = {"plan_only", "workflow", "light_iterate"}
 TRADEOFF_CANDIDATES_ARTIFACT_KEY = "decision_candidates"

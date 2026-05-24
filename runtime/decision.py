@@ -12,15 +12,13 @@ from .checkpoint_cancel import is_checkpoint_cancel_intent
 from .decision_policy import match_decision_policy, should_trigger_decision_policy
 from .decision_templates import PRIMARY_OPTION_FIELD_ID, build_strategy_pick_template
 from .knowledge_layout import resolve_context_profile
-from .models import (
+from sopify_contracts.artifacts import PlanArtifact
+from sopify_contracts.core import ExecutionGate, RouteDecision, RuntimeConfig
+from sopify_contracts.decision import (
     DecisionOption,
     DecisionSelection,
     DecisionState,
     DecisionSubmission,
-    ExecutionGate,
-    PlanArtifact,
-    RouteDecision,
-    RuntimeConfig,
 )
 
 CURRENT_DECISION_FILENAME = "current_decision.json"

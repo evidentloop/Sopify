@@ -171,12 +171,10 @@ class StatusDoctorContractTests(unittest.TestCase):
 
             status_payload = build_status_payload(home_root=home_root, workspace_root=None)
             self.assertEqual(status_payload["hosts"][0]["payload_bundle"]["source_kind"], "legacy_layout")
-            self.assertEqual(status_payload["hosts"][0]["payload_bundle"]["reason_code"], "LEGACY_FALLBACK_SELECTED")
-            self.assertEqual(status_payload["hosts"][0]["payload_bundle"]["primary_code"], "legacy_fallback_selected")
-            self.assertEqual(status_payload["hosts"][0]["payload_bundle"]["action_level"], "warn")
+            self.assertEqual(status_payload["hosts"][0]["payload_bundle"]["reason_code"], "PAYLOAD_BUNDLE_READY")
             rendered = render_status_text(status_payload)
-            self.assertIn("payload_bundle=legacy_layout (LEGACY_FALLBACK_SELECTED)", rendered)
-            self.assertIn("payload_outcome: legacy_fallback_selected [warn]", rendered)
+            self.assertIn("payload_bundle=legacy_layout (PAYLOAD_BUNDLE_READY)", rendered)
+            self.assertNotIn("payload_outcome:", rendered)
 
             doctor_payload = build_doctor_payload(home_root=home_root, workspace_root=None)
             payload_bundle_check = next(
@@ -184,12 +182,10 @@ class StatusDoctorContractTests(unittest.TestCase):
                 for check in doctor_payload["checks"]
                 if check["host_id"] == "codex" and check["check_id"] == "payload_bundle_resolution"
             )
-            self.assertEqual(payload_bundle_check["status"], "warn")
-            self.assertEqual(payload_bundle_check["reason_code"], "LEGACY_FALLBACK_SELECTED")
+            self.assertEqual(payload_bundle_check["status"], "pass")
+            self.assertEqual(payload_bundle_check["reason_code"], "PAYLOAD_BUNDLE_READY")
             self.assertEqual(payload_bundle_check["source_kind"], "legacy_layout")
-            self.assertEqual(payload_bundle_check["primary_code"], "legacy_fallback_selected")
-            self.assertEqual(payload_bundle_check["action_level"], "warn")
-            self.assertIn("outcome: legacy_fallback_selected [warn]", render_doctor_text(doctor_payload))
+            self.assertNotIn("outcome:", render_doctor_text(doctor_payload))
 
     def test_status_and_doctor_fail_closed_for_non_object_payload_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as home_dir:
@@ -330,7 +326,7 @@ class StatusDoctorContractTests(unittest.TestCase):
             install_global_payload(CODEX_ADAPTER, repo_root=REPO_ROOT, home_root=home_root)
             run_workspace_bootstrap(CODEX_ADAPTER.payload_root(home_root), workspace_root)
 
-            bundle_root = workspace_root / ".sopify-runtime"
+            bundle_root = workspace_root / ".sopify-skills"
             for name in ("sopify_contracts", "canonical_writer", "runtime", "scripts", "tests"):
                 target = bundle_root / name
                 if target.exists():
@@ -367,8 +363,8 @@ class StatusDoctorContractTests(unittest.TestCase):
             install_global_payload(CODEX_ADAPTER, repo_root=REPO_ROOT, home_root=home_root)
             run_workspace_bootstrap(CODEX_ADAPTER.payload_root(home_root), workspace_root)
 
-            workspace_manifest = json.loads((workspace_root / ".sopify-runtime" / "manifest.json").read_text(encoding="utf-8"))
-            self.assertNotIn("capabilities", workspace_manifest)
+            workspace_manifest = json.loads((workspace_root / ".sopify-skills" / "sopify.json").read_text(encoding="utf-8"))
+            self.assertEqual(workspace_manifest["capabilities"], ["runtime_gate"])
             self.assertNotIn("limits", workspace_manifest)
 
             doctor_payload = build_doctor_payload(home_root=home_root, workspace_root=workspace_root)
@@ -387,7 +383,7 @@ class StatusDoctorContractTests(unittest.TestCase):
             self.assertEqual(preload_check["status"], "pass")
             self.assertEqual(preload_check["reason_code"], "ok")
 
-    def test_doctor_uses_workspace_fallback_decision_when_selected_global_bundle_is_missing(self) -> None:
+    def test_doctor_fail_closes_when_selected_global_bundle_is_missing(self) -> None:
         with tempfile.TemporaryDirectory() as home_dir, tempfile.TemporaryDirectory() as workspace_dir:
             home_root = Path(home_dir)
             workspace_root = Path(workspace_dir)
@@ -400,15 +396,6 @@ class StatusDoctorContractTests(unittest.TestCase):
             payload_manifest = json.loads((payload_root / "payload-manifest.json").read_text(encoding="utf-8"))
             selected_version = str(payload_manifest["active_version"])
             selected_bundle_root = payload_root / "bundles" / selected_version
-            bundle_root = workspace_root / ".sopify-runtime"
-
-            workspace_manifest_path = bundle_root / "manifest.json"
-            workspace_manifest = json.loads(workspace_manifest_path.read_text(encoding="utf-8"))
-            workspace_manifest["legacy_fallback"] = True
-            workspace_manifest_path.write_text(json.dumps(workspace_manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-            for name in ("sopify_contracts", "canonical_writer", "runtime", "scripts", "tests"):
-                shutil.copytree(selected_bundle_root / name, bundle_root / name)
-
             shutil.rmtree(selected_bundle_root)
 
             doctor_payload = build_doctor_payload(home_root=home_root, workspace_root=workspace_root)
@@ -433,11 +420,11 @@ class StatusDoctorContractTests(unittest.TestCase):
                 if check["host_id"] == "codex" and check["check_id"] == "payload_bundle_resolution"
             )
 
-            self.assertEqual(workspace_check["reason_code"], "LEGACY_FALLBACK_SELECTED")
-            self.assertEqual(handoff_check["status"], "pass")
-            self.assertEqual(handoff_check["reason_code"], "ok")
-            self.assertEqual(preload_check["status"], "pass")
-            self.assertEqual(preload_check["reason_code"], "ok")
+            self.assertEqual(workspace_check["reason_code"], "GLOBAL_BUNDLE_MISSING")
+            self.assertEqual(handoff_check["status"], "fail")
+            self.assertEqual(handoff_check["reason_code"], "GLOBAL_BUNDLE_MISSING")
+            self.assertEqual(preload_check["status"], "fail")
+            self.assertEqual(preload_check["reason_code"], "GLOBAL_BUNDLE_MISSING")
             self.assertEqual(payload_bundle_check["reason_code"], "GLOBAL_BUNDLE_MISSING")
 
     def test_doctor_recommends_on_demand_bootstrap_without_public_workspace_flag(self) -> None:
@@ -471,7 +458,7 @@ class StatusDoctorContractTests(unittest.TestCase):
             payload_root = CODEX_ADAPTER.payload_root(home_root)
             payload_manifest = json.loads((payload_root / "payload-manifest.json").read_text(encoding="utf-8"))
             active_version = payload_manifest["active_version"]
-            bundle_root = workspace_root / ".sopify-runtime"
+            bundle_root = workspace_root / ".sopify-skills"
             for name in ("sopify_contracts", "canonical_writer", "runtime", "scripts", "tests"):
                 shutil.copytree(payload_root / "bundles" / active_version / name, bundle_root / name)
             (bundle_root / "scripts" / "runtime_gate.py").unlink()

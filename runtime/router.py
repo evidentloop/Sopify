@@ -4,14 +4,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import re
-from typing import Iterable
-
 from .clarification import has_submitted_clarification, parse_clarification_response
-from .context_snapshot import ContextResolvedSnapshot, resolve_context_snapshot, snapshot_state_conflict_artifacts
+from .context_snapshot import ContextResolvedSnapshot, resolve_context_snapshot, snapshot_global_execution_run, snapshot_state_conflict_artifacts
 from .decision import has_submitted_decision, parse_decision_response
 from .entry_guard import DIRECT_EDIT_BLOCKED_RUNTIME_REQUIRED_REASON_CODE
-from .models import ClarificationState, DecisionState, RouteDecision, RuntimeConfig, SkillMeta
-from .skill_resolver import resolve_route_candidate_skills, resolve_runtime_skill_id
+from sopify_contracts.core import RouteDecision, RuntimeConfig
+from .action_intent import ActionProposal
+from sopify_contracts.decision import ClarificationState, DecisionState
 from canonical_writer import StateStore
 
 _COMMAND_PATTERNS = (
@@ -36,6 +35,10 @@ SUPPORTED_ROUTE_NAMES = (
     "consult",
 )
 
+# Checkpoint reply keywords — used ONLY by checkpoint-specific classifiers
+# (_classify_pending_clarification, _classify_state_conflict), never by the
+# main Router.classify() ingress.  General cancel/continue intent must come
+# through ActionProposal (cancel_flow / execute_existing_plan).
 _CONTINUE_KEYWORDS = {"继续", "下一步", "继续执行", "继续吧", "go on", "continue", "resume", "next"}
 _CANCEL_KEYWORDS = {"取消", "强制取消", "停止", "终止", "算了", "放弃", "abort", "cancel", "stop", "force cancel"}
 _ARCHITECTURE_KEYWORDS = ("架构", "系统", "runtime", "workflow", "engine", "adapter", "plugin", "新功能", "重构", "refactor")
@@ -214,7 +217,6 @@ class Router:
         self,
         user_input: str,
         *,
-        skills: Iterable[SkillMeta],
         snapshot: ContextResolvedSnapshot | None = None,
     ) -> RouteDecision:
         text = user_input.strip()
@@ -236,18 +238,17 @@ class Router:
         current_plan = snapshot.current_plan
         current_last_route = snapshot.last_route
 
-        decide_decision = _classify_decide_command(text, skills=skills)
+        decide_decision = _classify_decide_command(text)
         if decide_decision is not None:
             return self._with_capture(decide_decision)
 
-        command_decision = _classify_command(text, skills=skills, config=self.config)
+        command_decision = _classify_command(text, config=self.config)
         if snapshot.is_conflict:
             return self._with_capture(
                 _classify_state_conflict(
                     text,
                     command_decision=command_decision,
                     snapshot=snapshot,
-                    skills=skills,
                 )
             )
 
@@ -256,54 +257,24 @@ class Router:
                 text,
                 current_clarification,
                 command_decision=command_decision,
-                skills=skills,
             )
             if pending_clarification is not None:
                 return self._with_capture(pending_clarification)
 
-        if current_decision is not None and current_decision.status in {"pending", "collecting", "confirmed", "cancelled", "timed_out"}:
+        if current_decision is not None and current_decision.status in {"pending", "collecting", "confirmed"}:
             pending_decision = _classify_pending_decision(
                 text,
                 current_decision,
                 command_decision=command_decision,
-                skills=skills,
             )
             if pending_decision is not None:
                 return self._with_capture(pending_decision)
 
-        if (global_active_run is not None or review_active_run is not None) and _normalize(text) in _CANCEL_KEYWORDS:
-            return RouteDecision(
-                route_name="cancel_active",
-                request_text=text,
-                reason="Matched active-flow cancellation intent",
-                complexity="simple",
-                should_recover_context=True,
-                active_run_action="cancel",
-                artifacts={
-                    "cancel_scope": "global" if global_active_run is not None else "session",
-                },
-            )
-
-
         if command_decision is not None:
             return self._with_capture(command_decision)
 
-        if execution_active_run is not None and _normalize(text) in _CONTINUE_KEYWORDS:
-            return self._with_capture(
-                RouteDecision(
-                    route_name="resume_active",
-                    request_text=text,
-                    reason="Matched active-flow continuation intent",
-                    complexity="medium",
-                    should_recover_context=True,
-                    candidate_skill_ids=_candidate_skills("resume_active", skills, "develop"),
-                    active_run_action="resume",
-                )
-            )
-
         plan_meta_debug_route = _classify_plan_materialization_meta_debug(
             text,
-            skills=skills,
         )
         if plan_meta_debug_route is not None:
             return self._with_capture(plan_meta_debug_route)
@@ -318,7 +289,7 @@ class Router:
                     complexity="complex",
                     plan_level="standard",
                     plan_package_policy=_plan_package_policy_for_route("workflow", text, config=self.config),
-                    candidate_skill_ids=_candidate_skills("workflow", skills, "analyze", "design", "develop"),
+                    candidate_skill_ids=("analyze", "design", "develop"),
                     artifacts={
                         "entry_guard_reason_code": DIRECT_EDIT_BLOCKED_RUNTIME_REQUIRED_REASON_CODE,
                         "direct_edit_guard_kind": runtime_first_guard["guard_kind"],
@@ -346,7 +317,7 @@ class Router:
                     request_text=text,
                     reason=signal.reason,
                     complexity=signal.level,
-                    candidate_skill_ids=_candidate_skills("quick_fix", skills, "develop"),
+                    candidate_skill_ids=("develop",),
                 )
             )
         if signal.level == "medium":
@@ -358,7 +329,7 @@ class Router:
                     complexity=signal.level,
                     plan_level=signal.plan_level,
                     plan_package_policy=_plan_package_policy_for_route("light_iterate", text, config=self.config),
-                    candidate_skill_ids=_candidate_skills("light_iterate", skills, "design", "develop"),
+                    candidate_skill_ids=("design", "develop"),
                 )
             )
         return self._with_capture(
@@ -369,7 +340,7 @@ class Router:
                 complexity=signal.level,
                 plan_level=signal.plan_level,
                 plan_package_policy=_plan_package_policy_for_route("workflow", text, config=self.config),
-                candidate_skill_ids=_candidate_skills("workflow", skills, "analyze", "design", "develop"),
+                candidate_skill_ids=("analyze", "design", "develop"),
             )
         )
 
@@ -378,7 +349,7 @@ class Router:
         return decision
 
 
-def _classify_command(text: str, *, skills: Iterable[SkillMeta], config: RuntimeConfig) -> RouteDecision | None:
+def _classify_command(text: str, *, config: RuntimeConfig) -> RouteDecision | None:
     for pattern, command in _COMMAND_PATTERNS:
         match = pattern.match(text)
         if not match:
@@ -394,7 +365,7 @@ def _classify_command(text: str, *, skills: Iterable[SkillMeta], config: Runtime
                 complexity="complex",
                 plan_level="standard",
                 plan_package_policy="immediate",
-                candidate_skill_ids=_candidate_skills("plan_only", skills, "analyze", "design"),
+                candidate_skill_ids=("analyze", "design"),
             )
         if command == "~go exec":
             return RouteDecision(
@@ -404,7 +375,7 @@ def _classify_command(text: str, *, skills: Iterable[SkillMeta], config: Runtime
                 command=command,
                 complexity="medium",
                 should_recover_context=True,
-                candidate_skill_ids=_candidate_skills("exec_plan", skills, "develop"),
+                candidate_skill_ids=("develop",),
                 active_run_action="resume",
             )
         if command == "~go":
@@ -416,7 +387,7 @@ def _classify_command(text: str, *, skills: Iterable[SkillMeta], config: Runtime
                 complexity="complex",
                 plan_level="standard",
                 plan_package_policy=_plan_package_policy_for_route("workflow", request_text, config=config),
-                candidate_skill_ids=_candidate_skills("workflow", skills, "analyze", "design", "develop"),
+                candidate_skill_ids=("analyze", "design", "develop"),
             )
     return None
 
@@ -426,7 +397,6 @@ def _classify_state_conflict(
     *,
     command_decision: RouteDecision | None,
     snapshot: ContextResolvedSnapshot,
-    skills: Iterable[SkillMeta],
 ) -> RouteDecision:
     normalized = _normalize(text)
     if normalized in _CANCEL_KEYWORDS:
@@ -446,13 +416,13 @@ def _classify_state_conflict(
         command=command_decision.command if command_decision is not None else None,
         complexity="simple",
         should_recover_context=True,
-        candidate_skill_ids=_candidate_skills("state_conflict", skills, "analyze", "develop"),
+        candidate_skill_ids=("analyze", "develop"),
         active_run_action=active_run_action,
         artifacts=artifacts,
     )
 
 
-def _classify_decide_command(text: str, *, skills: Iterable[SkillMeta]) -> RouteDecision | None:
+def _classify_decide_command(text: str) -> RouteDecision | None:
     stripped = text.strip()
     lowered = stripped.lower()
     if not lowered.startswith("~decide"):
@@ -464,7 +434,7 @@ def _classify_decide_command(text: str, *, skills: Iterable[SkillMeta]) -> Route
             reason="Matched explicit decision status command",
             complexity="medium",
             should_recover_context=True,
-            candidate_skill_ids=_candidate_skills("decision_pending", skills, "design"),
+            candidate_skill_ids=("design",),
             active_run_action="inspect_decision",
         )
     return RouteDecision(
@@ -473,7 +443,7 @@ def _classify_decide_command(text: str, *, skills: Iterable[SkillMeta]) -> Route
         reason="Matched explicit decision response command",
         complexity="medium",
         should_recover_context=True,
-        candidate_skill_ids=_candidate_skills("decision_resume", skills, "design"),
+        candidate_skill_ids=("design",),
         active_run_action="decision_response",
     )
 
@@ -483,10 +453,9 @@ def _classify_pending_decision(
     current_decision: DecisionState,
     *,
     command_decision: RouteDecision | None,
-    skills: Iterable[SkillMeta],
 ) -> RouteDecision | None:
     if (
-        current_decision.status in {"pending", "collecting", "cancelled", "timed_out"}
+        current_decision.status in {"pending", "collecting"}
         and has_submitted_decision(current_decision)
         and (command_decision is None or command_decision.route_name != "decision_pending")
     ):
@@ -496,7 +465,7 @@ def _classify_pending_decision(
             reason="Structured decision submission is ready to be resumed",
             complexity="medium",
             should_recover_context=True,
-            candidate_skill_ids=_candidate_skills("decision_resume", skills, "design"),
+            candidate_skill_ids=("design",),
             active_run_action="resume_submitted_decision",
         )
 
@@ -511,7 +480,7 @@ def _classify_pending_decision(
                     reason="Pending decision checkpoint must be resolved before exec recovery can continue",
                     complexity="medium",
                     should_recover_context=True,
-                    candidate_skill_ids=_candidate_skills("decision_pending", skills, "design"),
+                    candidate_skill_ids=("design",),
                     active_run_action="inspect_decision",
                 )
             return RouteDecision(
@@ -521,7 +490,7 @@ def _classify_pending_decision(
                 command=command_decision.command,
                 complexity="medium",
                 should_recover_context=True,
-                candidate_skill_ids=_candidate_skills("decision_resume", skills, "design"),
+                candidate_skill_ids=("design",),
                 active_run_action="materialize_confirmed_decision",
             )
 
@@ -533,7 +502,7 @@ def _classify_pending_decision(
             reason="Pending decision checkpoint is waiting for confirmation",
             complexity="medium",
             should_recover_context=True,
-            candidate_skill_ids=_candidate_skills("decision_pending", skills, "design"),
+            candidate_skill_ids=("design",),
             active_run_action="inspect_decision",
         )
     if response.action in {"choose", "materialize", "cancel", "invalid"}:
@@ -543,7 +512,7 @@ def _classify_pending_decision(
             reason="Matched a response for the pending decision checkpoint",
             complexity="medium",
             should_recover_context=True,
-            candidate_skill_ids=_candidate_skills("decision_resume", skills, "design"),
+            candidate_skill_ids=("design",),
             active_run_action="decision_response",
         )
     return None
@@ -556,7 +525,6 @@ def _classify_pending_clarification(
     current_clarification: ClarificationState,
     *,
     command_decision: RouteDecision | None,
-    skills: Iterable[SkillMeta],
 ) -> RouteDecision | None:
     if command_decision is not None:
         if command_decision.route_name in {"plan_only", "workflow", "light_iterate"}:
@@ -568,7 +536,7 @@ def _classify_pending_clarification(
                 reason="Pending clarification must be answered before execution can continue",
                 complexity="medium",
                 should_recover_context=True,
-                candidate_skill_ids=_candidate_skills("clarification_pending", skills, "analyze", "design"),
+                candidate_skill_ids=("analyze", "design"),
                 active_run_action="inspect_clarification",
             )
 
@@ -579,7 +547,7 @@ def _classify_pending_clarification(
             reason="Restoring planning from structured clarification answers",
             complexity="medium",
             should_recover_context=True,
-            candidate_skill_ids=_candidate_skills("clarification_resume", skills, "analyze", "design"),
+            candidate_skill_ids=("analyze", "design"),
             active_run_action="clarification_response_from_state",
         )
 
@@ -591,7 +559,7 @@ def _classify_pending_clarification(
             reason="Pending clarification is still waiting for factual details",
             complexity="medium",
             should_recover_context=True,
-            candidate_skill_ids=_candidate_skills("clarification_pending", skills, "analyze", "design"),
+            candidate_skill_ids=("analyze", "design"),
             active_run_action="inspect_clarification",
         )
     if response.action == "cancel":
@@ -610,7 +578,7 @@ def _classify_pending_clarification(
             reason="Received supplemental facts for the pending clarification",
             complexity="medium",
             should_recover_context=True,
-            candidate_skill_ids=_candidate_skills("clarification_resume", skills, "analyze", "design"),
+            candidate_skill_ids=("analyze", "design"),
             active_run_action="clarification_response",
         )
     return RouteDecision(
@@ -619,7 +587,7 @@ def _classify_pending_clarification(
         reason=response.message or "Clarification still needs more factual details",
         complexity="medium",
         should_recover_context=True,
-        candidate_skill_ids=_candidate_skills("clarification_pending", skills, "analyze", "design"),
+        candidate_skill_ids=("analyze", "design"),
         active_run_action="inspect_clarification",
     )
 
@@ -651,8 +619,6 @@ def estimate_complexity(text: str) -> _ComplexitySignal:
 
 def _classify_plan_materialization_meta_debug(
     text: str,
-    *,
-    skills: Iterable[SkillMeta],
 ) -> RouteDecision | None:
     if not any(pattern.search(text) is not None for pattern in _PLAN_MATERIALIZATION_META_DEBUG_PATTERNS):
         return None
@@ -662,7 +628,7 @@ def _classify_plan_materialization_meta_debug(
         reason="Matched plan-materialization meta-debug intent and bypassed workflow routing",
         complexity="simple",
         should_recover_context=False,
-        candidate_skill_ids=_candidate_skills("consult", skills, "analyze"),
+        candidate_skill_ids=("analyze",),
     )
 
 
@@ -771,13 +737,190 @@ def _normalize(text: str) -> str:
     return " ".join(text.strip().lower().split())
 
 
-def _candidate_skills(route_name: str, skills: Iterable[SkillMeta], *preferred: str) -> tuple[str, ...]:
-    return resolve_route_candidate_skills(
-        route_name,
-        skills,
-        fallback_preferred=tuple(preferred),
+
+
+# -- Authorized proposal → route derivation (moved from engine.py in 6.2) ----
+
+_ACTION_TYPE_TO_ROUTE: dict[str, str] = {
+    "consult_readonly": "consult",
+    "execute_existing_plan": "resume_active",
+    # cancel_flow handled inline (needs snapshot for cancel_scope).
+    # propose_plan handled inline (needs complexity analysis for plan_level).
+}
+
+
+def _derive_route_from_authorized_proposal(
+    proposal: ActionProposal,
+    user_input: str,
+    *,
+    config: RuntimeConfig,
+    snapshot: ContextResolvedSnapshot | None,
+) -> RouteDecision:
+    """Deterministically map an authorized ActionProposal to a RouteDecision.
+
+    Called only when ``validation_decision.decision == DECISION_AUTHORIZE``
+    and there is no ``route_override``.  Falls through to Router.classify()
+    is NOT expected — every recognized action_type produces a route here.
+    """
+    action = proposal.action_type
+
+    # --- cancel_flow: snapshot-driven cancel_scope ---
+    if action == "cancel_flow":
+        has_global = snapshot_global_execution_run(snapshot) is not None
+        route = RouteDecision(
+            route_name="cancel_active",
+            request_text=user_input,
+            reason="action_proposal_derive: cancel_flow",
+            complexity="simple",
+            should_recover_context=True,
+            active_run_action="cancel",
+            artifacts={"cancel_scope": "global" if has_global else "session"},
+        )
+    # --- checkpoint_response: snapshot-driven ---
+    elif action == "checkpoint_response":
+        route = _derive_checkpoint_response_route(user_input, snapshot=snapshot)
+    # --- modify_files: complexity-driven ---
+    elif action == "modify_files":
+        route = _derive_modify_files_route(user_input)
+    # --- propose_plan: complexity for plan_level, immediate materialization ---
+    elif action == "propose_plan":
+        signal = estimate_complexity(user_input)
+        route = RouteDecision(
+            route_name="plan_only",
+            request_text=user_input,
+            reason=f"action_proposal_derive: propose_plan ({signal.reason})",
+            complexity="complex",
+            plan_level=signal.plan_level or "standard",
+            plan_package_policy="immediate",
+            candidate_skill_ids=("analyze", "design"),
+        )
+    else:
+        # --- static mappings ---
+        route_name = _ACTION_TYPE_TO_ROUTE.get(action)
+        if route_name is not None:
+            route = _build_static_route(route_name, action, user_input)
+        else:
+            # Unreachable for valid ACTION_TYPES (archive_plan handled by route_override).
+            route = RouteDecision(
+                route_name="consult",
+                request_text=user_input,
+                reason=f"action_proposal_derive: unknown action_type {action!r}, falling back to consult",
+                complexity="simple",
+            )
+
+    return route
+
+
+def _derive_checkpoint_response_route(
+    user_input: str,
+    *,
+    snapshot: ContextResolvedSnapshot | None,
+) -> RouteDecision:
+    """Route checkpoint_response based on active checkpoint state in snapshot.
+
+    Only pending/collecting checkpoints are routable.  confirmed/cancelled/
+    timed_out checkpoints are terminal and will not accept further free-text
+    responses.
+
+    NOTE: ActionProposal admission for checkpoint_response may still carry a
+    plan_subject field, but the actual routing decision depends solely on
+    the active checkpoint truth in the snapshot, not on plan_subject.
+    """
+    if snapshot is not None:
+        clarification = snapshot.current_clarification
+        if clarification is not None and clarification.status == "pending":
+            return RouteDecision(
+                route_name="clarification_resume",
+                request_text=user_input,
+                reason="action_proposal_derive: checkpoint_response with pending clarification",
+                complexity="medium",
+                should_recover_context=True,
+                candidate_skill_ids=("analyze", "design"),
+                active_run_action="clarification_response",
+            )
+        decision = snapshot.current_decision
+        if decision is not None and decision.status in {"pending", "collecting"}:
+            return RouteDecision(
+                route_name="decision_resume",
+                request_text=user_input,
+                reason="action_proposal_derive: checkpoint_response with active decision",
+                complexity="medium",
+                should_recover_context=True,
+                candidate_skill_ids=("design",),
+                active_run_action="decision_response",
+            )
+    # No active checkpoint → REJECT (fail-closed)
+    return RouteDecision(
+        route_name="proposal_rejected",
+        request_text=user_input,
+        reason="action_proposal_derive: checkpoint_response but no active pending/collecting checkpoint",
+        complexity="simple",
+        should_recover_context=False,
+        artifacts={"reject_reason_code": "checkpoint_response.no_active_checkpoint"},
     )
 
 
+def _derive_modify_files_route(
+    user_input: str,
+) -> RouteDecision:
+    """Route modify_files based on text complexity analysis."""
+    signal = estimate_complexity(user_input)
+    if signal.level == "simple":
+        return RouteDecision(
+            route_name="quick_fix",
+            request_text=user_input,
+            reason=f"action_proposal_derive: modify_files ({signal.reason})",
+            complexity=signal.level,
+            candidate_skill_ids=("develop",),
+        )
+    if signal.level == "medium":
+        return RouteDecision(
+            route_name="light_iterate",
+            request_text=user_input,
+            reason=f"action_proposal_derive: modify_files ({signal.reason})",
+            complexity=signal.level,
+            plan_level=signal.plan_level,
+            plan_package_policy="authorized_only",
+            candidate_skill_ids=("design", "develop"),
+        )
+    return RouteDecision(
+        route_name="workflow",
+        request_text=user_input,
+        reason=f"action_proposal_derive: modify_files ({signal.reason})",
+        complexity=signal.level,
+        plan_level=signal.plan_level,
+        plan_package_policy="authorized_only",
+        candidate_skill_ids=("analyze", "design", "develop"),
+    )
+
+
+def _build_static_route(
+    route_name: str,
+    action_type: str,
+    user_input: str,
+) -> RouteDecision:
+    """Build a RouteDecision for action types with a fixed route mapping.
+
+    Only handles routes reachable via _ACTION_TYPE_TO_ROUTE:
+    resume_active (execute_existing_plan) and consult (consult_readonly).
+    cancel_flow is handled inline in _derive_route_from_authorized_proposal.
+    """
+    if route_name == "resume_active":
+        return RouteDecision(
+            route_name="resume_active",
+            request_text=user_input,
+            reason=f"action_proposal_derive: {action_type}",
+            complexity="medium",
+            should_recover_context=True,
+            active_run_action="resume",
+            candidate_skill_ids=("develop",),
+        )
+    # consult_readonly
+    return RouteDecision(
+        route_name="consult",
+        request_text=user_input,
+        reason=f"action_proposal_derive: {action_type}",
+        complexity="simple",
+    )
 
 

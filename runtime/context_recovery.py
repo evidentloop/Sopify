@@ -6,7 +6,8 @@ from pathlib import Path
 from typing import Dict, List
 
 from .context_snapshot import ContextResolvedSnapshot, resolve_context_snapshot
-from .models import RecoveredContext, RouteDecision, RuntimeConfig
+from sopify_contracts.core import RouteDecision, RuntimeConfig
+from sopify_contracts.handoff import RecoveredContext
 from canonical_writer import StateStore
 
 _SUMMARY_CANDIDATES = ("README.md", "plan.md", "tasks.md")

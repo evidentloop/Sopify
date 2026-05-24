@@ -11,7 +11,6 @@ Run release preflight checks before bumping Sopify version:
   1) Sync Codex -> Claude skills mirrors
   2) Verify mirrors and version consistency
   3) Run runtime unit tests + installer/runtime smoke checks
-  4) Run skill eval quality gate
 EOF
 }
 
@@ -62,7 +61,6 @@ run_step "Sync skills" bash "$ROOT_DIR/scripts/sync-skills.sh"
 run_step "Check skills sync" bash "$ROOT_DIR/scripts/check-skills-sync.sh"
 run_step "Check version consistency" bash "$ROOT_DIR/scripts/check-version-consistency.sh"
 run_step "Check builtin catalog drift" check_builtin_catalog_drift
-run_step "Check fail-close contract" python3 "$ROOT_DIR/scripts/check-fail-close-contract.py"
 run_step "Check context checkpoints" python3 "$ROOT_DIR/scripts/check-context-checkpoints.py" repo --root "$ROOT_DIR"
 run_step "Run hard gate tests (contract + smoke + distribution)" python3 -m pytest "$ROOT_DIR/tests" -m "not implementation_mirror" -v
 
@@ -75,9 +73,5 @@ fi
 run_step "Run install/payload bootstrap smoke" python3 "$ROOT_DIR/scripts/check-install-payload-bundle-smoke.py"
 run_step "Run prompt runtime gate smoke" python3 "$ROOT_DIR/scripts/check-prompt-runtime-gate-smoke.py"
 run_step "Run bundle runtime smoke check" bash "$ROOT_DIR/scripts/check-runtime-smoke.sh"
-
-if [[ -f "$ROOT_DIR/scripts/check-skill-eval-gate.py" ]]; then
-  run_step "Run skill eval quality gate" python3 "$ROOT_DIR/scripts/check-skill-eval-gate.py"
-fi
 
 echo "[release-preflight] All checks passed."

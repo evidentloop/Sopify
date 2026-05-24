@@ -15,34 +15,19 @@ from .checkpoint_request import (
     checkpoint_request_from_decision_state,
     normalize_checkpoint_request,
 )
-from .action_projection import ActionProjectionError, build_action_projection, supports_action_projection
 from .clarification import CURRENT_CLARIFICATION_RELATIVE_PATH, build_scope_clarification_form, clarification_submission_state_payload
 from .deterministic_guard import (
     evaluate_deterministic_guard,
     expected_allowed_response_mode,
     supports_deterministic_guard,
 )
-from .develop_quality import build_develop_quality_contract, carry_forward_develop_quality_artifacts
-from .decision_policy import has_tradeoff_checkpoint_signal
 from .decision import CURRENT_DECISION_RELATIVE_PATH
+from .decision_policy import has_tradeoff_checkpoint_signal
 from .entry_guard import build_entry_guard_contract
 
-from .resolution_planner import (
-    ResolutionPlannerError,
-    build_resolution_planner,
-    supports_resolution_planner,
-)
-from .sidecar_classifier_boundary import (
-    SidecarClassifierBoundaryError,
-    build_sidecar_classifier_boundary,
-    supports_sidecar_classifier_boundary,
-)
-from .vnext_phase_boundary import (
-    VNextPhaseBoundaryError,
-    build_vnext_phase_boundary,
-    supports_vnext_phase_boundary,
-)
-from .models import ExecutionSummary, KbArtifact, PlanArtifact, RecoveredContext, RouteDecision, RunState, RuntimeConfig, RuntimeHandoff
+from sopify_contracts.artifacts import KbArtifact, PlanArtifact
+from sopify_contracts.core import ExecutionSummary, RouteDecision, RunState, RuntimeConfig
+from sopify_contracts.handoff import RecoveredContext, RuntimeHandoff
 
 HANDOFF_SCHEMA_VERSION = "1"
 CURRENT_HANDOFF_FILENAME = "current_handoff.json"
@@ -157,7 +142,6 @@ def build_runtime_handoff(
         plan_path=resolved_plan.path if resolved_plan is not None else None,
         handoff_kind=handoff_kind,
         required_host_action=required_host_action,
-        recommended_skill_ids=tuple(decision.candidate_skill_ids),
         artifacts=artifacts,
         notes=normalized_notes,
         observability=observability,
@@ -262,15 +246,6 @@ def _collect_handoff_artifacts(
         artifacts["execution_summary"] = execution_summary_payload.to_dict()
     if current_plan is not None and current_plan.files:
         artifacts["plan_files"] = list(current_plan.files)
-    if required_host_action == "continue_host_develop":
-        artifacts["develop_quality_contract"] = build_develop_quality_contract()
-        carry_forward_develop_quality_artifacts(artifacts, source=decision.artifacts)
-        if (
-            previous_handoff is not None
-            and current_plan is not None
-            and previous_handoff.plan_id == current_plan.plan_id
-        ):
-            carry_forward_develop_quality_artifacts(artifacts, source=previous_handoff.artifacts)
     if decision.route_name == "archive_lifecycle":
         archive_lifecycle = decision.artifacts.get("archive_lifecycle")
         if isinstance(archive_lifecycle, Mapping):
@@ -305,7 +280,6 @@ def _collect_handoff_artifacts(
                 artifacts["history_index_path"] = history_index
     if skill_result:
         artifacts["skill_result_keys"] = sorted(skill_result.keys())
-        tradeoff_signal = has_tradeoff_checkpoint_signal(skill_result)
         raw_checkpoint_request = skill_result.get("checkpoint_request")
         if isinstance(raw_checkpoint_request, Mapping):
             try:
@@ -317,15 +291,10 @@ def _collect_handoff_artifacts(
                     phase=normalized_request.source_stage,
                 )
             except ValueError:
-                # Keep the handoff stable even when a skill emits malformed data.
-                error_code = "invalid_skill_checkpoint_request"
-                if tradeoff_signal:
-                    error_code = CHECKPOINT_REASON_MISSING_BUT_TRADEOFF_DETECTED
-                    artifacts["checkpoint_request_reason_code"] = CHECKPOINT_REASON_MISSING_BUT_TRADEOFF_DETECTED
-                artifacts["checkpoint_request_error"] = error_code
-        elif tradeoff_signal:
-            artifacts["checkpoint_request_error"] = CHECKPOINT_REASON_MISSING_BUT_TRADEOFF_DETECTED
+                artifacts["checkpoint_request_error"] = "invalid_skill_checkpoint_request"
+        elif has_tradeoff_checkpoint_signal(skill_result):
             artifacts["checkpoint_request_reason_code"] = CHECKPOINT_REASON_MISSING_BUT_TRADEOFF_DETECTED
+            artifacts["checkpoint_request_error"] = CHECKPOINT_REASON_MISSING_BUT_TRADEOFF_DETECTED
     if current_clarification is not None:
         artifacts["clarification_file"] = CURRENT_CLARIFICATION_RELATIVE_PATH
         artifacts["clarification_id"] = getattr(current_clarification, "clarification_id", None)
@@ -424,7 +393,6 @@ def _attach_resume_context_artifacts(
     artifacts["resume_context"] = normalized
     if str(phase or "").strip() == "develop":
         artifacts["develop_resume_context"] = normalized
-        carry_forward_develop_quality_artifacts(artifacts, source=normalized)
 
 
 def _should_attach_execution_summary(*, decision: RouteDecision, current_run: RunState | None) -> bool:
@@ -528,50 +496,6 @@ def _attach_v1_guardrail_artifacts(
     )
     artifacts["deterministic_guard"] = guard.to_dict()
 
-    if supports_action_projection(required_host_action):
-        try:
-            projection = build_action_projection(
-                guard,
-                plan_id=current_plan.plan_id if current_plan is not None else None,
-                plan_path=current_plan.path if current_plan is not None else None,
-                current_run=current_run,
-                artifacts=artifacts,
-            )
-        except ActionProjectionError as exc:
-            artifacts["action_projection_error"] = str(exc)
-        else:
-            artifacts["action_projection"] = projection.to_dict()
-
-    planner = None
-    if supports_resolution_planner(required_host_action):
-        try:
-            planner = build_resolution_planner(guard)
-        except ResolutionPlannerError as exc:
-            artifacts["resolution_planner_error"] = str(exc)
-        else:
-            artifacts["resolution_planner"] = planner.to_dict()
-
-    if supports_sidecar_classifier_boundary(required_host_action):
-        if planner is None:
-            artifacts["sidecar_classifier_boundary_error"] = (
-                "Resolution planner unavailable for sidecar boundary"
-            )
-        else:
-            try:
-                boundary = build_sidecar_classifier_boundary(guard, planner)
-            except SidecarClassifierBoundaryError as exc:
-                artifacts["sidecar_classifier_boundary_error"] = str(exc)
-            else:
-                artifacts["sidecar_classifier_boundary"] = boundary.to_dict()
-
-    if not supports_vnext_phase_boundary(required_host_action):
-        return
-    try:
-        phase_boundary = build_vnext_phase_boundary(guard)
-    except VNextPhaseBoundaryError as exc:
-        artifacts["vnext_phase_boundary_error"] = str(exc)
-        return
-    artifacts["vnext_phase_boundary"] = phase_boundary.to_dict()
 
 
 def _build_v1_observability_stats(
@@ -594,11 +518,7 @@ def _build_v1_observability_stats(
         outcome = unresolved_outcome_family or "fail_closed"
         fallback_path = str(guard.get("fallback_action") or "").strip()
     else:
-        resolution_planner = artifacts.get("resolution_planner")
-        if isinstance(resolution_planner, Mapping):
-            default_no_candidate = resolution_planner.get("default_no_candidate_recovery")
-            if isinstance(default_no_candidate, Mapping):
-                fallback_path = str(default_no_candidate.get("fallback_action") or "").strip()
+        fallback_path = "none"
 
     return {
         "reason_code": str(guard.get("reason_code") or "").strip(),

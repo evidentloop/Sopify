@@ -6,6 +6,38 @@ Format: Summary → Changed → Plan Packages. File-level details live in `git l
 
 ## [Unreleased]
 
+## [2026-05-22.232127] - 2026-05-22
+
+### Summary
+
+- Updated 1 active plan package(s); Changes across: Docs, Runtime, Skills, Tests.
+
+### Changed
+
+- **Docs**: Refined public documentation (2 files)
+- **Runtime**: Updated runtime internals (5 files)
+- **Skills**: Synced prompt-layer skills (4 files)
+- **Tests**: Updated automated coverage (2 files)
+
+### Plan Packages
+
+- `20260522_runtime_slimming_kernel_extraction` (active)
+
+## [2026-05-22.231627] - 2026-05-22
+
+### Summary
+
+- Updated 1 active plan package(s); Changes across: Runtime, Tests.
+
+### Changed
+
+- **Runtime**: Updated runtime internals (5 files)
+- **Tests**: Updated automated coverage (2 files)
+
+### Plan Packages
+
+- `20260522_runtime_slimming_kernel_extraction` (active)
+
 ## [2026-05-21.101226] - 2026-05-21
 
 ### Summary

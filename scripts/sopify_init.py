@@ -24,7 +24,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 _SOPIFY_SKILLS_DIR = ".sopify-skills"
 _SOPIFY_JSON_FILENAME = "sopify.json"
-_WORKSPACE_CAPABILITIES = ["preferences_preload", "runtime_gate"]
+_WORKSPACE_CAPABILITIES = ["runtime_gate"]
 
 _LOGO_LINES = [
     "███████╗ █████╗ ██████╗ ██╗███████╗██╗   ██╗",
@@ -40,7 +40,6 @@ _LOGO_RESET = "\033[0m"
 _MANAGED_IGNORE_BEGIN = "# BEGIN sopify-managed"
 _MANAGED_IGNORE_END = "# END sopify-managed"
 _MANAGED_IGNORE_ENTRIES = (
-    ".sopify-runtime/",
     ".sopify-skills/state/",
     ".sopify-skills/plan/_registry.yaml",
 )

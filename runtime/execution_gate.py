@@ -9,7 +9,9 @@ from typing import Any, Mapping
 
 from ._yaml import YamlParseError, load_yaml
 from .knowledge_sync import parse_knowledge_sync
-from .models import ClarificationState, DecisionState, ExecutionGate, PlanArtifact, RouteDecision, RuntimeConfig
+from sopify_contracts.artifacts import PlanArtifact
+from sopify_contracts.core import ExecutionGate, RouteDecision, RuntimeConfig
+from sopify_contracts.decision import ClarificationState, DecisionState
 
 _FRONT_MATTER_RE = re.compile(r"\A---\n(?P<front>.*?)\n---\n(?P<body>.*)\Z", re.DOTALL)
 _REQUIRED_METADATA_KEYS = (

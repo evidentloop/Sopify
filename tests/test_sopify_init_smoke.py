@@ -63,7 +63,6 @@ class SopifyInitSmokeTests(unittest.TestCase):
             content = gitignore.read_text(encoding="utf-8")
             self.assertIn("# BEGIN sopify-managed", content)
             self.assertIn("# END sopify-managed", content)
-            self.assertIn(".sopify-runtime/", content)
 
     def test_fresh_workspace_creates_copilot_instructions(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

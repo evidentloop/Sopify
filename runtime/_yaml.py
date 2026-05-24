@@ -1,15 +1,19 @@
-"""Minimal YAML loader for Sopify runtime.
+"""Minimal YAML loader and writer for Sopify runtime.
 
 This fallback parser intentionally supports only the subset used by
 `sopify.config.yaml` and simple skill front matter: nested mappings,
 lists, booleans, integers, strings, and comments.
+
+The writer (`dump_yaml`) produces deterministic YAML output for the same
+subset, used by the plan registry to serialize `_registry.yaml`.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 import re
-from typing import Any, List, Sequence, Tuple
+from typing import Any, List, Mapping, Sequence, Tuple
 
 
 class YamlParseError(ValueError):
@@ -262,3 +266,70 @@ def _parse_block_scalar(
     if not style.endswith("-"):
         text += "\n"
     return text, index
+
+
+# ---------------------------------------------------------------------------
+# YAML writer (deterministic subset used by plan_registry)
+# ---------------------------------------------------------------------------
+
+
+def dump_yaml(value: Any, *, indent: int = 0) -> list[str]:
+    """Serialize a value to YAML lines using the same subset the loader supports."""
+    prefix = " " * indent
+    if isinstance(value, Mapping):
+        lines: list[str] = []
+        for key, item in value.items():
+            key_text = str(key)
+            if is_yaml_scalar(item):
+                lines.append(f"{prefix}{key_text}: {yaml_scalar(item)}")
+            else:
+                lines.append(f"{prefix}{key_text}:")
+                lines.extend(dump_yaml(item, indent=indent + 2))
+        return lines
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+        lines = []
+        for item in value:
+            if isinstance(item, Mapping):
+                mapping_items = list(item.items())
+                if not mapping_items:
+                    lines.append(f"{prefix}- {{}}")
+                    continue
+                first_key, first_value = mapping_items[0]
+                if is_yaml_scalar(first_value):
+                    lines.append(f"{prefix}- {first_key}: {yaml_scalar(first_value)}")
+                else:
+                    lines.append(f"{prefix}- {first_key}:")
+                    lines.extend(dump_yaml(first_value, indent=indent + 4))
+                for key, value_item in mapping_items[1:]:
+                    child_prefix = " " * (indent + 2)
+                    if is_yaml_scalar(value_item):
+                        lines.append(f"{child_prefix}{key}: {yaml_scalar(value_item)}")
+                    else:
+                        lines.append(f"{child_prefix}{key}:")
+                        lines.extend(dump_yaml(value_item, indent=indent + 4))
+                continue
+            if is_yaml_scalar(item):
+                lines.append(f"{prefix}- {yaml_scalar(item)}")
+            else:
+                lines.append(f"{prefix}-")
+                lines.extend(dump_yaml(item, indent=indent + 2))
+        return lines
+    return [f"{prefix}{yaml_scalar(value)}"]
+
+
+def is_yaml_scalar(value: Any) -> bool:
+    """Return True for values that serialize as a single YAML token."""
+    return not isinstance(value, Mapping) and not (
+        isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray))
+    )
+
+
+def yaml_scalar(value: Any) -> str:
+    """Serialize a scalar value to its YAML text representation."""
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (int, float)):
+        return str(value)
+    return json.dumps(str(value), ensure_ascii=False)

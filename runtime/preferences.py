@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from .config import load_runtime_config
-from .models import RuntimeConfig
+from sopify_contracts.core import RuntimeConfig
 
 PreferencesPreloadStatus = Literal["loaded", "missing", "invalid", "read_error"]
 PREFERENCES_PRELOAD_STATUSES: tuple[PreferencesPreloadStatus, ...] = (

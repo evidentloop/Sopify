@@ -1,33 +1,6 @@
 """Sopify runtime package."""
 
-from .engine import run_runtime
-from .models import (
-    PlanArtifact,
-    RecoveredContext,
-    RouteDecision,
-    RunState,
-    RuntimeConfig,
-    RuntimeResult,
-    SkillActivation,
-    SkillMeta,
-)
-from .output import render_runtime_error, render_runtime_output
-from .preferences import PreferencesPreloadResult, preload_preferences, preload_preferences_for_workspace, resolve_preferences_path
-
-__all__ = [
-    "PlanArtifact",
-    "PreferencesPreloadResult",
-    "RecoveredContext",
-    "RouteDecision",
-    "RunState",
-    "RuntimeConfig",
-    "RuntimeResult",
-    "SkillActivation",
-    "SkillMeta",
-    "preload_preferences",
-    "preload_preferences_for_workspace",
-    "render_runtime_error",
-    "render_runtime_output",
-    "resolve_preferences_path",
-    "run_runtime",
-]
+# Kernel-only re-exports.  Heavy legacy imports (engine, models,
+# output, preferences) removed during runtime-slimming S4.
+# Consumers that previously used ``from runtime import RuntimeConfig``
+# should import from ``sopify_contracts`` directly.

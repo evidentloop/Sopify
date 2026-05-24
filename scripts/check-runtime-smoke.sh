@@ -8,7 +8,7 @@ usage() {
 Usage: scripts/check-runtime-smoke.sh
 
 Run a minimal zero-config smoke test against the current Sopify runtime bundle.
-This script works both in the repository root and inside a vendored .sopify-runtime/ bundle.
+This script works both in the repository root and inside a vendored runtime bundle.
 It validates bundle/runtime asset integrity, not first-hop host ingress ordering.
 EOF
 }
@@ -88,9 +88,6 @@ PLAN_DIR="$WORK_DIR/.sopify-skills/plan"
 STATE_FILE="$WORK_DIR/.sopify-skills/state/current_plan.json"
 HANDOFF_FILE="$WORK_DIR/.sopify-skills/state/current_handoff.json"
 GATE_RECEIPT_FILE="$WORK_DIR/.sopify-skills/state/current_gate_receipt.json"
-CLARIFICATION_BRIDGE_ENTRY="$BUNDLE_ROOT/scripts/clarification_bridge_runtime.py"
-DECISION_BRIDGE_ENTRY="$BUNDLE_ROOT/scripts/decision_bridge_runtime.py"
-DEVELOP_CALLBACK_ENTRY="$BUNDLE_ROOT/scripts/develop_callback_runtime.py"
 PROJECT_FILE="$WORK_DIR/.sopify-skills/project.md"
 BLUEPRINT_INDEX="$WORK_DIR/.sopify-skills/blueprint/README.md"
 BLUEPRINT_BACKGROUND="$WORK_DIR/.sopify-skills/blueprint/background.md"
@@ -99,8 +96,7 @@ BLUEPRINT_TASKS="$WORK_DIR/.sopify-skills/blueprint/tasks.md"
 PREFERENCES_FILE="$WORK_DIR/.sopify-skills/user/preferences.md"
 HISTORY_INDEX="$WORK_DIR/.sopify-skills/history/index.md"
 WIKI_OVERVIEW="$WORK_DIR/.sopify-skills/wiki/overview.md"
-WORKSPACE_STUB_MANIFEST="$WORK_DIR/.sopify-runtime/manifest.json"
-SOPIFY_JSON="$WORK_DIR/.sopify-skills/sopify.json"
+WORKSPACE_STUB_MANIFEST="$WORK_DIR/.sopify-skills/sopify.json"
 
 if [[ ! -d "$PLAN_DIR" ]]; then
   echo "Smoke check failed: missing plan directory: $PLAN_DIR" >&2
@@ -124,21 +120,6 @@ fi
 
 if ! grep -q '"entry_guard"' "$HANDOFF_FILE"; then
   echo "Smoke check failed: handoff is missing entry_guard contract: $HANDOFF_FILE" >&2
-  exit 1
-fi
-
-if [[ ! -f "$CLARIFICATION_BRIDGE_ENTRY" ]]; then
-  echo "Smoke check failed: missing clarification bridge helper: $CLARIFICATION_BRIDGE_ENTRY" >&2
-  exit 1
-fi
-
-if [[ ! -f "$DECISION_BRIDGE_ENTRY" ]]; then
-  echo "Smoke check failed: missing decision bridge helper: $DECISION_BRIDGE_ENTRY" >&2
-  exit 1
-fi
-
-if [[ ! -f "$DEVELOP_CALLBACK_ENTRY" ]]; then
-  echo "Smoke check failed: missing develop callback helper: $DEVELOP_CALLBACK_ENTRY" >&2
   exit 1
 fi
 
@@ -193,21 +174,6 @@ if [[ ! -f "$WORKSPACE_STUB_MANIFEST" ]]; then
   exit 1
 fi
 
-if [[ ! -f "$SOPIFY_JSON" ]]; then
-  echo "Smoke check failed: missing sopify.json activation marker: $SOPIFY_JSON" >&2
-  exit 1
-fi
-
-if ! grep -q '"schema_version"' "$SOPIFY_JSON"; then
-  echo "Smoke check failed: sopify.json is missing schema_version: $SOPIFY_JSON" >&2
-  exit 1
-fi
-
-if ! grep -q '"stub_version": "1"' "$WORKSPACE_STUB_MANIFEST"; then
-  echo "Smoke check failed: workspace stub is missing stub_version: $WORKSPACE_STUB_MANIFEST" >&2
-  exit 1
-fi
-
 if grep -q '"runtime_gate_entry":' "$WORKSPACE_STUB_MANIFEST"; then
   echo "Smoke check failed: workspace stub unexpectedly carries runtime_gate_entry: $WORKSPACE_STUB_MANIFEST" >&2
   exit 1
@@ -250,12 +216,6 @@ fi
 
 if [[ "$GATE_OUTPUT" != *'"runtime_gate_entry": "scripts/runtime_gate.py"'* ]]; then
   echo "Smoke check failed: runtime gate did not project runtime_gate_entry from the selected bundle." >&2
-  printf '%s\n' "$GATE_OUTPUT" >&2
-  exit 1
-fi
-
-if [[ "$GATE_OUTPUT" != *'"preferences_preload_entry": "scripts/preferences_preload_runtime.py"'* ]]; then
-  echo "Smoke check failed: runtime gate did not project preferences_preload_entry from the selected bundle." >&2
   printf '%s\n' "$GATE_OUTPUT" >&2
   exit 1
 fi

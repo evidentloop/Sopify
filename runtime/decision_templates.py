@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .models import (
+from sopify_contracts.decision import (
     DecisionCheckpoint,
     DecisionCondition,
     DecisionField,

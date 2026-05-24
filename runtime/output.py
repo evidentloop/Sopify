@@ -8,7 +8,7 @@ import sys
 from .clarification import CURRENT_CLARIFICATION_RELATIVE_PATH
 from .decision import CURRENT_DECISION_RELATIVE_PATH
 from .handoff import CURRENT_HANDOFF_RELATIVE_PATH
-from .models import RuntimeResult
+from sopify_contracts.handoff import RuntimeResult
 from .plan_registry import extract_priority_note_event
 
 _PHASE_LABELS = {

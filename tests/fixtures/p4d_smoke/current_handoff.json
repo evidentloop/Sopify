@@ -6,7 +6,6 @@
   "plan_path": ".sopify-skills/plan/20260519_p4d_copilot_cli_pilot",
   "handoff_kind": "decision_checkpoint",
   "required_host_action": "confirm_decision",
-  "recommended_skill_ids": ["analyze"],
   "artifacts": {
     "decision_checkpoint": {
       "decision_id": "d-shadow-writer-scope",

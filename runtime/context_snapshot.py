@@ -10,15 +10,10 @@ from typing import Any, Mapping
 from uuid import uuid4
 
 from canonical_writer._resume import develop_resume_context_issue
-from .models import (
-    ClarificationState,
-    DecisionState,
-    PlanArtifact,
-    RouteDecision,
-    RunState,
-    RuntimeConfig,
-    RuntimeHandoff,
-)
+from sopify_contracts.artifacts import PlanArtifact
+from sopify_contracts.core import RouteDecision, RunState, RuntimeConfig
+from sopify_contracts.decision import ClarificationState, DecisionState
+from sopify_contracts.handoff import RuntimeHandoff
 from canonical_writer import StateStore
 from canonical_writer.invariants import is_supported_phase
 
@@ -971,3 +966,44 @@ def _freeze_mapping(value: Mapping[str, Any]) -> Mapping[str, Any]:
         else:
             frozen[str(key)] = item
     return MappingProxyType(frozen)
+
+
+# -- Snapshot query helpers (consolidated from engine.py / _kernel_turn.py) ----
+
+GLOBAL_EXECUTION_ROUTES = frozenset({"resume_active", "exec_plan", "archive_lifecycle"})
+PROMOTABLE_REVIEW_STAGES = frozenset({"plan_generated", "ready_for_execution", "develop_pending"})
+
+
+def snapshot_has_global_execution_truth(snapshot: ContextResolvedSnapshot | None) -> bool:
+    if snapshot is None:
+        return False
+    return snapshot.preferred_state_scope == "global" and snapshot.execution_active_run is not None
+
+
+def snapshot_global_execution_run(snapshot: ContextResolvedSnapshot | None) -> RunState | None:
+    if not snapshot_has_global_execution_truth(snapshot):
+        return None
+    return snapshot.execution_active_run
+
+
+def snapshot_review_run(snapshot: ContextResolvedSnapshot | None) -> RunState | None:
+    if snapshot is None or snapshot.current_run is None:
+        return None
+    global_run = snapshot_global_execution_run(snapshot)
+    if global_run is not None and snapshot.current_run == global_run:
+        return None
+    return snapshot.current_run
+
+
+def recovery_store_for_route(
+    decision: RouteDecision,
+    *,
+    review_store: StateStore,
+    global_store: StateStore,
+    snapshot: ContextResolvedSnapshot | None = None,
+) -> StateStore:
+    if decision.route_name == "state_conflict" and snapshot is not None and snapshot.preferred_state_scope == "global":
+        return global_store
+    if decision.route_name in GLOBAL_EXECUTION_ROUTES and snapshot_has_global_execution_truth(snapshot):
+        return global_store
+    return review_store

@@ -10,32 +10,22 @@ from tempfile import NamedTemporaryFile
 from typing import Any, Mapping
 
 from .builtin_catalog import load_builtin_skills
-from canonical_writer._resume import DEVELOP_RESUME_AFTER_ACTIONS, DEVELOP_RESUME_CONTEXT_REQUIRED_FIELDS
 from .entry_guard import (
     DEFAULT_RUNTIME_ENTRY as ENTRY_GUARD_DEFAULT_ENTRY,
     ENTRY_GUARD_BYPASS_BLOCKED_COMMANDS,
-    ENTRY_GUARD_DEVELOP_CALLBACK_REASON_CODE,
     ENTRY_GUARD_PENDING_ACTIONS,
     ENTRY_GUARD_REASON_CODES,
-    PLAN_ONLY_HELPER_ENTRY as ENTRY_GUARD_PLAN_ONLY_HELPER_ENTRY,
 )
 from .clarification import CURRENT_CLARIFICATION_RELATIVE_PATH
 from .decision import CURRENT_DECISION_RELATIVE_PATH
 from .handoff import CURRENT_HANDOFF_RELATIVE_PATH
 from .knowledge_layout import CONTEXT_PROFILES, KB_LAYOUT_VERSION, KNOWLEDGE_PATHS
-from .preferences import PREFERENCES_PRELOAD_STATUSES
 from .router import SUPPORTED_ROUTE_NAMES, build_runtime_first_hints
 from canonical_writer import iso_now
 
 MANIFEST_SCHEMA_VERSION = "1"
 DEFAULT_MANIFEST_FILENAME = "manifest.json"
 DEFAULT_ENTRY = ENTRY_GUARD_DEFAULT_ENTRY
-PLAN_ONLY_ENTRY = ENTRY_GUARD_PLAN_ONLY_HELPER_ENTRY
-DECISION_BRIDGE_ENTRY = "scripts/decision_bridge_runtime.py"
-CLARIFICATION_BRIDGE_ENTRY = "scripts/clarification_bridge_runtime.py"
-DEVELOP_CALLBACK_ENTRY = "scripts/develop_callback_runtime.py"
-PLAN_REGISTRY_ENTRY = "scripts/plan_registry_runtime.py"
-PREFERENCES_PRELOAD_ENTRY = "scripts/preferences_preload_runtime.py"
 RUNTIME_GATE_ENTRY = "scripts/runtime_gate.py"
 _SOPIFY_VERSION_RE = re.compile(r"^<!--\s*SOPIFY_VERSION:\s*(?P<version>.+?)\s*-->$", re.MULTILINE)
 _CHANGELOG_VERSION_RE = re.compile(r"^## \[(?P<version>[^\]]+)\]", re.MULTILINE)
@@ -58,7 +48,6 @@ class BundleManifest:
         knowledge_paths: Mapping[str, str],
         context_profiles: Mapping[str, tuple[str, ...] | list[str]],
         default_entry: str,
-        plan_only_entry: str,
         supported_routes: tuple[str, ...],
         builtin_skills: tuple[Mapping[str, Any], ...],
         handoff_file: str,
@@ -74,7 +63,6 @@ class BundleManifest:
         self.knowledge_paths = dict(knowledge_paths)
         self.context_profiles = {name: tuple(entries) for name, entries in context_profiles.items()}
         self.default_entry = default_entry
-        self.plan_only_entry = plan_only_entry
         self.supported_routes = supported_routes
         self.builtin_skills = builtin_skills
         self.handoff_file = handoff_file
@@ -92,7 +80,6 @@ class BundleManifest:
             "knowledge_paths": dict(self.knowledge_paths),
             "context_profiles": {name: list(entries) for name, entries in self.context_profiles.items()},
             "default_entry": self.default_entry,
-            "plan_only_entry": self.plan_only_entry,
             "supported_routes": list(self.supported_routes),
             "builtin_skills": [dict(skill) for skill in self.builtin_skills],
             "handoff_file": self.handoff_file,
@@ -131,7 +118,6 @@ def build_bundle_manifest(
         knowledge_paths=_knowledge_paths(),
         context_profiles=_context_profiles(),
         default_entry=DEFAULT_ENTRY,
-        plan_only_entry=PLAN_ONLY_ENTRY,
         supported_routes=SUPPORTED_ROUTE_NAMES,
         builtin_skills=builtin_skills,
         handoff_file=CURRENT_HANDOFF_RELATIVE_PATH,
@@ -148,16 +134,10 @@ def build_bundle_manifest(
             "plan_scaffold": True,
             "kb_bootstrap": True,
             "decision_checkpoint": True,
-            "decision_bridge": True,
             "clarification_checkpoint": True,
-            "clarification_bridge": True,
-            "develop_callback": True,
-            "develop_quality_feedback": True,
-            "develop_resume_context": True,
             "execution_gate": True,
             "plan_registry": True,
             "plan_registry_priority_confirm": True,
-            "planning_mode_orchestrator": True,
             "preferences_preload": True,
             "runtime_gate": True,
             "runtime_entry_guard": True,
@@ -186,16 +166,13 @@ def build_bundle_manifest(
             ],
             "host_bridge_status": {
                 "develop": "required",
-                "develop_callback": "required",
             },
             "entry_guard": {
                 "strict_runtime_entry": True,
                 "default_runtime_entry": DEFAULT_ENTRY,
-                "plan_only_helper_entry": PLAN_ONLY_ENTRY,
                 "pending_checkpoint_actions": list(ENTRY_GUARD_PENDING_ACTIONS),
                 "bypass_blocked_commands": list(ENTRY_GUARD_BYPASS_BLOCKED_COMMANDS),
                 "reason_codes": dict(ENTRY_GUARD_REASON_CODES),
-                "develop_callback_reason_code": ENTRY_GUARD_DEVELOP_CALLBACK_REASON_CODE,
             },
             "runtime_payload_required_skill_ids": [],
             "session_state": {
@@ -207,101 +184,6 @@ def build_bundle_manifest(
             },
             "clarification_file": CURRENT_CLARIFICATION_RELATIVE_PATH,
             "decision_file": CURRENT_DECISION_RELATIVE_PATH,
-            "clarification_bridge_entry": CLARIFICATION_BRIDGE_ENTRY,
-            "clarification_bridge_hosts": {
-                "cli": {
-                    "preferred_mode": "interactive_form",
-                    "fallback_renderer": "text",
-                    "input": "line_prompt",
-                    "textarea": "multiline_text",
-                },
-            },
-            "decision_bridge_entry": DECISION_BRIDGE_ENTRY,
-            "decision_bridge_hosts": {
-                "cli": {
-                    "preferred_mode": "interactive_form",
-                    "fallback_renderer": "text",
-                    "select": "interactive_select",
-                    "multi_select": "interactive_multi_select",
-                    "confirm": "interactive_confirm",
-                    "input": "line_prompt",
-                    "textarea": "multiline_text",
-                },
-            },
-            "develop_callback_entry": DEVELOP_CALLBACK_ENTRY,
-            "develop_callback_hosts": {
-                "cli": {
-                    "preferred_mode": "structured_callback",
-                    "inspect": "json_contract",
-                    "submit": "json_payload",
-                    "submit_quality": "json_payload",
-                },
-            },
-            "develop_resume_context_required_fields": list(DEVELOP_RESUME_CONTEXT_REQUIRED_FIELDS),
-            "develop_resume_after_actions": list(DEVELOP_RESUME_AFTER_ACTIONS),
-            "develop_quality_contract_version": "1",
-            "plan_registry_entry": PLAN_REGISTRY_ENTRY,
-            "plan_registry_hosts": {
-                "cli": {
-                    "preferred_mode": "inspect_only_summary",
-                    "trigger_points": [
-                        "post_plan_review",
-                        "manual_plan_registry_review",
-                    ],
-                    "mount_scope": "review_only",
-                    "blocked_scopes": [
-                        "develop",
-                        "execute",
-                    ],
-                    "inspect": "json_contract",
-                    "confirm_priority": "json_payload",
-                    "confirm_priority_trigger": "explicit_user_action",
-                    "default_surface": "inspect_contract",
-                    "display_fields": [
-                        "current_plan",
-                        "selected_plan",
-                        "recommendations",
-                        "drift_notice",
-                        "execution_truth",
-                    ],
-                    "allowed_actions": [
-                        "confirm_suggested",
-                        "set_p1",
-                        "set_p2",
-                        "set_p3",
-                        "dismiss",
-                    ],
-                    "note_optional": True,
-                    "confirm_payload_fields": [
-                        "plan_id",
-                        "priority",
-                        "note",
-                    ],
-                    "success_behavior": {
-                        "refresh_scope": "selected_card",
-                        "stay_in_context": "review",
-                        "auto_execute": False,
-                        "auto_switch_current_plan": False,
-                    },
-                    "failure_behavior": {
-                        "inspect_failure": "hide_card_non_blocking",
-                        "confirm_failure": "show_retryable_error",
-                    },
-                    "copy": {
-                        "title": "Plan 优先级建议",
-                        "summary": "当前 active plan、当前评审 plan 与建议优先级",
-                        "boundary_notice": "确认优先级只会更新 registry，不会切换 current_plan",
-                        "success_notice": "已记录到 plan registry",
-                        "pending_notice": "已保留系统建议，暂未写入最终优先级",
-                    },
-                    "raw_registry_visibility": "advanced_only",
-                    "execution_truth": "current_plan",
-                    "observe_only": True,
-                },
-            },
-            "preferences_preload_entry": PREFERENCES_PRELOAD_ENTRY,
-            "preferences_preload_contract_version": "1",
-            "preferences_preload_statuses": list(PREFERENCES_PRELOAD_STATUSES),
             "runtime_gate_entry": RUNTIME_GATE_ENTRY,
             "runtime_gate_contract_version": "1",
             "runtime_gate_allowed_response_modes": [
