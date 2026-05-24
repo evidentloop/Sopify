@@ -270,7 +270,7 @@ archive_ready: false
   > 目标: 把 router 的主请求入口协议与 checkpoint 回复协议拆开，结束两类语义长期混跑
   > ingress 终态: 普通 host request 优先只吃 ActionProposal，不再依赖 `_CONTINUE_KEYWORDS` / `_CANCEL_KEYWORDS` 这类自由文本猜测
   > checkpoint 终态: clarification / decision 继续保留轻量自然语言回复解析，只负责 `继续` / `取消` / `choose` / answer 这类 checkpoint reply
-  > 直接收益: router 从"富文本分类器"收敛成"主入口控制层 + checkpoint 回复层"两块，后续才能继续清 candidate_skill_ids / recommended_skill_ids 等局部语境
+  > 直接收益: router 从"富文本分类器"收敛成"主入口控制层 + checkpoint 回复层"两块，后续才能继续清 candidate_skill_ids 链和宿主面遗留 skill contract
   > 联动面: router.py / gate.py / _kernel_turn.py / action_intent.py / clarification.py / decision.py / handoff.py + 对应 tests
   > engine 关联: 顺手收掉 engine ingress 薄层（`_derive_route_from_authorized_proposal`），不扩散到 planning / checkpoint resume 主块
   > kernel extraction 遗留债: `_make_run_id` / `_make_run_state` / `_snapshot_has_global_execution_truth` 目前在 engine.py 与 _kernel_turn.py 双份；本题开始前先消重，避免后续双边修改分叉
@@ -280,20 +280,30 @@ archive_ready: false
   > - _enter_active_develop_context 白盒化: 原端到端 run_runtime("继续") 改为手工拼 RunState + RuntimeHandoff + stamp_handoff_resolution_id。不再覆盖 resume → develop_pending → handoff 端到端路径。测试形态债，不阻塞 6.3-6.5。
   > - exec_plan → handoff 缺口: exec_plan route 不产生 RuntimeHandoff（result.handoff is None），3 个测试删掉了 handoff 断言。预存问题，deferred to 6.6。
   > - router-side derive focused test: ✅ 已补 6 个正向测试 (DeriveRouteTests in test_runtime_router.py)，覆盖 cancel_flow session/global scope + checkpoint_response pending/terminal/empty。
-- [ ] 6.3 **recommended_skill_ids contract 裁定** (难度: 低，纯决策)
-  > 前置于 6.4 实现。三选一:
-  > - 保留 recommended_skill_ids，把动态发现改成静态推荐
-  > - 保留字段但降级为空/弱语义
-  > - 连字段一起从 handoff contract 里删除
-  > 证据面: blueprint/protocol.md:410 明文说宿主要消费 recommended_skill_ids
-  > 裁定不先定，后面做的全是假动作
-- [ ] 6.4 **skill discovery 退场** (难度: 中，依赖 6.3 裁定)
-  > 范围: skill_registry.py (255) + skill_resolver.py (111) + skill_schema.py (140) = ~506 LOC
-  > 联动: builtin_catalog.py (267 LOC) 被 manifest.py:12 直接依赖，不可随 skill_registry 一起删
-  > engine.py:61,71 也消费 skill_resolver/skill_registry，non-kernel handler path 需同步处理
-  > candidate_skill_ids 是 CheckpointRequest dataclass 字段 (checkpoint_request.py:60)，序列化进 current_decision.json / current_clarification.json — 这是 contract surface
-  > 如果 6.3 裁定保留字段: 删 skill_registry/resolver/schema，router + _kernel_turn + engine 改为静态 tuple
-  > 如果 6.3 裁定不保留字段: 整条链 + handoff/checkpoint contract 一起退场，范围更大
+- [x] 6.3 **recommended_skill_ids contract 裁定** (难度: 低，纯决策) ✅ 裁定完成
+  > **裁定结果: C1 — 删除 recommended_skill_ids + 改 protocol**
+  > 关键证据:
+  > - 宿主文档（COPILOT.md、full.md、lightweight.md）接续逻辑 100% 靠 required_host_action，零处消费 recommended_skill_ids
+  > - runtime 内部 recommended_skill_ids 只透传不做决策
+  > - protocol.md:410 已同步修改：宿主接续依据收口为 required_host_action + artifacts + machine truth
+  > 对 6.4 的指令:
+  > - 删 RuntimeHandoff.recommended_skill_ids 字段
+  > - 删 skill_registry.py / skill_resolver.py / skill_schema.py
+  > - candidate_skill_ids 保留为内部字段（checkpoint materializer 恢复链需要），不再往宿主面扩散
+- [ ] 6.4 **skill discovery 退场 + recommended_skill_ids 删除** (难度: 中，承接 6.3 裁定 C1)
+  > 删除范围:
+  > - skill_registry.py (255) + skill_resolver.py (111) + skill_schema.py (140) = ~506 LOC 全删
+  > - RuntimeHandoff.recommended_skill_ids 字段删除（sopify_contracts/handoff.py）
+  > - handoff.py:143 的 recommended_skill_ids 透传删除
+  > - _kernel_turn.py:151 / engine.py:537 的 recommended_skill_ids 搬运删除
+  > - protocol.md:410 宿主接续依据改写
+  > - tests/fixtures/p4d_smoke/current_handoff.json 删除 recommended_skill_ids 字段
+  > 保留范围:
+  > - builtin_catalog.py (267 LOC) 被 manifest.py:12 直接依赖，不可随 skill_registry 一起删
+  > - candidate_skill_ids 保留为内部字段（checkpoint materializer 恢复链需要）
+  > - Router/derive 里的 candidate_skill_ids 改为硬编码静态 tuple（已经事实静态化，只去掉 resolve 调用壳）
+  > SkillRegistry.discover() 调用点退场: router.py / _kernel_turn.py / engine.py / tests
+  > 一并清理: _ACTION_KEYWORDS / _ARCHITECTURE_KEYWORDS 及其对应的普通 ingress heuristics；checkpoint local reply grammar 不在此删
 - [ ] 6.5 **plan_registry 结构重构审计** (难度: 最高)
   > 范围: plan_registry.py (1,013 LOC) + plan_scaffold.py (464 LOC, blocked by engine.py)
   > 消费者: engine.py:47 (5 符号) + archive_lifecycle.py:18 + output.py:12 + plan_scaffold.py:17

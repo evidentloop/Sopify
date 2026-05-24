@@ -407,7 +407,7 @@ ExecutionAuthorizationReceipt 是 execute_existing_plan 授权通过后生成的
 
 ### 8.2 Post-Run Handoff 消费
 
-runtime 执行后，若 `.sopify-skills/state/current_handoff.json` 存在，宿主必须优先按其中的 `required_host_action`、`recommended_skill_ids`、`artifacts` 决定下一步。渲染层 `Next:` 行仅为人类摘要，不作为唯一机器依据。
+runtime 执行后，若 `.sopify-skills/state/current_handoff.json` 存在，宿主必须优先按其中的 `required_host_action`、`artifacts` 及当前 `current_*` machine truth 决定下一步。渲染层 `Next:` 行仅为人类摘要，不作为唯一机器依据。
 
 > **Mainline-only 解释**：宿主的最小接续主链是 `gate → current_* machine truth → handoff → host consume rule`。`route` 是 runtime 内部分流实现；`checkpoint` 只在 clarification / decision 暂停时出现，是主链分叉，不是每轮必经步骤。宿主需要稳定消费的是 gate/handoff/state contract，而不是 runtime 内部模块划分。
 
