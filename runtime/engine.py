@@ -6,21 +6,16 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 import re
 from typing import Any, Mapping, Optional
-from uuid import uuid4
-
 from .checkpoint_materializer import materialize_checkpoint_request
 from .checkpoint_request import checkpoint_request_from_clarification_state, checkpoint_request_from_decision_state
 from .clarification import build_clarification_state, has_submitted_clarification, merge_clarification_request, parse_clarification_response, stale_clarification
 from .config import load_runtime_config
 from .context_snapshot import (
     ContextResolvedSnapshot,
-    GLOBAL_EXECUTION_ROUTES,
-    PROMOTABLE_REVIEW_STAGES,
     resolve_context_snapshot,
     snapshot_has_global_execution_truth,
     snapshot_review_run,
 )
-from .context_recovery import recover_context
 from .decision import (
     ACTIVE_PLAN_ATTACH_OPTION_ID,
     ACTIVE_PLAN_BINDING_DECISION_TYPE,
@@ -49,7 +44,7 @@ from .kb import bootstrap_kb, ensure_blueprint_index, ensure_blueprint_scaffold
 from sopify_contracts.artifacts import KbArtifact, PlanArtifact
 from sopify_contracts.core import ExecutionGate, RouteDecision, RunState, RuntimeConfig, SkillMeta
 from sopify_contracts.decision import ClarificationState, DecisionState
-from sopify_contracts.handoff import RecoveredContext, RuntimeHandoff, RuntimeResult, SkillActivation
+from sopify_contracts.handoff import RuntimeHandoff, RuntimeResult, SkillActivation
 from .plan_registry import (
     PlanRegistryError,
     encode_priority_note_event,
@@ -92,7 +87,6 @@ _CURRENT_PLAN_ANCHOR_PATTERNS = (
     re.compile(r"(继续|回到|基于|沿用|挂到|并入|写进|写入).*(plan|方案)", re.IGNORECASE),
 )
 _HOST_FACING_TRUTH_KIND_ENGINE_RUNTIME_HANDOFF = "engine_runtime_handoff"
-_HOST_FACING_TRUTH_KIND_PROMOTION_GLOBAL_EXECUTION = "promotion_global_execution"
 _ABORTABLE_CLARIFICATION_STATUSES = frozenset({"pending", "collecting"})
 _ABORTABLE_DECISION_STATUSES = frozenset({"pending", "collecting", "cancelled", "timed_out"})
 
@@ -318,101 +312,6 @@ def _normalize_run_after_abort(current_run: RunState) -> RunState:
     )
 
 
-def _is_zero_write_conflict_inspect(route: RouteDecision) -> bool:
-    # Conflict inspection is intentionally observational. Keep it out of
-    # last_route.json as well so "inspect" does not mutate any state file.
-    return route.route_name == "state_conflict" and route.active_run_action != "abort_conflict"
-
-
-def _resolve_execution_state_store(
-    decision: RouteDecision,
-    *,
-    config: RuntimeConfig,
-    review_store: StateStore,
-    global_store: StateStore,
-    recovered_context: RecoveredContext,
-    session_id: str | None,
-) -> tuple[StateStore, Any, list[str]]:
-    global_execution_context = recover_context(
-        decision,
-        config=config,
-        state_store=global_store,
-        global_state_store=global_store,
-    )
-    if global_execution_context.current_run is not None and global_execution_context.current_plan is not None:
-        # Re-resolve against the global store alone so execution routes only see
-        # the single global execution truth instead of the mixed review/global
-        # composite snapshot used at the router boundary.
-        return (global_store, global_execution_context, [])
-
-    promoted, promotion_notes = _promote_review_state_to_global_execution(
-        review_store=review_store,
-        global_store=global_store,
-        review_plan=recovered_context.current_plan,
-        review_run=recovered_context.current_run,
-        review_handoff=recovered_context.current_handoff,
-        existing_global_run=global_execution_context.current_run,
-        session_id=session_id,
-        resolution_id=recovered_context.resolution_id,
-    )
-    recovery_store = global_store if promoted else review_store
-    recovered = recover_context(
-        decision,
-        config=config,
-        state_store=recovery_store,
-        global_state_store=global_store,
-    )
-    return (recovery_store, recovered, promotion_notes)
-
-
-def _promote_review_state_to_global_execution(
-    *,
-    review_store: StateStore,
-    global_store: StateStore,
-    review_plan: PlanArtifact | None,
-    review_run: RunState | None,
-    review_handoff: RuntimeHandoff | None,
-    existing_global_run: RunState | None,
-    session_id: str | None,
-    resolution_id: str,
-) -> tuple[bool, list[str]]:
-    if review_store is global_store:
-        return (False, [])
-    if review_plan is None or review_run is None:
-        return (False, [])
-    if review_run.stage not in PROMOTABLE_REVIEW_STAGES:
-        return (False, [])
-
-    notes: list[str] = []
-    owner_warning = _soft_execution_ownership_warning(existing_global_run=existing_global_run, session_id=session_id)
-    if owner_warning is not None:
-        notes.append(owner_warning)
-
-    # Promotion is the explicit handoff point from session review state into the
-    # single global execution truth used by execution-confirm / resume / archive lifecycle.
-    global_store.set_current_plan(review_plan)
-    global_run = _with_global_run_ownership(review_run, session_id=session_id)
-    if review_handoff is not None:
-        global_run, _ = global_store.set_host_facing_truth(
-            run_state=global_run,
-            handoff=_with_global_handoff_ownership(
-                review_handoff,
-                current_run=global_run,
-                session_id=session_id,
-            ),
-            resolution_id=_derived_resolution_id(
-                resolved_resolution_id=resolution_id,
-                current_run=global_run,
-                current_handoff=review_handoff,
-            ),
-            truth_kind=_HOST_FACING_TRUTH_KIND_PROMOTION_GLOBAL_EXECUTION,
-        )
-    else:
-        global_store.set_current_run(global_run)
-    notes.append(f"Promoted session review state to global execution truth from {review_store.root.name}")
-    return (True, notes)
-
-
 def _soft_execution_ownership_warning(
     *,
     existing_global_run: RunState | None,
@@ -506,70 +405,6 @@ def _with_global_run_ownership(run_state: RunState, *, session_id: str | None) -
     )
 
 
-def _with_global_handoff_ownership(
-    handoff: RuntimeHandoff,
-    *,
-    current_run: RunState | None,
-    session_id: str | None,
-) -> RuntimeHandoff:
-    observability = dict(handoff.observability)
-    owner_session_id = ""
-    if current_run is not None:
-        owner_session_id = current_run.owner_session_id
-    if not owner_session_id:
-        owner_session_id = str(session_id or "").strip()
-    if owner_session_id:
-        observability["owner_session_id"] = owner_session_id
-    if current_run is not None:
-        if current_run.owner_host:
-            observability["owner_host"] = current_run.owner_host
-        if current_run.owner_run_id:
-            observability["owner_run_id"] = current_run.owner_run_id
-    return RuntimeHandoff(
-        schema_version=handoff.schema_version,
-        route_name=handoff.route_name,
-        run_id=handoff.run_id,
-        plan_id=handoff.plan_id,
-        plan_path=handoff.plan_path,
-        handoff_kind=handoff.handoff_kind,
-        required_host_action=handoff.required_host_action,
-        artifacts=handoff.artifacts,
-        notes=handoff.notes,
-        observability=observability,
-        resolution_id=handoff.resolution_id,
-    )
-
-
-def _result_state_store_for_route(
-    decision: RouteDecision,
-    *,
-    review_store: StateStore,
-    global_store: StateStore,
-    canceled_store: StateStore | None,
-    preserved_review_after_cancel: bool = False,
-    current_clarification: ClarificationState | None = None,
-    current_decision: DecisionState | None = None,
-    snapshot: ContextResolvedSnapshot | None = None,
-) -> StateStore:
-    if canceled_store is not None:
-        if canceled_store is global_store and preserved_review_after_cancel:
-            return review_store
-        return canceled_store
-    if decision.route_name == "state_conflict" and snapshot is not None and snapshot.preferred_state_scope == "global":
-        return global_store
-    if decision.route_name in GLOBAL_EXECUTION_ROUTES:
-        return global_store
-    if decision.route_name in {"decision_pending", "decision_resume"}:
-        if current_decision is not None and current_decision.phase in {"execution_gate", "develop"}:
-            return global_store
-        return review_store
-    if decision.route_name in {"clarification_pending", "clarification_resume"}:
-        if current_clarification is not None and current_clarification.phase == "develop":
-            return global_store
-        return review_store
-    return review_store
-
-
 def run_runtime(
     user_input: str,
     *,
@@ -607,34 +442,6 @@ def _default_plan_level(decision: RouteDecision) -> str:
     return "standard"
 
 
-def _new_resolution_id() -> str:
-    return uuid4().hex
-
-
-def _derived_resolution_id(
-    *,
-    resolved_resolution_id: str = "",
-    current_run: RunState | None = None,
-    current_handoff: RuntimeHandoff | None = None,
-) -> str:
-    # Host-facing writes should reuse the resolution batch from the snapshot
-    # that produced the derived checkpoint truth whenever it is available.
-    for candidate in (
-        resolved_resolution_id,
-        current_run.resolution_id if current_run is not None else "",
-        current_handoff.resolution_id if current_handoff is not None else "",
-    ):
-        normalized = str(candidate or "").strip()
-        if normalized:
-            return normalized
-    return _new_resolution_id()
-
-
-def _with_route_artifacts(decision: RouteDecision, artifacts: Mapping[str, Any]) -> RouteDecision:
-    merged = {**dict(decision.artifacts), **dict(artifacts)}
-    return replace(decision, artifacts=merged)
-
-
 def _same_plan_artifact(left: PlanArtifact | None, right: PlanArtifact | None) -> bool:
     return left is not None and right is not None and left.plan_id == right.plan_id and left.path == right.path
 
@@ -650,14 +457,6 @@ def _archive_state_store_for_current_plan(
     if _same_plan_artifact(current_plan, review_store.get_current_plan()):
         return review_store
     return global_store
-
-
-def _pending_required_host_action(snapshot) -> str:
-    if snapshot.current_clarification is not None and snapshot.current_clarification.status in {"pending", "collecting"}:
-        return "answer_questions"
-    if snapshot.current_decision is not None and snapshot.current_decision.status in {"pending", "collecting", "confirmed", "cancelled", "timed_out"}:
-        return "confirm_decision"
-    return ""
 
 
 def _augment_generated_files(
@@ -1193,24 +992,6 @@ def _resume_from_active_plan_binding_decision(
     notes.extend(planning_notes)
     return (planning_route, plan_artifact, notes, kb_artifact, current_decision)
 
-
-
-def _exec_plan_unavailable_route(decision: RouteDecision, *, reason: str) -> RouteDecision:
-    return RouteDecision(
-        route_name="exec_plan",
-        request_text=decision.request_text,
-        reason=reason,
-        command=decision.command,
-        complexity=decision.complexity,
-        plan_level=decision.plan_level,
-        candidate_skill_ids=decision.candidate_skill_ids or ("develop",),
-        should_recover_context=True,
-        should_create_plan=False,
-        capture_mode=decision.capture_mode,
-        runtime_skill_id=None,
-        active_run_action="inspect_exec_recovery",
-        artifacts=decision.artifacts,
-    )
 
 
 def _clarification_pending_route(decision: RouteDecision, *, reason: str) -> RouteDecision:
