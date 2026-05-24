@@ -36,7 +36,7 @@ archive_ready: false
 | 1. 蓝图 delta 校验 | ✅ 完成 | 5 项审计全通过 |
 | 2. 当前消费者扫描 | ✅ 完成 | 4 类清单 + consumer 判定 |
 | 3. 删除就绪结论 | ✅ 完成 | kernel 边界锁定, 退场量级 ~38K LOC |
-| 4. 审计后删除 | ⚠️ 部分完成 | 4.1-4.5/4.6/4.7-4.10a/4.10c/4.10d ✅; **4.10b plan_scaffold + 4.11/4.12 + 4.13 installer 瘦身 未完成** |
+| 4. 审计后删除 | ⚠️ 部分完成 | 4.1-4.5/4.6/4.7-4.10a/4.10c/4.10d ✅; **4.13-A ✅, 4.13-B 代码完成待审批**; 4.10b plan_scaffold + 4.11/4.12 + 4.13 Phase B 未完成 |
 | 5. 文档更新 | ⚠️ 部分完成 | 5.2/5.3 ✅; **5.1/5.4-5.7 未完成** |
 | 6. contract 面清理 + engine 重构 | ✅ 完成 | 6.1-6.6 全部收完, −6,400+ LOC |
 
@@ -49,7 +49,7 @@ archive_ready: false
                                                        ↓
                                                6.1 → 6.2 → 6.3 → 6.4 → 6.5 → 6.6
                                                                                   ↓
-                                                                           → 后续: 4.10b / 4.13 / 5.x
+                                                              P4.6-A → 4.13-A → 4.13-B → 后续: 4.10b / 4.13-PhaseB / 5.x
 ```
 
 ## 1. 蓝图 delta 校验 ✅
@@ -403,10 +403,9 @@ archive_ready: false
 
 > **产品前提**: 项目级安装保留。瘦身方向不是删安装链，而是收过渡态为正式实现。
 >
-> **Phase A — 可直接执行 (无产品口径依赖)**:
-> - 停写 legacy workspace stub (.sopify-runtime/manifest.json)，收敛到单 marker (.sopify-skills/sopify.json)
-> - sync-runtime-assets.sh + installer/runtime_bundle.py 壳套壳重写为纯 Python
-> - 相关 installer/validate/bootstrap 回归验证
+> **Phase A — 代码完成，待审批**:
+> - ✅ 4.13-A: 停写 legacy workspace stub (.sopify-runtime/manifest.json)，收敛到单 marker (.sopify-skills/sopify.json) + stub 合同对齐 + 文档同步
+> - 🔲 4.13-B: sync-runtime-assets.sh 壳套壳重写为纯 Python + bundle contract 测试对齐 (代码完成，未 commit)
 >
 > **Phase B — 需先定义最小 contract (产品设计题)**:
 > - install smoke (check-install-payload-bundle-smoke.py) 最小 contract 重设计

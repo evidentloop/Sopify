@@ -10,6 +10,7 @@ from typing import Any, Mapping, Sequence
 
 from canonical_writer._time import iso_now as _iso_now
 from .checkpoint_request import (
+    CHECKPOINT_REASON_MISSING_BUT_TRADEOFF_DETECTED,
     checkpoint_request_from_clarification_state,
     checkpoint_request_from_decision_state,
     normalize_checkpoint_request,
@@ -21,6 +22,7 @@ from .deterministic_guard import (
     supports_deterministic_guard,
 )
 from .decision import CURRENT_DECISION_RELATIVE_PATH
+from .decision_policy import has_tradeoff_checkpoint_signal
 from .entry_guard import build_entry_guard_contract
 
 from sopify_contracts.artifacts import KbArtifact, PlanArtifact
@@ -290,6 +292,9 @@ def _collect_handoff_artifacts(
                 )
             except ValueError:
                 artifacts["checkpoint_request_error"] = "invalid_skill_checkpoint_request"
+        elif has_tradeoff_checkpoint_signal(skill_result):
+            artifacts["checkpoint_request_reason_code"] = CHECKPOINT_REASON_MISSING_BUT_TRADEOFF_DETECTED
+            artifacts["checkpoint_request_error"] = CHECKPOINT_REASON_MISSING_BUT_TRADEOFF_DETECTED
     if current_clarification is not None:
         artifacts["clarification_file"] = CURRENT_CLARIFICATION_RELATIVE_PATH
         artifacts["clarification_id"] = getattr(current_clarification, "clarification_id", None)

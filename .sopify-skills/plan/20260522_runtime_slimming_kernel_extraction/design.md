@@ -449,7 +449,7 @@ Step 4: 用等价覆盖测试守住 contract
 | ~~co-delete~~ **deleted (P4.6-A)** | `plan_registry_runtime.py` | 109 | legacy helper，已删 |
 | ~~co-delete~~ → **KEEP+SLIM (→ 4.13)** | `check-prompt-runtime-gate-smoke.py` | 369 | release gate 活跃依赖，项目级安装保留 |
 | **CUTOVER** | `check-runtime-smoke.sh` | 268 | ci.yml + release-preflight 活跃依赖 |
-| ~~co-delete~~ → **REWRITE (→ 4.13)** | `sync-runtime-assets.sh` | 137 | 壳套壳 (Python→bash→rsync)，能力保留实现重写 |
+| ~~co-delete~~ → ~~REWRITE~~ **deleted (4.13-B)** | `sync-runtime-assets.sh` | 137 | 壳套壳已重写为纯 Python (installer/runtime_bundle.py)，bash 脚本已删 |
 | ~~cutover~~ → **KEEP+SLIM (→ 4.13)** | `check-install-payload-bundle-smoke.py` | ~369 | release gate 活跃依赖，项目级安装保留 |
 | ~~cutover~~ **deleted (P4.6-A)** | `check-skill-eval-gate.py` | ~100 | eval gate 整组退场，已删 |
 | **cutover (release 联动)** | `generate-builtin-catalog.py` | ~100 | L17 直接 import runtime._yaml/runtime.skill_schema |
@@ -690,7 +690,7 @@ retain-after-decoupling 的已知耦合点：
 
 额外判定：
 
-1. `installer/runtime_bundle.py` ~~是 pure legacy runtime bundle surface，不属于 retain-after-decoupling，应在 runtime 退场时直接同步删除~~ → **REWRITE (→ 4.13)**: 产品决策项目级安装保留，壳套壳实现需重写为纯 Python，但能力本身保留
+1. `installer/runtime_bundle.py` ~~是 pure legacy runtime bundle surface，不属于 retain-after-decoupling，应在 runtime 退场时直接同步删除~~ → ~~REWRITE~~ **DONE (4.13-B)**: 壳套壳已重写为纯 Python (shutil.copytree + write_bundle_manifest)，bash 依赖已移除
 2. `scripts/sopify_status.py` / `scripts/sopify_doctor.py` 不列入独立解耦清单；它们只是 `installer/inspection.py` 的薄入口，变化应由 inspection cutover 吸收
 
 ### Step 2 Cutover 表（5 文件）

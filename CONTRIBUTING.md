@@ -28,8 +28,8 @@ Key constraints:
 Use these commands when you need maintainer-level control over the vendored runtime bundle:
 
 ```bash
-# Sync runtime assets into a target workspace
-bash scripts/sync-runtime-assets.sh /path/to/project
+# Sync runtime assets into a target workspace (maintainer command)
+python3 -c "from installer.runtime_bundle import sync_runtime_bundle; from pathlib import Path; sync_runtime_bundle(Path('.'), Path('/path/to/project'))"
 
 # Validate the raw input entry in the target workspace
 python3 /path/to/project/.sopify-runtime/scripts/sopify_runtime.py \
