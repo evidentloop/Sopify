@@ -231,7 +231,7 @@ class EngineIntegrationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
             run_runtime(
-                "~go plan payload 放 host root 还是 workspace/.sopify-runtime",
+                "~go plan payload 放 host root 还是 workspace/.sopify-skills",
                 workspace_root=workspace,
                 user_home=workspace / "home",
             )
@@ -1349,7 +1349,7 @@ class EngineIntegrationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
             run_runtime(
-                "~go plan payload 放 host root 还是 workspace/.sopify-runtime",
+                "~go plan payload 放 host root 还是 workspace/.sopify-skills",
                 workspace_root=workspace,
                 user_home=workspace / "home",
             )
@@ -1361,7 +1361,7 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertFalse((workspace / ".sopify-skills" / "state" / "current_decision.json").exists())
 
             run_runtime(
-                "~go plan payload 放 host root 还是 workspace/.sopify-runtime",
+                "~go plan payload 放 host root 还是 workspace/.sopify-skills",
                 workspace_root=workspace,
                 user_home=workspace / "home",
             )
@@ -1378,7 +1378,7 @@ class EngineIntegrationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
             run_runtime(
-                "~go plan payload 放 host root 还是 workspace/.sopify-runtime",
+                "~go plan payload 放 host root 还是 workspace/.sopify-skills",
                 workspace_root=workspace,
                 user_home=workspace / "home",
             )
@@ -1394,7 +1394,7 @@ class EngineIntegrationTests(unittest.TestCase):
             workspace = Path(temp_dir)
             state_root = workspace / ".sopify-skills" / "state"
             run_runtime(
-                "~go plan payload 放 host root 还是 workspace/.sopify-runtime",
+                "~go plan payload 放 host root 还是 workspace/.sopify-skills",
                 workspace_root=workspace,
                 user_home=workspace / "home",
             )
@@ -1419,7 +1419,7 @@ class EngineIntegrationTests(unittest.TestCase):
             workspace = Path(temp_dir)
             state_root = workspace / ".sopify-skills" / "state"
             run_runtime(
-                "~go plan payload 放 host root 还是 workspace/.sopify-runtime",
+                "~go plan payload 放 host root 还是 workspace/.sopify-skills",
                 workspace_root=workspace,
                 user_home=workspace / "home",
             )
@@ -1460,7 +1460,7 @@ class EngineIntegrationTests(unittest.TestCase):
             state_root = workspace / ".sopify-skills" / "state"
 
             run_runtime(
-                "~go plan payload 放 host root 还是 workspace/.sopify-runtime",
+                "~go plan payload 放 host root 还是 workspace/.sopify-skills",
                 workspace_root=workspace,
                 user_home=workspace / "home",
             )
@@ -2010,7 +2010,7 @@ class EngineIntegrationTests(unittest.TestCase):
             workspace = Path(temp_dir)
 
             result = run_runtime(
-                "~go plan payload 放 host root 还是 workspace/.sopify-runtime",
+                "~go plan payload 放 host root 还是 workspace/.sopify-skills",
                 workspace_root=workspace,
                 user_home=workspace / "home",
             )
@@ -2028,7 +2028,7 @@ class EngineIntegrationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
             run_runtime(
-                "~go plan payload 放 host root 还是 workspace/.sopify-runtime",
+                "~go plan payload 放 host root 还是 workspace/.sopify-skills",
                 workspace_root=workspace,
                 user_home=workspace / "home",
             )
@@ -2050,7 +2050,7 @@ class EngineIntegrationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
             run_runtime(
-                "~go plan payload 放 host root 还是 workspace/.sopify-runtime",
+                "~go plan payload 放 host root 还是 workspace/.sopify-skills",
                 workspace_root=workspace,
                 user_home=workspace / "home",
             )
@@ -2065,7 +2065,7 @@ class EngineIntegrationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
             run_runtime(
-                "~go plan payload 放 host root 还是 workspace/.sopify-runtime",
+                "~go plan payload 放 host root 还是 workspace/.sopify-skills",
                 workspace_root=workspace,
                 user_home=workspace / "home",
             )
@@ -2096,7 +2096,7 @@ class EngineIntegrationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
             pending = run_runtime(
-                "~go plan payload 放 host root 还是 workspace/.sopify-runtime",
+                "~go plan payload 放 host root 还是 workspace/.sopify-skills",
                 workspace_root=workspace,
                 user_home=workspace / "home",
             )
@@ -2125,7 +2125,7 @@ class EngineIntegrationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
             pending = run_runtime(
-                "~go plan payload 放 host root 还是 workspace/.sopify-runtime",
+                "~go plan payload 放 host root 还是 workspace/.sopify-skills",
                 workspace_root=workspace,
                 user_home=workspace / "home",
             )
@@ -2268,7 +2268,7 @@ class EngineIntegrationTests(unittest.TestCase):
             workspace = Path(temp_dir)
 
             orchestrated = run_plan_loop(
-                "payload 放 host root 还是 workspace/.sopify-runtime",
+                "payload 放 host root 还是 workspace/.sopify-skills",
                 workspace_root=workspace,
                 input_reader=lambda _prompt: "1",
                 output_writer=lambda _message: None,
@@ -2302,7 +2302,7 @@ class EngineIntegrationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
             checkpoint_result = run_runtime(
-                "~go plan payload 放 host root 还是 workspace/.sopify-runtime",
+                "~go plan payload 放 host root 还是 workspace/.sopify-skills",
                 workspace_root=workspace,
                 user_home=workspace / "home",
             )
@@ -2313,7 +2313,7 @@ class EngineIntegrationTests(unittest.TestCase):
                 return_value=None,
             ):
                 orchestrated = run_plan_loop(
-                    "payload 放 host root 还是 workspace/.sopify-runtime",
+                    "payload 放 host root 还是 workspace/.sopify-skills",
                     workspace_root=workspace,
                     input_reader=lambda _prompt: "1",
                     output_writer=lambda _message: None,
@@ -2330,7 +2330,7 @@ class EngineIntegrationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
             checkpoint_result = run_runtime(
-                "~go plan payload 放 host root 还是 workspace/.sopify-runtime",
+                "~go plan payload 放 host root 还是 workspace/.sopify-skills",
                 workspace_root=workspace,
                 user_home=workspace / "home",
             )
@@ -2340,7 +2340,7 @@ class EngineIntegrationTests(unittest.TestCase):
                 side_effect=PlanOrchestratorError("bridge missing submit/resume"),
             ):
                 orchestrated = run_plan_loop(
-                    "payload 放 host root 还是 workspace/.sopify-runtime",
+                    "payload 放 host root 还是 workspace/.sopify-skills",
                     workspace_root=workspace,
                     input_reader=lambda _prompt: "1",
                     output_writer=lambda _message: None,
@@ -2355,7 +2355,7 @@ class EngineIntegrationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
             checkpoint_result = run_runtime(
-                "~go plan payload 放 host root 还是 workspace/.sopify-runtime",
+                "~go plan payload 放 host root 还是 workspace/.sopify-skills",
                 workspace_root=workspace,
                 user_home=workspace / "home",
             )
@@ -2369,7 +2369,7 @@ class EngineIntegrationTests(unittest.TestCase):
                 side_effect=lambda _handoff: f"sig-{next(counter)}",
             ):
                 orchestrated = run_plan_loop(
-                    "payload 放 host root 还是 workspace/.sopify-runtime",
+                    "payload 放 host root 还是 workspace/.sopify-skills",
                     workspace_root=workspace,
                     max_loops=2,
                     input_reader=lambda _prompt: "1",
@@ -2398,7 +2398,7 @@ class EngineIntegrationTests(unittest.TestCase):
                     "host",
                     "root",
                     "还是",
-                    "workspace/.sopify-runtime",
+                    "workspace/.sopify-skills",
                 ],
                 capture_output=True,
                 text=True,
@@ -2677,7 +2677,7 @@ class EngineIntegrationTests(unittest.TestCase):
                     "host",
                     "root",
                     "还是",
-                    "workspace/.sopify-runtime",
+                    "workspace/.sopify-skills",
                 ],
                 capture_output=True,
                 text=True,
@@ -2867,7 +2867,7 @@ class EngineIntegrationTests(unittest.TestCase):
                     "host",
                     "root",
                     "还是",
-                    "workspace/.sopify-runtime",
+                    "workspace/.sopify-skills",
                 ],
                 capture_output=True,
                 text=True,

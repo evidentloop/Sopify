@@ -8,7 +8,7 @@ usage() {
 Usage: scripts/check-runtime-smoke.sh
 
 Run a minimal zero-config smoke test against the current Sopify runtime bundle.
-This script works both in the repository root and inside a vendored .sopify-runtime/ bundle.
+This script works both in the repository root and inside a vendored runtime bundle.
 It validates bundle/runtime asset integrity, not first-hop host ingress ordering.
 EOF
 }
@@ -96,7 +96,7 @@ BLUEPRINT_TASKS="$WORK_DIR/.sopify-skills/blueprint/tasks.md"
 PREFERENCES_FILE="$WORK_DIR/.sopify-skills/user/preferences.md"
 HISTORY_INDEX="$WORK_DIR/.sopify-skills/history/index.md"
 WIKI_OVERVIEW="$WORK_DIR/.sopify-skills/wiki/overview.md"
-WORKSPACE_STUB_MANIFEST="$WORK_DIR/.sopify-runtime/manifest.json"
+WORKSPACE_STUB_MANIFEST="$WORK_DIR/.sopify-skills/sopify.json"
 
 if [[ ! -d "$PLAN_DIR" ]]; then
   echo "Smoke check failed: missing plan directory: $PLAN_DIR" >&2
@@ -171,11 +171,6 @@ fi
 
 if [[ ! -f "$WORKSPACE_STUB_MANIFEST" ]]; then
   echo "Smoke check failed: missing workspace stub manifest: $WORKSPACE_STUB_MANIFEST" >&2
-  exit 1
-fi
-
-if ! grep -q '"stub_version": "1"' "$WORKSPACE_STUB_MANIFEST"; then
-  echo "Smoke check failed: workspace stub is missing stub_version: $WORKSPACE_STUB_MANIFEST" >&2
   exit 1
 fi
 

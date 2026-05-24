@@ -151,7 +151,7 @@ def run_smoke(*, temp_root: Path) -> dict[str, Any]:
             scenario_id="decision_checkpoint_only",
             workspace=decision_workspace,
             home_root=smoke_home,
-            request="~go plan payload 放 host root 还是 workspace/.sopify-runtime",
+            request="~go plan payload 放 host root 还是 workspace/.sopify-skills",
             expected_exit_code=0,
             expected_status="ready",
             expected_mode="checkpoint_only",

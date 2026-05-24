@@ -386,7 +386,7 @@ ExecutionAuthorizationReceipt 是 execute_existing_plan 授权通过后生成的
 
 **入口解析**：
 - Repo-local 开发态：`scripts/runtime_gate.py enter --workspace-root <cwd> --request "<raw user request>"`
-- Vendored 模式：工作区 `.sopify-runtime/manifest.json` 只是 thin stub（声明 `bundle_version / locator_mode / ignore_mode`）；宿主结合 `~/.codex/sopify/payload-manifest.json` 解析 selected global bundle，从 bundle contract 或 workspace-preflight contract 消费 `runtime_gate_entry`
+- Vendored 模式：工作区 `.sopify-skills/sopify.json` 是唯一 workspace activation marker（声明 `bundle_version / locator_mode / ignore_mode / capabilities`）；宿主结合 `~/.codex/sopify/payload-manifest.json` 解析 selected global bundle，从 bundle contract 或 workspace-preflight contract 消费 `runtime_gate_entry`
 - 若工作区缺少兼容 manifest，宿主先调 `~/.codex/sopify/helpers/bootstrap_workspace.py --workspace-root <cwd>`
 
 **Gate 通过条件**：仅当 `status == ready` ∧ `gate_passed == true` ∧ `evidence.handoff_found == true` ∧ `evidence.strict_runtime_entry == true` 时，宿主才可进入后续阶段。
@@ -447,7 +447,7 @@ runtime 执行后，若 `.sopify-skills/state/current_handoff.json` 存在，宿
 | `scripts/runtime_gate.py enter` | runtime gate，宿主第一跳 |
 | `~/.codex/sopify/payload-manifest.json` | 全局 payload metadata |
 | `~/.codex/sopify/helpers/bootstrap_workspace.py` | workspace bootstrap helper |
-| `.sopify-runtime/manifest.json` | vendored bundle machine contract |
+| `.sopify-skills/sopify.json` | workspace activation marker (唯一 stub) |
 
 ### 8.5 State 文件索引
 

@@ -107,7 +107,7 @@ def run_smoke(*, target_value: str, temp_root: Path) -> dict[str, Any]:
     install_stdout = _run_install_cli(target_value=target.value, temp_home=temp_home)
     host_root = adapter.destination_root(temp_home)
     payload_root = adapter.payload_root(temp_home)
-    bundle_root = workspace_root / ".sopify-runtime"
+    marker_root = workspace_root / ".sopify-skills"
     helper_path = payload_root / "helpers" / "bootstrap_workspace.py"
 
     host_paths = validate_host_install(adapter, home_root=temp_home)
@@ -130,15 +130,15 @@ def run_smoke(*, target_value: str, temp_root: Path) -> dict[str, Any]:
         label="workspace bundle skip line",
     )
 
-    if bundle_root.exists():
-        raise RuntimeError("Workspace bundle should not exist before trigger-time bootstrap.")
+    if marker_root.exists():
+        raise RuntimeError("Workspace marker should not exist before trigger-time bootstrap.")
     if payload_bundle.source_kind != "global_active":
         raise RuntimeError(f"Unexpected payload bundle source_kind: {payload_bundle.source_kind!r}")
     if payload_bundle.reason_code != "PAYLOAD_BUNDLE_READY":
         raise RuntimeError(f"Unexpected payload bundle reason_code: {payload_bundle.reason_code!r}")
 
     bootstrap_stdout = _run_workspace_bootstrap(helper_path=helper_path, workspace_root=workspace_root)
-    workspace_stub_path, workspace_manifest = validate_workspace_stub_manifest(bundle_root)
+    workspace_stub_path, workspace_manifest = validate_workspace_stub_manifest(marker_root)
     global_bundle_root = resolve_payload_bundle_root(payload_root)
     global_bundle_paths = validate_bundle_install(global_bundle_root)
     smoke_stdout = run_bundle_smoke_check(
@@ -168,13 +168,6 @@ def run_smoke(*, target_value: str, temp_root: Path) -> dict[str, Any]:
             )
         )
 
-    legacy_fallback_visibility = _exercise_legacy_fallback_visibility(
-        temp_root=temp_root,
-        temp_home=temp_home,
-        target_host=target.host,
-        payload_root=payload_root,
-        helper_path=helper_path,
-    )
 
     return {
         "passed": True,
@@ -185,7 +178,7 @@ def run_smoke(*, target_value: str, temp_root: Path) -> dict[str, Any]:
         "workspace_root": str(workspace_root),
         "host_root": str(host_root),
         "payload_root": str(payload_root),
-        "bundle_root": str(bundle_root),
+        "bundle_root": str(workspace_root / ".sopify-skills"),
         "global_bundle_root": str(global_bundle_root),
         "payload_bundle": payload_bundle.to_status_dict(),
         "workspace_bundle": workspace_bundle,
@@ -203,7 +196,6 @@ def run_smoke(*, target_value: str, temp_root: Path) -> dict[str, Any]:
                 "install_output_surfaces_workspace_skip_reason": True,
             },
         },
-        "legacy_fallback_visibility": legacy_fallback_visibility,
         "checks": {
             "single_install_command_only": True,
             "workspace_bundle_absent_before_trigger": True,
@@ -213,7 +205,6 @@ def run_smoke(*, target_value: str, temp_root: Path) -> dict[str, Any]:
             "runtime_gate_entry_preserved": True,
             "workspace_stub_selected_after_bootstrap": True,
             "bundle_smoke_passed": True,
-            "legacy_workspace_fallback_visible": True,
         },
         "manifest": {
             "default_entry": default_entry,
@@ -228,88 +219,6 @@ def run_smoke(*, target_value: str, temp_root: Path) -> dict[str, Any]:
             "payload": [str(path) for path in payload_paths],
             "workspace_stub": [str(workspace_stub_path)],
             "global_bundle": [str(path) for path in global_bundle_paths],
-        },
-    }
-
-
-def _exercise_legacy_fallback_visibility(
-    *,
-    temp_root: Path,
-    temp_home: Path,
-    target_host: str,
-    payload_root: Path,
-    helper_path: Path,
-) -> dict[str, Any]:
-    legacy_workspace_root = temp_root / "legacy-workspace"
-    legacy_workspace_root.mkdir(parents=True, exist_ok=True)
-    (legacy_workspace_root / ".git").mkdir(parents=True, exist_ok=True)
-    _run_workspace_bootstrap(helper_path=helper_path, workspace_root=legacy_workspace_root)
-
-    payload_manifest = json.loads((payload_root / "payload-manifest.json").read_text(encoding="utf-8"))
-    selected_version = str(payload_manifest["active_version"])
-    selected_bundle_root = payload_root / "bundles" / selected_version
-    legacy_bundle_root = legacy_workspace_root / ".sopify-runtime"
-    workspace_manifest_path = legacy_bundle_root / "manifest.json"
-    workspace_manifest = json.loads(workspace_manifest_path.read_text(encoding="utf-8"))
-    workspace_manifest["legacy_fallback"] = True
-    workspace_manifest_path.write_text(
-        json.dumps(workspace_manifest, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
-    for name in ("sopify_contracts", "canonical_writer", "runtime", "scripts", "tests"):
-        shutil.copytree(selected_bundle_root / name, legacy_bundle_root / name)
-
-    hidden_bundle_root = selected_bundle_root.with_name(f"{selected_bundle_root.name}.missing")
-    selected_bundle_root.rename(hidden_bundle_root)
-    try:
-        status_payload = build_status_payload(home_root=temp_home, workspace_root=legacy_workspace_root)
-        doctor_payload = build_doctor_payload(home_root=temp_home, workspace_root=legacy_workspace_root)
-    finally:
-        hidden_bundle_root.rename(selected_bundle_root)
-
-    host_status = next(host for host in status_payload["hosts"] if host["host_id"] == target_host)
-    workspace_bundle = host_status.get("workspace_bundle") or {}
-    payload_bundle = host_status.get("payload_bundle") or {}
-    if workspace_bundle.get("reason_code") != "LEGACY_FALLBACK_SELECTED":
-        raise RuntimeError(
-            "Legacy workspace fallback did not surface as LEGACY_FALLBACK_SELECTED: {!r}".format(
-                workspace_bundle.get("reason_code")
-            )
-        )
-    if payload_bundle.get("reason_code") != "GLOBAL_BUNDLE_MISSING":
-        raise RuntimeError(
-            "Legacy workspace payload diagnostics did not surface GLOBAL_BUNDLE_MISSING: {!r}".format(
-                payload_bundle.get("reason_code")
-            )
-        )
-
-    status_text = render_status_text(status_payload)
-    doctor_text = render_doctor_text(doctor_payload)
-    _require_install_surface_line(
-        status_text,
-        "payload_outcome: global_bundle_missing [fail_closed]",
-        label="legacy status payload outcome",
-    )
-    _require_install_surface_line(
-        status_text,
-        "workspace_outcome: legacy_fallback_selected [warn]",
-        label="legacy status workspace outcome",
-    )
-    _require_install_surface_line(
-        doctor_text,
-        "outcome: legacy_fallback_selected [warn]",
-        label="legacy doctor workspace outcome",
-    )
-
-    return {
-        "workspace_root": str(legacy_workspace_root),
-        "payload_bundle": payload_bundle,
-        "workspace_bundle": workspace_bundle,
-        "checks": {
-            "legacy_workspace_fallback_visible": True,
-            "global_bundle_missing_visible": True,
-            "status_surface_aligned": True,
-            "doctor_surface_aligned": True,
         },
     }
 

@@ -185,14 +185,14 @@ class PlanReuseRuntimeTests(unittest.TestCase):
             store = StateStore(config)
             store.ensure()
             current_plan = create_plan_scaffold(
-                "payload 放 host root 还是 workspace/.sopify-runtime",
+                "payload 放 host root 还是 workspace/.sopify-skills",
                 config=config,
                 level="standard",
             )
             store.set_current_plan(current_plan)
 
             first = run_runtime(
-                "~go plan payload 放 host root 还是 workspace/.sopify-runtime",
+                "~go plan payload 放 host root 还是 workspace/.sopify-skills",
                 workspace_root=workspace,
                 user_home=workspace / "home",
             )

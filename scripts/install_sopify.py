@@ -136,7 +136,7 @@ def run_install(
     if workspace_root is not None:
         workspace_bootstrap = run_workspace_bootstrap(payload_install.root, workspace_root)
         bundle_root = workspace_bootstrap.bundle_root
-        validate_workspace_stub_manifest(bundle_root)
+        validate_workspace_stub_manifest(workspace_root / ".sopify-skills")
 
     return InstallResult(
         target=target,

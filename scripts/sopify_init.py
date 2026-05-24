@@ -40,7 +40,6 @@ _LOGO_RESET = "\033[0m"
 _MANAGED_IGNORE_BEGIN = "# BEGIN sopify-managed"
 _MANAGED_IGNORE_END = "# END sopify-managed"
 _MANAGED_IGNORE_ENTRIES = (
-    ".sopify-runtime/",
     ".sopify-skills/state/",
     ".sopify-skills/plan/_registry.yaml",
 )

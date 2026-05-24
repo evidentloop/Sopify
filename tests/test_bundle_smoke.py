@@ -37,8 +37,6 @@ class BundleSmokeTests(unittest.TestCase):
         self.assertEqual(payload["script"], "scripts/check-install-payload-bundle-smoke.py")
         self.assertTrue(payload["checks"]["single_install_command_only"])
         self.assertTrue(payload["install_surface"]["checks"]["install_output_exposes_global_path"])
-        self.assertTrue(payload["legacy_fallback_visibility"]["checks"]["legacy_workspace_fallback_visible"])
-        self.assertTrue(payload["legacy_fallback_visibility"]["checks"]["global_bundle_missing_visible"])
 
     def test_import_runtime_entry(self) -> None:
         self.assertTrue(callable(run_runtime))

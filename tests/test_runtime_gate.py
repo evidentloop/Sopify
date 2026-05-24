@@ -187,7 +187,7 @@ def _write_legacy_payload_manifest_for_gate(*, home_root: Path) -> Path:
                 "  'state': 'READY',",
                 "  'reason_code': 'WORKSPACE_BUNDLE_READY',",
                 "  'workspace_root': str(workspace_root),",
-                "  'bundle_root': str(workspace_root / '.sopify-runtime'),",
+                "  'bundle_root': str(workspace_root / '.sopify-skills'),",
                 "  'from_version': None,",
                 "  'to_version': None,",
                 "  'message': 'legacy helper fallback',",
@@ -332,7 +332,6 @@ class RuntimeGateTests(unittest.TestCase):
             "GLOBAL_BUNDLE_MISSING",
             "GLOBAL_BUNDLE_INCOMPATIBLE",
             "GLOBAL_INDEX_CORRUPTED",
-            "LEGACY_FALLBACK_SELECTED",
             "PAYLOAD_MANIFEST_NOT_FOUND",
             "HOST_MISMATCH",
             "INGRESS_CONTRACT_INVALID",
@@ -399,7 +398,7 @@ class RuntimeGateTests(unittest.TestCase):
 
             self.assertEqual(result["status"], "ready")
             self.assertEqual(result["preflight"]["action"], "skipped")
-            self.assertEqual(result["preflight"]["helper_argv_mode"], "legacy_fallback")
+            self.assertEqual(result["preflight"]["helper_argv_mode"], "minimal_argv")
             self.assertEqual(result["preflight"]["reason_code"], "WORKSPACE_BUNDLE_READY")
 
     def test_gate_preflight_skips_first_write_for_non_explicit_request(self) -> None:
@@ -422,7 +421,7 @@ class RuntimeGateTests(unittest.TestCase):
             self.assertEqual(result["preflight"]["reason_code"], "FIRST_WRITE_NOT_AUTHORIZED")
             self.assertEqual(result["preflight"]["root_resolution_source"], "cwd")
             self.assertEqual(result["error_code"], "workspace_first_write_blocked")
-            self.assertFalse((workspace / ".sopify-runtime" / "manifest.json").exists())
+            self.assertFalse((workspace / ".sopify-skills" / "sopify.json").exists())
             self.assertFalse((workspace / ".sopify-skills" / "state" / "sessions" / "session-non-explicit").exists())
             self.assertTrue((workspace / ".sopify-skills" / "state" / CURRENT_GATE_RECEIPT_FILENAME).exists())
 
@@ -456,7 +455,7 @@ class RuntimeGateTests(unittest.TestCase):
             self.assertNotIn("NON_GIT_WORKSPACE", result["preflight"]["evidence"])
             self.assertNotIn("ignore_mode=noop", result["preflight"]["evidence"])
             self.assertEqual(result["error_code"], "workspace_first_write_blocked")
-            self.assertFalse((workspace / ".sopify-runtime" / "manifest.json").exists())
+            self.assertFalse((workspace / ".sopify-skills" / "sopify.json").exists())
 
     def test_gate_preflight_root_confirm_recovers_when_repo_root_is_explicitly_selected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -480,8 +479,8 @@ class RuntimeGateTests(unittest.TestCase):
             self.assertEqual(result["preflight"]["reason_code"], "STUB_SELECTED")
             self.assertEqual(result["preflight"]["activation_root"], str(repo_root.resolve()))
             self.assertEqual(result["preflight"]["requested_root"], str(workspace.resolve()))
-            self.assertTrue((repo_root / ".sopify-runtime" / "manifest.json").exists())
-            self.assertFalse((workspace / ".sopify-runtime" / "manifest.json").exists())
+            self.assertTrue((repo_root / ".sopify-skills" / "sopify.json").exists())
+            self.assertFalse((workspace / ".sopify-skills" / "sopify.json").exists())
 
     def test_gate_preflight_root_confirm_current_directory_flows_into_non_git_confirm(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -507,7 +506,7 @@ class RuntimeGateTests(unittest.TestCase):
             self.assertIn("NON_GIT_WORKSPACE", result["preflight"]["evidence"])
             self.assertIn("ignore_mode=noop", result["preflight"]["evidence"])
             self.assertIn("~go init", result["message"])
-            self.assertFalse((workspace / ".sopify-runtime" / "manifest.json").exists())
+            self.assertFalse((workspace / ".sopify-skills" / "sopify.json").exists())
 
     def test_gate_preflight_root_confirm_current_directory_recovers_after_go_init_confirm(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -532,7 +531,7 @@ class RuntimeGateTests(unittest.TestCase):
             self.assertEqual(result["preflight"]["activation_root"], str(workspace.resolve()))
             self.assertIn("NON_GIT_WORKSPACE", result["preflight"]["evidence"])
             self.assertIn("ignore_mode=noop", result["preflight"]["evidence"])
-            self.assertTrue((workspace / ".sopify-runtime" / "manifest.json").exists())
+            self.assertTrue((workspace / ".sopify-skills" / "sopify.json").exists())
 
     def test_gate_preflight_blocks_first_write_for_non_interactive_session(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -553,7 +552,7 @@ class RuntimeGateTests(unittest.TestCase):
             self.assertEqual(result["status"], "error")
             self.assertEqual(result["preflight"]["reason_code"], "NON_INTERACTIVE")
             self.assertEqual(result["error_code"], "workspace_first_write_blocked")
-            self.assertFalse((workspace / ".sopify-runtime" / "manifest.json").exists())
+            self.assertFalse((workspace / ".sopify-skills" / "sopify.json").exists())
 
     def test_gate_preflight_blocks_first_write_for_readonly_workspace(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -583,7 +582,7 @@ class RuntimeGateTests(unittest.TestCase):
             self.assertIn(f"target_root={workspace.resolve()}", result["preflight"]["evidence"])
             self.assertEqual(result["error_code"], "workspace_first_write_blocked")
             self.assertIn("receipt_write_error", result)
-            self.assertFalse((workspace / ".sopify-runtime" / "manifest.json").exists())
+            self.assertFalse((workspace / ".sopify-skills" / "sopify.json").exists())
 
     def test_gate_preflight_requires_confirm_for_non_git_workspace_before_go_plan_bootstrap(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -608,8 +607,8 @@ class RuntimeGateTests(unittest.TestCase):
             self.assertEqual(result["allowed_response_mode"], ERROR_VISIBLE_RETRY)
             self.assertEqual(result["error_code"], "workspace_first_write_blocked")
             self.assertIn("~go init", result["message"])
-            self.assertFalse((workspace / ".sopify-runtime" / "manifest.json").exists())
-            self.assertFalse((workspace / ".sopify-runtime" / "scripts").exists())
+            self.assertFalse((workspace / ".sopify-skills" / "sopify.json").exists())
+            self.assertFalse((workspace / ".sopify-skills" / "scripts").exists())
 
     def test_gate_preflight_bootstraps_missing_git_workspace_for_go_plan(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -631,8 +630,8 @@ class RuntimeGateTests(unittest.TestCase):
             self.assertEqual(result["preflight"]["reason_code"], "STUB_SELECTED")
             self.assertEqual(result["preflight"]["host_id"], "codex")
             self.assertNotIn("NON_GIT_WORKSPACE", result["preflight"].get("evidence", ()))
-            self.assertTrue((workspace / ".sopify-runtime" / "manifest.json").exists())
-            self.assertFalse((workspace / ".sopify-runtime" / "scripts").exists())
+            self.assertTrue((workspace / ".sopify-skills" / "sopify.json").exists())
+            self.assertFalse((workspace / ".sopify-skills" / "scripts").exists())
 
     def test_gate_preflight_bootstraps_git_workspace_in_explicit_commit_lock_mode(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -654,7 +653,7 @@ class RuntimeGateTests(unittest.TestCase):
             self.assertEqual(result["preflight"]["reason_code"], "STUB_SELECTED")
             self.assertEqual(result["preflight"]["ignore_mode"], "gitignore")
             self.assertEqual(Path(result["preflight"]["ignore_target"]).resolve(), (workspace / ".gitignore").resolve())
-            manifest = json.loads((workspace / ".sopify-runtime" / "manifest.json").read_text(encoding="utf-8"))
+            manifest = json.loads((workspace / ".sopify-skills" / "sopify.json").read_text(encoding="utf-8"))
             self.assertEqual(manifest["ignore_mode"], "gitignore")
             self.assertIn("# BEGIN sopify-managed", (workspace / ".gitignore").read_text(encoding="utf-8"))
 
@@ -687,7 +686,7 @@ class RuntimeGateTests(unittest.TestCase):
                 Path(result["preflight"]["ignore_target"]).resolve(),
                 (workspace / ".git" / "info" / "exclude").resolve(),
             )
-            manifest = json.loads((workspace / ".sopify-runtime" / "manifest.json").read_text(encoding="utf-8"))
+            manifest = json.loads((workspace / ".sopify-skills" / "sopify.json").read_text(encoding="utf-8"))
             self.assertEqual(manifest["ignore_mode"], "exclude")
             self.assertFalse((workspace / ".gitignore").exists())
             self.assertIn("# BEGIN sopify-managed", (workspace / ".git" / "info" / "exclude").read_text(encoding="utf-8"))
@@ -711,7 +710,7 @@ class RuntimeGateTests(unittest.TestCase):
             self.assertEqual(result["preflight"]["reason_code"], "STUB_SELECTED")
             self.assertIn("NON_GIT_WORKSPACE", result["preflight"]["evidence"])
             self.assertIn("ignore_mode=noop", result["preflight"]["evidence"])
-            self.assertTrue((workspace / ".sopify-runtime" / "manifest.json").exists())
+            self.assertTrue((workspace / ".sopify-skills" / "sopify.json").exists())
 
     def test_preflight_returns_selected_pinned_bundle_contract_instead_of_payload_active_bundle(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -737,7 +736,7 @@ class RuntimeGateTests(unittest.TestCase):
             pinned_manifest_path.write_text(json.dumps(pinned_manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
             (pinned_bundle_root / "scripts" / "runtime_gate_pinned.py").write_text("", encoding="utf-8")
 
-            workspace_manifest_path = workspace / ".sopify-runtime" / "manifest.json"
+            workspace_manifest_path = workspace / ".sopify-skills" / "sopify.json"
             workspace_manifest_path.parent.mkdir(parents=True, exist_ok=True)
             workspace_manifest_path.write_text(
                 json.dumps(
@@ -768,53 +767,6 @@ class RuntimeGateTests(unittest.TestCase):
             self.assertEqual(Path(result["global_bundle_root"]).resolve(), pinned_bundle_root.resolve())
             self.assertEqual(result["runtime_gate_entry"], "scripts/runtime_gate_pinned.py")
 
-    @pytest.mark.implementation_mirror
-
-    def test_preflight_exposes_legacy_workspace_entries_when_global_bundle_falls_back(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            temp_root = Path(temp_dir)
-            home_root = temp_root / "home"
-            workspace = temp_root / "workspace"
-            workspace.mkdir(parents=True, exist_ok=True)
-            payload_manifest_path = _install_payload_manifest_for_gate(home_root=home_root)
-            payload_root = payload_manifest_path.parent
-
-            install_result = subprocess.run(
-                [sys.executable, str(payload_root / "helpers" / "bootstrap_workspace.py"), "--workspace-root", str(workspace)],
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-            bootstrap_payload = json.loads(install_result.stdout)
-            self.assertEqual(bootstrap_payload["reason_code"], "STUB_SELECTED")
-            self.assertIn("NON_GIT_WORKSPACE", bootstrap_payload["evidence"])
-
-            payload_manifest = json.loads(payload_manifest_path.read_text(encoding="utf-8"))
-            selected_version = str(payload_manifest["active_version"])
-            selected_bundle_root = payload_root / "bundles" / selected_version
-            bundle_root = workspace / ".sopify-runtime"
-
-            workspace_manifest_path = bundle_root / "manifest.json"
-            workspace_manifest = json.loads(workspace_manifest_path.read_text(encoding="utf-8"))
-            workspace_manifest["legacy_fallback"] = True
-            workspace_manifest_path.write_text(json.dumps(workspace_manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-            for name in ("sopify_contracts", "canonical_writer", "runtime", "scripts", "tests"):
-                shutil.copytree(selected_bundle_root / name, bundle_root / name)
-
-            shutil.rmtree(selected_bundle_root)
-
-            result = preflight_workspace_runtime(
-                workspace,
-                request_text="~go plan demo",
-                payload_manifest_path=payload_manifest_path,
-                user_home=home_root,
-            )
-
-            self.assertEqual(result["reason_code"], "LEGACY_FALLBACK_SELECTED")
-            self.assertTrue(result["bundle_manifest_path"].endswith(f"/bundles/{selected_version}/manifest.json"))
-            self.assertTrue(result["global_bundle_root"].endswith(f"/bundles/{selected_version}"))
-            self.assertEqual(result["runtime_gate_entry"], "scripts/runtime_gate.py")
-
     def test_gate_preflight_brake_layer_blocks_first_write_even_for_go_command(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
@@ -834,7 +786,7 @@ class RuntimeGateTests(unittest.TestCase):
             self.assertEqual(result["preflight"]["action"], "skipped")
             self.assertEqual(result["preflight"]["reason_code"], "BRAKE_LAYER_BLOCKED")
             self.assertEqual(result["error_code"], "workspace_first_write_blocked")
-            self.assertFalse((workspace / ".sopify-runtime" / "manifest.json").exists())
+            self.assertFalse((workspace / ".sopify-skills" / "sopify.json").exists())
             self.assertFalse((workspace / ".sopify-skills" / "state" / "sessions" / "session-brake").exists())
             self.assertTrue((workspace / ".sopify-skills" / "state" / CURRENT_GATE_RECEIPT_FILENAME).exists())
 
@@ -1510,7 +1462,7 @@ class RuntimeGateTests(unittest.TestCase):
                         "  'state': 'READY',",
                         "  'reason_code': 'WORKSPACE_BUNDLE_READY',",
                         "  'workspace_root': str(workspace_root),",
-                        "  'bundle_root': str(workspace_root / '.sopify-runtime'),",
+                        "  'bundle_root': str(workspace_root / '.sopify-skills'),",
                         "  'from_version': None,",
                         "  'to_version': None,",
                         "  'message': 'legacy helper fallback',",
@@ -1580,7 +1532,7 @@ class RuntimeGateTests(unittest.TestCase):
             self.assertEqual(result["preflight"]["action"], "skipped")
             self.assertEqual(result["preflight"]["reason_code"], "BRAKE_LAYER_BLOCKED")
             self.assertEqual(result["preflight"]["helper_argv_mode"], "legacy_request_preserved")
-            self.assertFalse((workspace / ".sopify-runtime" / "manifest.json").exists())
+            self.assertFalse((workspace / ".sopify-skills" / "sopify.json").exists())
 
     @pytest.mark.implementation_mirror
 
@@ -1604,7 +1556,7 @@ class RuntimeGateTests(unittest.TestCase):
             self.assertEqual(result["error_code"], "workspace_preflight_failed")
             self.assertIn("too old", result["message"])
             self.assertIn("Refresh the local Sopify install", result["message"])
-            self.assertFalse((workspace / ".sopify-runtime" / "manifest.json").exists())
+            self.assertFalse((workspace / ".sopify-skills" / "sopify.json").exists())
 
     @pytest.mark.implementation_mirror
 
@@ -1664,7 +1616,7 @@ class RuntimeGateTests(unittest.TestCase):
             workspace.mkdir(parents=True, exist_ok=True)
             ancestor_root = temp_root / "repo"
             (ancestor_root / ".git").mkdir(parents=True, exist_ok=True)
-            marker_path = ancestor_root / ".sopify-runtime" / "manifest.json"
+            marker_path = ancestor_root / ".sopify-skills" / "sopify.json"
             marker_path.parent.mkdir(parents=True, exist_ok=True)
             marker_path.write_text(json.dumps({"schema_version": "1"}, ensure_ascii=False) + "\n", encoding="utf-8")
             payload_manifest_path = _install_payload_manifest_for_gate(home_root=temp_root / "home")
@@ -1688,7 +1640,7 @@ class RuntimeGateTests(unittest.TestCase):
             workspace.mkdir(parents=True, exist_ok=True)
             ancestor_root = temp_root / "repo"
             (ancestor_root / ".git").mkdir(parents=True, exist_ok=True)
-            marker_path = ancestor_root / ".sopify-runtime" / "manifest.json"
+            marker_path = ancestor_root / ".sopify-skills" / "sopify.json"
             marker_path.parent.mkdir(parents=True, exist_ok=True)
             marker_path.write_text(json.dumps({"schema_version": "1"}, ensure_ascii=False) + "\n", encoding="utf-8")
             payload_manifest_path = _install_payload_manifest_for_gate(home_root=temp_root / "home")
@@ -1704,7 +1656,7 @@ class RuntimeGateTests(unittest.TestCase):
             self.assertEqual(result["status"], "ready")
             self.assertEqual(result["preflight"]["activation_root"], str(workspace.resolve()))
             self.assertEqual(result["preflight"]["root_resolution_source"], "explicit_root")
-            self.assertTrue((workspace / ".sopify-runtime" / "manifest.json").exists())
+            self.assertTrue((workspace / ".sopify-skills" / "sopify.json").exists())
 
     def test_gate_preflight_invalid_ancestor_marker_falls_closed_to_cwd(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1713,7 +1665,7 @@ class RuntimeGateTests(unittest.TestCase):
             workspace.mkdir(parents=True, exist_ok=True)
             (workspace / ".git").mkdir(parents=True, exist_ok=True)
             ancestor_root = temp_root / "repo"
-            marker_path = ancestor_root / ".sopify-runtime" / "manifest.json"
+            marker_path = ancestor_root / ".sopify-skills" / "sopify.json"
             marker_path.parent.mkdir(parents=True, exist_ok=True)
             marker_path.write_text("{invalid json\n", encoding="utf-8")
             payload_manifest_path = _install_payload_manifest_for_gate(home_root=temp_root / "home")
@@ -1728,8 +1680,8 @@ class RuntimeGateTests(unittest.TestCase):
             self.assertEqual(result["status"], "ready")
             self.assertEqual(result["preflight"]["activation_root"], str(workspace.resolve()))
             self.assertEqual(result["preflight"]["root_resolution_source"], "cwd")
-            self.assertEqual(result["preflight"]["fallback_reason"], "invalid_ancestor_marker")
-            self.assertTrue((workspace / ".sopify-runtime" / "manifest.json").exists())
+            self.assertEqual(result["preflight"].get("fallback_reason", ""), "")
+            self.assertTrue((workspace / ".sopify-skills" / "sopify.json").exists())
 
     def test_gate_returns_normal_runtime_followup_for_plan_review(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1784,7 +1736,7 @@ class RuntimeGateTests(unittest.TestCase):
             workspace = Path(temp_dir)
 
             result = enter_runtime_gate(
-                "~go plan payload 放 host root 还是 workspace/.sopify-runtime",
+                "~go plan payload 放 host root 还是 workspace/.sopify-skills",
                 workspace_root=workspace,
                 user_home=workspace / "home",
             )
@@ -2498,6 +2450,32 @@ class AuditOnlyHostIdTests(unittest.TestCase):
                 self.assertIn(payload_host, {"codex", "claude"},
                               "payload_host_id should reflect the real payload owner")
                 self.assertEqual(preflight.get("host_id"), payload_host)
+
+
+class FallbackStubCapabilityNormalizationTests(unittest.TestCase):
+    """Verify installer and vendored-fallback stub capability contracts stay aligned."""
+
+    def test_installer_rejects_preferences_preload_in_stub_capabilities(self) -> None:
+        """preferences_preload was removed from stub required_capabilities in P4.6-A."""
+        from installer.validate import _normalize_required_capabilities
+        from installer.models import InstallError
+        with self.assertRaises(InstallError):
+            _normalize_required_capabilities(["runtime_gate", "preferences_preload"])
+
+    def test_installer_accepts_runtime_gate_only(self) -> None:
+        from installer.validate import _normalize_required_capabilities
+        self.assertEqual(_normalize_required_capabilities(["runtime_gate"]), ["runtime_gate"])
+
+    def test_fallback_stub_capabilities_match_installer(self) -> None:
+        """The vendored fallback constant must mirror installer.validate._STUB_REQUIRED_CAPABILITIES."""
+        import ast, inspect, textwrap
+        import runtime.workspace_preflight as wp
+        source = inspect.getsource(wp)
+        self.assertIn(
+            '_FALLBACK_STUB_REQUIRED_CAPABILITIES = {"runtime_gate"}',
+            source,
+            "Fallback stub capabilities drifted from installer — must only contain runtime_gate",
+        )
 
 
 if __name__ == "__main__":

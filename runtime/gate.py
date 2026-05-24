@@ -11,10 +11,8 @@ from uuid import uuid4
 
 
 def _workspace_manifest_found(workspace: Path) -> bool:
-    """Check for workspace activation marker (sopify.json or legacy manifest)."""
-    if (workspace / ".sopify-skills" / "sopify.json").is_file():
-        return True
-    return (workspace / ".sopify-runtime" / "manifest.json").is_file()
+    """Check for the workspace activation marker (.sopify-skills/sopify.json)."""
+    return (workspace / ".sopify-skills" / "sopify.json").is_file()
 
 from .config import ConfigError, load_runtime_config
 from ._kernel_turn import execute_kernel_turn

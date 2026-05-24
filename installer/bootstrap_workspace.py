@@ -35,7 +35,6 @@ except ModuleNotFoundError as exc:
         "GLOBAL_BUNDLE_MISSING": "global_bundle_missing",
         "GLOBAL_BUNDLE_INCOMPATIBLE": "global_bundle_incompatible",
         "GLOBAL_INDEX_CORRUPTED": "global_index_corrupted",
-        "LEGACY_FALLBACK_SELECTED": "legacy_fallback_selected",
         "ROOT_CONFIRM_REQUIRED": "root_confirm_required",
         "READONLY": "readonly",
         "NON_INTERACTIVE": "non_interactive",
@@ -46,7 +45,6 @@ except ModuleNotFoundError as exc:
         "global_bundle_missing": "fail_closed",
         "global_bundle_incompatible": "fail_closed",
         "global_index_corrupted": "fail_closed",
-        "legacy_fallback_selected": "warn",
         "root_confirm_required": "confirm",
         "readonly": "fail_closed",
         "non_interactive": "fail_closed",
@@ -113,8 +111,6 @@ _WORKSPACE_STUB_LOCATOR_MODES = {"global_first", "global_only"}
 _WORKSPACE_STUB_IGNORE_MODES = {"exclude", "gitignore", "noop"}
 _SOPIFY_SKILLS_DIR = ".sopify-skills"
 _SOPIFY_JSON_FILENAME = "sopify.json"
-_LEGACY_BUNDLE_DIR = ".sopify-runtime"
-_LEGACY_MANIFEST_FILENAME = "manifest.json"
 _SOPIFY_MANAGED_IGNORE_BEGIN = "# BEGIN sopify-managed"
 _SOPIFY_MANAGED_IGNORE_END = "# END sopify-managed"
 _SOPIFY_MANAGED_IGNORE_ENTRIES = (
@@ -141,7 +137,7 @@ DIAGNOSTIC_INVALID_ANCESTOR_MARKER = "INVALID_ANCESTOR_MARKER"
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Bootstrap a workspace-local Sopify runtime bundle.")
-    parser.add_argument("--workspace-root", required=True, help="Target project root that should receive `.sopify-runtime/`.")
+    parser.add_argument("--workspace-root", required=True, help="Target project root that should receive Sopify workspace metadata.")
     parser.add_argument("--activation-root", default=None, help="Optional explicit activation root override.")
     parser.add_argument("--request", default="", help="Raw user request routed through host ingress.")
     parser.add_argument("--requested-root", default=None, help="Optional host-requested root for observability.")
@@ -216,24 +212,10 @@ def bootstrap_workspace(
     if not payload_manifest:
         raise ValueError(f"Missing or invalid payload manifest: {payload_manifest_path}")
 
-    target_bundle_dir = str(payload_manifest.get("default_bundle_dir") or _LEGACY_BUNDLE_DIR)
+    target_bundle_dir = str(payload_manifest.get("default_bundle_dir") or ".sopify-runtime")
     bundle_root = resolved_activation_root / target_bundle_dir
-    # Dual-path: read workspace marker preferring sopify.json, fallback to legacy stub
-    marker_path, marker_kind = _resolve_workspace_marker(resolved_activation_root)
-    if marker_kind == "sopify_json":
-        current_manifest_path = marker_path
-    else:
-        current_manifest_path = bundle_root / _LEGACY_MANIFEST_FILENAME
+    current_manifest_path = resolved_activation_root / _SOPIFY_SKILLS_DIR / _SOPIFY_JSON_FILENAME
     current_manifest = _read_json(current_manifest_path) if current_manifest_path.is_file() else {}
-    # When sopify.json is primary, merge in fields only the legacy stub carries
-    if marker_kind == "sopify_json":
-        legacy_stub_path = resolved_activation_root / _LEGACY_BUNDLE_DIR / _LEGACY_MANIFEST_FILENAME
-        if legacy_stub_path.is_file():
-            legacy_data = _read_json(legacy_stub_path)
-            if legacy_data:
-                for field in ("legacy_fallback", "ignore_mode", "written_by_host", "stub_version"):
-                    if field not in current_manifest and field in legacy_data:
-                        current_manifest[field] = legacy_data[field]
     (
         selected_bundle_root,
         bundle_manifest_path,
@@ -600,17 +582,9 @@ def _resolve_activation_root(
         return (explicit_activation_root, "explicit_root", "")
 
     for ancestor in workspace_root.parents:
-        # Prefer new sopify.json marker
         new_marker = ancestor / _SOPIFY_SKILLS_DIR / _SOPIFY_JSON_FILENAME
         if new_marker.is_file() and _marker_has_minimum_validity(new_marker):
             return (ancestor, "ancestor_marker", "")
-        # Legacy fallback
-        legacy_marker = ancestor / _LEGACY_BUNDLE_DIR / _LEGACY_MANIFEST_FILENAME
-        if not legacy_marker.is_file():
-            continue
-        if _marker_has_minimum_validity(legacy_marker):
-            return (ancestor, "ancestor_marker", "")
-        return (workspace_root, "cwd", "invalid_ancestor_marker")
 
     return (workspace_root, "cwd", "")
 
@@ -638,17 +612,6 @@ def _marker_has_minimum_validity(marker_path: Path) -> bool:
     if not payload:
         return False
     return isinstance(payload.get("schema_version"), str) and bool(str(payload.get("schema_version") or "").strip())
-
-
-def _resolve_workspace_marker(workspace_root: Path) -> tuple[Path, str]:
-    """Resolve the workspace activation marker, preferring sopify.json over legacy stub."""
-    new_path = workspace_root / _SOPIFY_SKILLS_DIR / _SOPIFY_JSON_FILENAME
-    if new_path.is_file():
-        return (new_path, "sopify_json")
-    legacy_path = workspace_root / _LEGACY_BUNDLE_DIR / _LEGACY_MANIFEST_FILENAME
-    if legacy_path.is_file():
-        return (legacy_path, "legacy_stub")
-    return (new_path, "sopify_json")
 
 
 def _classify_workspace_bundle(
@@ -685,15 +648,7 @@ def _classify_workspace_bundle(
     from_version = _string_or_none(normalized_manifest.get("bundle_version")) or _string_or_none(bundle_manifest.get("bundle_version"))
 
     if global_reason_code:
-        state, reason_code, message = _classify_global_failure_fallback(
-            current_manifest=normalized_manifest,
-            payload_manifest=payload_manifest,
-            bundle_manifest=bundle_manifest,
-            bundle_root=bundle_root,
-            global_reason_code=global_reason_code,
-            global_message=global_message or "Selected global bundle is unavailable.",
-        )
-        return (state, reason_code, message, from_version)
+        return ("INCOMPATIBLE", global_reason_code, global_message or "Selected global bundle is unavailable.", from_version)
 
     state, reason_code, message = _classify_global_bundle_contract(
         payload_manifest=payload_manifest,
@@ -701,14 +656,6 @@ def _classify_workspace_bundle(
         global_bundle_root=global_bundle_root,
     )
     if state != "READY":
-        state, reason_code, message = _classify_global_failure_fallback(
-            current_manifest=normalized_manifest,
-            payload_manifest=payload_manifest,
-            bundle_manifest=bundle_manifest,
-            bundle_root=bundle_root,
-            global_reason_code=reason_code,
-            global_message=message,
-        )
         return (state, reason_code, message, from_version)
 
     return (
@@ -775,73 +722,6 @@ def _classify_global_bundle_contract(
     return ("READY", "PAYLOAD_BUNDLE_READY", "Selected global bundle is available.")
 
 
-def _classify_global_failure_fallback(
-    *,
-    current_manifest: dict[str, Any],
-    payload_manifest: dict[str, Any],
-    bundle_manifest: dict[str, Any],
-    bundle_root: Path,
-    global_reason_code: str,
-    global_message: str,
-) -> tuple[str, str, str]:
-    locator_mode = str(current_manifest.get("locator_mode") or "global_first")
-    legacy_fallback = bool(current_manifest.get("legacy_fallback", False))
-    if locator_mode == "global_only" or not legacy_fallback:
-        return ("INCOMPATIBLE", global_reason_code, global_message)
-
-    legacy_state, _legacy_reason_code, _legacy_message = _classify_legacy_workspace_runtime(
-        current_manifest=current_manifest,
-        payload_manifest=payload_manifest,
-        bundle_manifest=bundle_manifest,
-        bundle_root=bundle_root,
-    )
-    if legacy_state == "READY":
-        return (
-            "READY",
-            "LEGACY_FALLBACK_SELECTED",
-            f"{global_message} Using compatible legacy workspace runtime fallback.",
-        )
-    return ("INCOMPATIBLE", global_reason_code, global_message)
-
-
-def _classify_legacy_workspace_runtime(
-    *,
-    current_manifest: dict[str, Any],
-    payload_manifest: dict[str, Any],
-    bundle_manifest: dict[str, Any],
-    bundle_root: Path,
-) -> tuple[str, str, str]:
-    if not _legacy_workspace_artifacts_present(bundle_root):
-        return ("ABSENT", "LEGACY_WORKSPACE_ABSENT", "No legacy workspace runtime artifacts were found.")
-    minimum_manifest = payload_manifest.get("minimum_workspace_manifest") or {}
-    required_capabilities = minimum_manifest.get("required_capabilities") or {}
-    legacy_capabilities = current_manifest.get("capabilities")
-    if not isinstance(legacy_capabilities, dict) or not legacy_capabilities:
-        if current_manifest.get("stub_version"):
-            legacy_capabilities = dict(required_capabilities)
-        else:
-            legacy_capabilities = bundle_manifest.get("capabilities") or {}
-    missing_capabilities = _find_missing_capabilities(required_capabilities, legacy_capabilities)
-    if missing_capabilities:
-        return (
-            "INCOMPATIBLE",
-            "MISSING_REQUIRED_CAPABILITY",
-            f"Workspace bundle is missing required capabilities: {', '.join(missing_capabilities)}.",
-        )
-    missing_files = _find_missing_required_files(bundle_root)
-    if missing_files:
-        return (
-            "INCOMPATIBLE",
-            "MISSING_REQUIRED_FILE",
-            f"Workspace bundle is missing required files: {', '.join(missing_files)}.",
-        )
-    return ("READY", "LEGACY_WORKSPACE_READY", "Legacy workspace runtime artifacts remain structurally complete.")
-
-
-def _legacy_workspace_artifacts_present(bundle_root: Path) -> bool:
-    return any((bundle_root / relative_path).exists() for relative_path in _REQUIRED_BUNDLE_FILES if relative_path != Path("manifest.json"))
-
-
 def _normalize_workspace_stub_contract(*, current_manifest: dict[str, Any], workspace_root: Path) -> dict[str, Any]:
     normalized = dict(current_manifest)
     normalized["schema_version"] = _normalize_stub_schema_version(normalized.get("schema_version"))
@@ -855,9 +735,6 @@ def _normalize_workspace_stub_contract(*, current_manifest: dict[str, Any], work
         if isinstance(sopify_json_caps, (list, tuple)):
             raw_capabilities = sopify_json_caps
     normalized["required_capabilities"] = _normalize_required_capabilities(raw_capabilities)
-    normalized["legacy_fallback"] = bool(normalized.get("legacy_fallback", False))
-    if normalized["locator_mode"] == "global_only" and normalized["legacy_fallback"]:
-        raise ValueError("Workspace stub contract is invalid: legacy_fallback is not allowed when locator_mode=global_only.")
     normalized["ignore_mode"] = _normalize_ignore_mode(normalized.get("ignore_mode"), workspace_root=workspace_root)
     normalized["written_by_host"] = bool(normalized.get("written_by_host", False))
     return normalized
@@ -1043,14 +920,11 @@ def _write_workspace_stub_overlay(
     bundle_manifest: dict[str, Any] | None = None,
     ignore_mode: str | None = None,
 ) -> None:
-    # Write sopify.json to .sopify-skills/ (new activation marker).
-    # Also write legacy .sopify-runtime/manifest.json for backward compatibility.
     sopify_json_dir = workspace_root / _SOPIFY_SKILLS_DIR
     sopify_json_path = sopify_json_dir / _SOPIFY_JSON_FILENAME
-    # Read from existing sopify.json or legacy manifest as source of truth for version info
     source_payload = _read_json(sopify_json_path)
     if not source_payload:
-        legacy_manifest = bundle_root / _LEGACY_MANIFEST_FILENAME
+        legacy_manifest = bundle_root / "manifest.json"
         source_payload = _read_json(legacy_manifest)
     if not source_payload:
         source_payload = dict(bundle_manifest or {})
@@ -1058,10 +932,13 @@ def _write_workspace_stub_overlay(
         raise ValueError(f"Workspace bootstrap produced an unreadable manifest for: {workspace_root}")
     sopify_json_payload = {
         "schema_version": str(source_payload.get("schema_version") or "1"),
+        "stub_version": "1",
         "workspace_kind": "deep" if (workspace_root / _SOPIFY_SKILLS_DIR / "blueprint").is_dir() else "external",
         "bundle_version": _string_or_none(source_payload.get("bundle_version")),
         "locator_mode": "global_first",
         "capabilities": list(_WORKSPACE_STUB_REQUIRED_CAPABILITIES),
+        "ignore_mode": ignore_mode or _default_ignore_mode(workspace_root),
+        "written_by_host": True,
     }
     sopify_json_dir.mkdir(parents=True, exist_ok=True)
     with NamedTemporaryFile("w", delete=False, dir=sopify_json_dir, encoding="utf-8") as handle:
@@ -1069,25 +946,6 @@ def _write_workspace_stub_overlay(
         handle.write("\n")
         temp_path = Path(handle.name)
     temp_path.replace(sopify_json_path)
-    # Legacy stub: write .sopify-runtime/manifest.json during transition
-    legacy_dir = workspace_root / _LEGACY_BUNDLE_DIR
-    legacy_payload = {
-        "schema_version": str(source_payload.get("schema_version") or "1"),
-        "stub_version": "1",
-        "bundle_version": _string_or_none(source_payload.get("bundle_version")),
-        "required_capabilities": list(_WORKSPACE_STUB_REQUIRED_CAPABILITIES),
-        "locator_mode": "global_first",
-        "legacy_fallback": False,
-        "ignore_mode": ignore_mode or _default_ignore_mode(workspace_root),
-        "written_by_host": True,
-    }
-    legacy_dir.mkdir(parents=True, exist_ok=True)
-    legacy_path = legacy_dir / _LEGACY_MANIFEST_FILENAME
-    with NamedTemporaryFile("w", delete=False, dir=legacy_dir, encoding="utf-8") as handle:
-        json.dump(legacy_payload, handle, ensure_ascii=False, indent=2, sort_keys=True)
-        handle.write("\n")
-        temp_path = Path(handle.name)
-    temp_path.replace(legacy_path)
 
 
 def _default_ignore_mode(workspace_root: Path) -> str:
@@ -1494,7 +1352,7 @@ def _result_evidence(
         evidence.append(f"ignore_mode={ignore_mode}")
         ignore_target = _resolve_ignore_target(workspace_root=workspace_root, ignore_mode=ignore_mode)
         if ignore_target is not None:
-            evidence.append(f"manual_disable=remove .sopify-runtime/manifest.json and the sopify-managed block from {ignore_target}")
+            evidence.append(f"manual_disable=remove .sopify-skills/sopify.json and the sopify-managed block from {ignore_target}")
     return evidence
 
 

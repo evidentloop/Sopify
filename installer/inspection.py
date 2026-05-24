@@ -51,7 +51,6 @@ REASON_PAYLOAD_BUNDLE_READY = "PAYLOAD_BUNDLE_READY"
 REASON_GLOBAL_BUNDLE_MISSING = "GLOBAL_BUNDLE_MISSING"
 REASON_GLOBAL_BUNDLE_INCOMPATIBLE = "GLOBAL_BUNDLE_INCOMPATIBLE"
 REASON_GLOBAL_INDEX_CORRUPTED = "GLOBAL_INDEX_CORRUPTED"
-REASON_LEGACY_FALLBACK_SELECTED = "LEGACY_FALLBACK_SELECTED"
 REASON_INGRESS_PROOF_GATE_ENTER_OBSERVED = "INGRESS_PROOF_GATE_ENTER_OBSERVED"
 REASON_INGRESS_PROOF_DIRECT_ENTRY_BLOCK_OBSERVED = "INGRESS_PROOF_DIRECT_ENTRY_BLOCK_OBSERVED"
 REASON_INGRESS_PROOF_MISSING = "INGRESS_PROOF_MISSING"
@@ -820,10 +819,6 @@ def inspect_payload_bundle_resolution(*, payload_root: Path, host_id: str, bundl
     ready_reason = REASON_PAYLOAD_BUNDLE_READY
     ready_status = CHECK_PASS
     recommendation = None
-    if source_kind == SOURCE_KIND_LEGACY_LAYOUT:
-        ready_reason = REASON_LEGACY_FALLBACK_SELECTED
-        ready_status = CHECK_WARN
-        recommendation = _payload_bundle_recommendation(host_id, REASON_LEGACY_FALLBACK_SELECTED)
     return PayloadBundleResolution(
         source_kind=source_kind,
         reason_code=ready_reason,
@@ -842,11 +837,11 @@ def _inspect_workspace_bundle(
     workspace_root: Path,
 ) -> InspectionCheck:
     payload_root = adapter.payload_root(home_root)
-    bundle_root = workspace_root / ".sopify-runtime"
+    bundle_root = workspace_root / ".sopify-skills"
     try:
         current_manifest_path, current_manifest = validate_workspace_stub_manifest(bundle_root)
     except InstallError as exc:
-        current_manifest_path = bundle_root / "manifest.json"
+        current_manifest_path = bundle_root / "sopify.json"
         reason_code = "MISSING_BUNDLE" if not current_manifest_path.exists() else REASON_STUB_INVALID
         return InspectionCheck(
             host_id=capability.host_id,
@@ -996,22 +991,7 @@ def _resolve_workspace_capability_manifest(
     if workspace_bundle.status != CHECK_PASS:
         return {}
 
-    bundle_root = workspace_root / ".sopify-runtime"
-    if workspace_bundle.reason_code == REASON_LEGACY_FALLBACK_SELECTED:
-        try:
-            _manifest_path, capability_manifest = validate_workspace_bundle_manifest(bundle_root)
-        except InstallError:
-            return {}
-        current_capabilities = capability_manifest.get("capabilities")
-        if isinstance(current_capabilities, dict) and current_capabilities:
-            return capability_manifest
-        payload_manifest = _read_json(adapter.payload_root(home_root) / "payload-manifest.json")
-        minimum_manifest = payload_manifest.get("minimum_workspace_manifest") or {}
-        required_capabilities = minimum_manifest.get("required_capabilities")
-        if isinstance(required_capabilities, dict) and required_capabilities:
-            return {"capabilities": dict(required_capabilities)}
-        return capability_manifest
-
+    bundle_root = workspace_root / ".sopify-skills"
     try:
         _manifest_path, current_manifest = validate_workspace_stub_manifest(bundle_root)
         selected_bundle_version = current_manifest.get("bundle_version")
@@ -1111,7 +1091,7 @@ def _workspace_bundle_recommendation(host_id: str, workspace_root: Path, reason_
         return f"Sopify is not enabled in {workspace_root} yet. Trigger Sopify there to bootstrap on demand."
     if reason_code == REASON_STUB_INVALID:
         return (
-            f"The local `.sopify-runtime/manifest.json` in {workspace_root} looks invalid. "
+            f"The local `.sopify-skills/sopify.json` in {workspace_root} looks invalid. "
             f"Rerun Sopify bootstrap, or delete that file and retry."
         )
     if reason_code == REASON_STUB_SELECTED:
@@ -1120,7 +1100,6 @@ def _workspace_bundle_recommendation(host_id: str, workspace_root: Path, reason_
         REASON_GLOBAL_BUNDLE_MISSING,
         REASON_GLOBAL_BUNDLE_INCOMPATIBLE,
         REASON_GLOBAL_INDEX_CORRUPTED,
-        REASON_LEGACY_FALLBACK_SELECTED,
     }:
         return _payload_bundle_recommendation(host_id, reason_code) or message
     return message
@@ -1278,8 +1257,6 @@ def _payload_bundle_recommendation(host_id: str, reason_code: str) -> str | None
         return f"Refresh the {host_id} payload because the selected global bundle is incomplete or incompatible: {refresh_command}"
     if reason_code == REASON_GLOBAL_INDEX_CORRUPTED:
         return f"Refresh the {host_id} payload because the bundle index is invalid or inconsistent: {refresh_command}"
-    if reason_code == REASON_LEGACY_FALLBACK_SELECTED:
-        return f"Refresh the {host_id} payload to migrate from the legacy bundle layout to the versioned bundle index: {refresh_command}"
     return None
 
 

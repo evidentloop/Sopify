@@ -705,7 +705,7 @@ def _setup_workspace_for_gate_integration(
             "  'action': 'skipped', 'state': 'READY',",
             "  'reason_code': 'WORKSPACE_BUNDLE_READY',",
             "  'workspace_root': str(w),",
-            "  'bundle_root': str(w / '.sopify-runtime'),",
+            "  'bundle_root': str(w / '.sopify-skills'),",
             "  'from_version': None, 'to_version': None,",
             "  'message': 'legacy helper fallback'",
             "}, ensure_ascii=False))",

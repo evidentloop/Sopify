@@ -18,7 +18,6 @@ _STUB_IGNORE_MODES = {"exclude", "gitignore", "noop"}
 _STUB_REQUIRED_CAPABILITIES = {"runtime_gate"}
 _EXACT_BUNDLE_VERSION_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 _DEFAULT_VERSIONED_BUNDLES_DIR = Path("bundles")
-_LEGACY_BUNDLE_MANIFEST_PATH = Path("bundle") / "manifest.json"
 
 
 def validate_host_install(adapter: HostAdapter, *, home_root: Path) -> tuple[Path, ...]:
@@ -208,14 +207,14 @@ def resolve_payload_bundle_manifest_path(
 
 
 def validate_workspace_bundle_manifest(bundle_root: Path) -> tuple[Path, dict[str, Any]]:
-    """Load the workspace-local control-plane manifest without asserting full bundle contents."""
-    manifest_path = bundle_root / "manifest.json"
+    """Load the workspace-local activation marker without asserting bundle contents."""
+    manifest_path = bundle_root / "sopify.json"
     manifest = _read_json_object(manifest_path)
     return (manifest_path, manifest)
 
 
 def validate_workspace_stub_manifest(bundle_root: Path) -> tuple[Path, dict[str, Any]]:
-    """Validate and normalize the thin-stub contract embedded in the workspace manifest."""
+    """Validate and normalize the thin-stub contract embedded in the workspace marker."""
     manifest_path, manifest = validate_workspace_bundle_manifest(bundle_root)
     workspace_root = bundle_root.parent
     normalized = dict(manifest)
@@ -223,10 +222,12 @@ def validate_workspace_stub_manifest(bundle_root: Path) -> tuple[Path, dict[str,
     normalized["stub_version"] = _normalize_stub_version(normalized.get("stub_version"))
     normalized["locator_mode"] = _normalize_locator_mode(normalized.get("locator_mode"))
     normalized["bundle_version"] = _normalize_bundle_version(normalized.get("bundle_version"))
-    normalized["required_capabilities"] = _normalize_required_capabilities(normalized.get("required_capabilities"))
-    normalized["legacy_fallback"] = bool(normalized.get("legacy_fallback", False))
-    if normalized["locator_mode"] == "global_only" and normalized["legacy_fallback"]:
-        raise InstallError(f"Stub verification failed: {manifest_path}")
+    raw_capabilities = normalized.get("required_capabilities")
+    if raw_capabilities is None:
+        sopify_json_caps = normalized.get("capabilities")
+        if isinstance(sopify_json_caps, (list, tuple)):
+            raw_capabilities = sopify_json_caps
+    normalized["required_capabilities"] = _normalize_required_capabilities(raw_capabilities)
     normalized["ignore_mode"] = _normalize_ignore_mode(normalized.get("ignore_mode"), workspace_root=workspace_root)
     normalized["written_by_host"] = bool(normalized.get("written_by_host", False))
     return (manifest_path, normalized)
@@ -292,7 +293,7 @@ def _legacy_bundle_manifest_path(payload_root: Path, payload_manifest: dict[str,
     relative = _resolve_payload_relative_path(payload_root, payload_manifest.get("bundle_manifest"), field_name="bundle_manifest")
     if relative:
         return payload_root / relative
-    return payload_root / _LEGACY_BUNDLE_MANIFEST_PATH
+    return payload_root / Path("bundle") / "manifest.json"
 
 
 def _resolve_payload_relative_path(payload_root: Path, value: Any, *, field_name: str) -> Path | None:

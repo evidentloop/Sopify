@@ -177,9 +177,9 @@ class DistributionFacadeTests(unittest.TestCase):
 
             rendered = render_distribution_result(legacy_report)
 
-            self.assertIn("payload bundle: source_kind=legacy_layout, reason_code=LEGACY_FALLBACK_SELECTED", rendered)
-            self.assertIn("payload outcome: legacy_fallback_selected [warn]", rendered)
-            self.assertIn("payload hint:", rendered)
+            self.assertIn("payload bundle: source_kind=legacy_layout, reason_code=PAYLOAD_BUNDLE_READY", rendered)
+            self.assertNotIn("payload outcome:", rendered)
+            self.assertNotIn("payload hint:", rendered)
             self.assertIn("workspace: will bootstrap on first project trigger", rendered)
 
     def test_distribution_install_with_workspace_reports_prewarmed_bundle(self) -> None:

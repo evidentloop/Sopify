@@ -36,7 +36,7 @@ class DecisionContractTests(unittest.TestCase):
     def test_decision_policy_keeps_current_planning_semantic_baseline(self) -> None:
         route = RouteDecision(
             route_name="plan_only",
-            request_text="payload 放 host root 还是 workspace/.sopify-runtime",
+            request_text="payload 放 host root 还是 workspace/.sopify-skills",
             reason="test",
             complexity="complex",
             plan_level="standard",
@@ -47,7 +47,7 @@ class DecisionContractTests(unittest.TestCase):
         self.assertIsNotNone(match)
         self.assertEqual(match.template_id, "strategy_pick")
         self.assertEqual(match.decision_type, "architecture_choice")
-        self.assertEqual(match.option_texts, ("payload 放 host root", "workspace/.sopify-runtime"))
+        self.assertEqual(match.option_texts, ("payload 放 host root", "workspace/.sopify-skills"))
 
     def test_decision_policy_ignores_non_architecture_alternatives(self) -> None:
         route = RouteDecision(
@@ -492,7 +492,7 @@ class DecisionContractTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
             run_runtime(
-                "~go plan payload 放 host root 还是 workspace/.sopify-runtime",
+                "~go plan payload 放 host root 还是 workspace/.sopify-skills",
                 workspace_root=workspace,
                 user_home=workspace / "home",
             )
@@ -554,7 +554,7 @@ class DecisionContractTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
             pending = run_runtime(
-                "~go plan payload 放 host root 还是 workspace/.sopify-runtime",
+                "~go plan payload 放 host root 还是 workspace/.sopify-skills",
                 workspace_root=workspace,
                 user_home=workspace / "home",
             )
@@ -635,7 +635,7 @@ class DecisionContractTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
             run_runtime(
-                "~go plan payload 放 host root 还是 workspace/.sopify-runtime",
+                "~go plan payload 放 host root 还是 workspace/.sopify-skills",
                 workspace_root=workspace,
                 user_home=workspace / "home",
             )
@@ -667,7 +667,7 @@ class DecisionContractTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
             run_runtime(
-                "~go plan payload 放 host root 还是 workspace/.sopify-runtime",
+                "~go plan payload 放 host root 还是 workspace/.sopify-skills",
                 workspace_root=workspace,
                 user_home=workspace / "home",
             )
@@ -702,7 +702,7 @@ class DecisionContractTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
             run_runtime(
-                "~go plan payload 放 host root 还是 workspace/.sopify-runtime",
+                "~go plan payload 放 host root 还是 workspace/.sopify-skills",
                 workspace_root=workspace,
                 user_home=workspace / "home",
             )
@@ -757,7 +757,7 @@ class DecisionContractTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
             run_runtime(
-                "~go plan payload 放 host root 还是 workspace/.sopify-runtime",
+                "~go plan payload 放 host root 还是 workspace/.sopify-skills",
                 workspace_root=workspace,
                 user_home=workspace / "home",
             )
@@ -806,7 +806,7 @@ class DecisionContractTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
             run_runtime(
-                "~go plan payload 放 host root 还是 workspace/.sopify-runtime",
+                "~go plan payload 放 host root 还是 workspace/.sopify-skills",
                 workspace_root=workspace,
                 user_home=workspace / "home",
             )
@@ -949,7 +949,7 @@ class DecisionContractTests(unittest.TestCase):
             workspace = Path(temp_dir)
             session_id = "session-a"
             run_runtime(
-                "~go plan payload 放 host root 还是 workspace/.sopify-runtime",
+                "~go plan payload 放 host root 还是 workspace/.sopify-skills",
                 workspace_root=workspace,
                 session_id=session_id,
                 user_home=workspace / "home",

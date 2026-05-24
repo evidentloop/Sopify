@@ -43,9 +43,9 @@ bash /path/to/project/.sopify-runtime/scripts/check-runtime-smoke.sh
 Bundle rules:
 
 - The global payload lives under `~/.codex/sopify/` or `~/.claude/sopify/`.
-- Hosts must read `.sopify-runtime/manifest.json` before falling back to fixed helper paths.
+- Hosts must read `.sopify-skills/sopify.json` to detect workspace activation and resolve the selected global bundle.
 - The first host hop goes through `.sopify-runtime/scripts/runtime_gate.py enter`.
-- Clarification, decision, and develop checkpoint helpers are internal bridge helpers, not replacement main entries.
+- All checkpoint helpers (clarification, decision) are internal to the runtime gate; hosts do not call them directly.
 
 ### Installer Entry Points and Release Assets
 

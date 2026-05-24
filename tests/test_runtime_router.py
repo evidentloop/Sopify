@@ -410,7 +410,7 @@ class RouterTests(unittest.TestCase):
             router = Router(config, state_store=store)
 
             run_runtime(
-                "~go plan payload 放 host root 还是 workspace/.sopify-runtime",
+                "~go plan payload 放 host root 还是 workspace/.sopify-skills",
                 workspace_root=workspace,
                 user_home=workspace / "home",
             )
@@ -469,7 +469,7 @@ class RouterTests(unittest.TestCase):
             router = Router(config, state_store=store)
 
             run_runtime(
-                "~go plan payload 放 host root 还是 workspace/.sopify-runtime",
+                "~go plan payload 放 host root 还是 workspace/.sopify-skills",
                 workspace_root=workspace,
                 user_home=workspace / "home",
             )
