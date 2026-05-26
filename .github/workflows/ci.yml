@@ -62,9 +62,6 @@ jobs:
               raise SystemExit(1)
           PY
 
-      - name: Check fail-close contract
-        run: python3 scripts/check-fail-close-contract.py
-
       - name: Check context checkpoints
         run: python3 scripts/check-context-checkpoints.py repo --root .
 

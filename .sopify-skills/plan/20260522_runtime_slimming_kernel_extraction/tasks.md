@@ -36,7 +36,7 @@ archive_ready: false
 | 1. 蓝图 delta 校验 | ✅ 完成 | 5 项审计全通过 |
 | 2. 当前消费者扫描 | ✅ 完成 | 4 类清单 + consumer 判定 |
 | 3. 删除就绪结论 | ✅ 完成 | kernel 边界锁定, 退场量级 ~38K LOC |
-| 4. 审计后删除 | ✅ 主线完成 | 4.1-4.5/4.6/4.7-4.10a/4.10b/4.10c/4.10d/4.13-A/4.13-B ✅; 4.11/4.12/4.13 Phase B 待后续 |
+| 4. 审计后删除 | ✅ 主线完成 | 4.1-4.5/4.6/4.7-4.10a/4.10b/4.10c/4.10d/4.11/4.13-A/4.13-B ✅; 4.12/4.13 Phase B 待后续 |
 | 5. 文档更新 | ⚠️ 部分完成 | 5.1/5.2/5.3 ✅; 5.4/5.5/5.6/5.7 待后续 |
 | 6. contract 面清理 + engine 重构 | ✅ 完成 | 6.1-6.6 全部收完, −6,400+ LOC |
 
@@ -277,15 +277,20 @@ archive_ready: false
   > **已知遗留声明**: runtime/contracts/decision_tables.yaml 仍引用 failure_recovery_table/host_message_templates/action_projection；
   >   tests/pytest_entries/fail_close_contract_entry.py 仍 import failure_recovery（import 会断）
   > **接受退化**: 非主链测试可能 fail，后续不救
-- [ ] 4.11 kernel 验证：确认 gate → route → handoff → checkpoint 链路在 kernel-only 模式下可用
+- [x] 4.11 kernel 验证：确认 gate → route → handoff → checkpoint 链路在 kernel-only 模式下可用
   > **coverage audit** ✅ 完成 (2026-05-23):
   > - gate.py / router.py / checkpoint_request.py / checkpoint_materializer.py 均有直接 contract/integration 覆盖
   > - end-to-end 真实链路存在：`test_runtime_engine.py` 中有 6+ integration tests 通过 `run_runtime()` 走完 gate → _kernel_turn → route → handoff → checkpoint
   > - 结论: 对 C1 (`from .models` → `from sopify_contracts.*`) 机械 rewire，无需先补测试；现有测试足以捕获 import 断裂
   >
-  > **未闭合项**:
-  > - `_kernel_turn.py` 作为 orchestration seam 仍无直接测试，当前仅通过 gate/engine 间接覆盖
-  > - 审计完成的是主链覆盖追踪，不等于“kernel-only 模式”已完全独立验证
+  > **直测完成** (2026-05-26):
+  > - `tests/test_runtime_kernel_turn.py`: 5 cases 直接调 `execute_kernel_turn()`
+  >   1. plan_only 主链 → handoff
+  >   2. active develop state planning 复用 existing plan + continue_host_develop handoff
+  >   3. decision_resume 经 kernel seam 正常分发
+  >   4. state_conflict inspect 严格只读（store 不变, last_route 不写）
+  >   5. state_conflict abort tombstone 语义（plan/run 存活, stage 不变）
+  > - 全量 631 passed, 49 subtests passed
 - [ ] 4.12 post-cutover naming/comment polish（deferred，非行为变更）
   > 进入条件: Package A + C 完成，retained 模块集合稳定
   > 范围:
@@ -420,7 +425,7 @@ archive_ready: false
 
 | 编号 | 内容 | 当前状态 |
 |------|------|----------|
-| 4.11 | kernel 验证 (gate→route→handoff→checkpoint) | coverage audit 完成; `_kernel_turn` 直接测试仍缺 |
+| 4.11 | kernel 验证 (gate→route→handoff→checkpoint) | ✅ 完成 — `test_runtime_kernel_turn.py` (5 cases) |
 | 4.12 | naming/comment polish | deferred — 进入条件: 模块集合稳定 |
 
 ### Tier 4: 文档更新
