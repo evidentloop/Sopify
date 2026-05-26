@@ -94,8 +94,6 @@ BLUEPRINT_BACKGROUND="$WORK_DIR/.sopify-skills/blueprint/background.md"
 BLUEPRINT_DESIGN="$WORK_DIR/.sopify-skills/blueprint/design.md"
 BLUEPRINT_TASKS="$WORK_DIR/.sopify-skills/blueprint/tasks.md"
 PREFERENCES_FILE="$WORK_DIR/.sopify-skills/user/preferences.md"
-HISTORY_INDEX="$WORK_DIR/.sopify-skills/history/index.md"
-WIKI_OVERVIEW="$WORK_DIR/.sopify-skills/wiki/overview.md"
 
 if [[ ! -d "$PLAN_DIR" ]]; then
   echo "Smoke check failed: missing plan directory: $PLAN_DIR" >&2
@@ -134,16 +132,6 @@ for file in \
     exit 1
   fi
 done
-
-if [[ -f "$WIKI_OVERVIEW" ]]; then
-  echo "Smoke check failed: legacy wiki overview should not be created: $WIKI_OVERVIEW" >&2
-  exit 1
-fi
-
-if [[ -f "$HISTORY_INDEX" ]]; then
-  echo "Smoke check failed: history index should not exist before explicit finalize: $HISTORY_INDEX" >&2
-  exit 1
-fi
 
 if ! grep -q '"runtime_entry_guard": true' "$MANIFEST_FILE"; then
   echo "Smoke check failed: manifest is missing runtime_entry_guard capability: $MANIFEST_FILE" >&2

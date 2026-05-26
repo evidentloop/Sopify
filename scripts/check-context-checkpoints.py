@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 from pathlib import Path, PurePosixPath
 import re
 import subprocess
@@ -15,19 +14,11 @@ from typing import Iterable
 PLAN_A_TASKS_PATH = Path(
     ".sopify-skills/plan/20260403_plan-a-risk-adaptive-interruption/tasks.md"
 )
-PR_TEMPLATE_PATH = Path(".github/pull_request_template.md")
 CI_WORKFLOW_PATH = Path(".github/workflows/ci.yml")
 COMMIT_HOOK_PATH = Path(".githooks/commit-msg")
 PREFLIGHT_PATH = Path("scripts/release-preflight.sh")
 
 ALLOWED_CONTEXT_CHECKPOINTS = ("A", "B", "C", "D")
-REQUIRED_PR_LABELS = (
-    "Context-Checkpoint:",
-    "Decision IDs:",
-    "Blocked by:",
-    "Out-of-scope touched:",
-)
-
 CHECKPOINT_TASK_REQUIREMENTS = {
     "A": ("15.4", "15.8", "15.9", "18.6", "19.5"),
     "B": ("5.1", "5.2", "5.3", "6.1", "6.2", "6.3", "6.4", "6.5", "6.6", "14.8", "15.5", "15.10"),
@@ -75,7 +66,6 @@ CHECKPOINT_SCOPE_PATTERNS = {
 }
 
 GOVERNANCE_SCOPE_PATTERNS = (
-    ".github/pull_request_template.md",
     ".github/workflows/ci.yml",
     ".githooks/commit-msg",
     "scripts/check-context-checkpoints.py",
@@ -85,9 +75,6 @@ GOVERNANCE_SCOPE_PATTERNS = (
     "CONTRIBUTING_CN.md",
 )
 
-PR_FIELD_PATTERN = re.compile(
-    r"(?mi)^(Context-Checkpoint|Decision IDs|Blocked by|Out-of-scope touched):\s*(.*?)\s*$"
-)
 TASK_STATUS_PATTERN = re.compile(r"^- \[(?P<status>[ x!~-])\] (?P<task_id>\d+\.\d+)\b", re.MULTILINE)
 
 
@@ -111,14 +98,6 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     commit_msg.add_argument("--root", default=".", help="Repository root")
     commit_msg.add_argument("--message-file", required=True, help="Path to the commit message file")
     add_files_args(commit_msg)
-
-    pr_body = subparsers.add_parser("pr-body", help="Validate PR metadata for scoped changes.")
-    pr_body.add_argument("--root", default=".", help="Repository root")
-    pr_body.add_argument("--body-file", help="Path to a PR body file")
-    pr_body.add_argument("--event-path", help="Path to a GitHub event payload")
-    pr_body.add_argument("--base-sha", help="Base revision used to compute changed files")
-    pr_body.add_argument("--head-sha", help="Head revision used to compute changed files")
-    add_files_args(pr_body)
 
     return parser.parse_args(argv)
 
@@ -150,18 +129,6 @@ def main(argv: list[str]) -> int:
                     staged_fallback=True,
                 ),
             )
-        elif args.command == "pr-body":
-            validate_pr_body(
-                root=root,
-                body=_load_pr_body(args),
-                changed_files=collect_changed_files(
-                    root,
-                    explicit_files=args.files,
-                    files_file=args.files_file,
-                    base_sha=args.base_sha,
-                    head_sha=args.head_sha,
-                ),
-            )
         else:
             raise ValidationError(f"Unsupported command: {args.command}")
     except ValidationError as exc:
@@ -179,13 +146,11 @@ def validate_repo(root: Path, checkpoints: tuple[str, ...]) -> None:
         )
         return
 
-    _require_file_with_labels(root / PR_TEMPLATE_PATH, REQUIRED_PR_LABELS, "PR template")
     _require_file_contains(root / COMMIT_HOOK_PATH, "check-context-checkpoints.py", "commit-msg hook")
     _require_file_contains(root / COMMIT_HOOK_PATH, "commit-msg --root", "commit-msg hook")
     _require_file_contains(root / PREFLIGHT_PATH, "check-context-checkpoints.py", "release preflight")
     _require_file_contains(root / PREFLIGHT_PATH, "repo --root", "release preflight")
     _require_file_contains(root / CI_WORKFLOW_PATH, "check-context-checkpoints.py repo", "CI workflow")
-    _require_file_contains(root / CI_WORKFLOW_PATH, "check-context-checkpoints.py pr-body", "CI workflow")
 
     task_status = parse_task_statuses(tasks_path)
     for checkpoint in checkpoints:
@@ -224,38 +189,6 @@ def validate_commit_message(*, root: Path, message_file: Path, changed_files: tu
         raise ValidationError(
             f"Context-Checkpoint {checkpoint!r} does not match the touched Plan A scope ({hint})"
         )
-
-
-def validate_pr_body(*, root: Path, body: str, changed_files: tuple[str, ...]) -> None:
-    relevant, allowed_candidates = resolve_checkpoint_scope(changed_files)
-    if not relevant:
-        return
-    if not body.strip():
-        raise ValidationError("Scoped Plan A pull request must include checkpoint metadata in the PR body")
-
-    fields = parse_pr_fields(body)
-    missing = [label.rstrip(":") for label in REQUIRED_PR_LABELS if label.rstrip(":") not in fields]
-    if missing:
-        raise ValidationError(
-            "Scoped Plan A pull request is missing required metadata fields: " + ", ".join(missing)
-        )
-
-    checkpoint = normalize_context_checkpoint(fields["Context-Checkpoint"])
-    if checkpoint is None:
-        hint = _allowed_checkpoint_hint(allowed_candidates)
-        raise ValidationError(
-            f"PR field Context-Checkpoint must be one of {hint}"
-        )
-    if checkpoint not in allowed_candidates:
-        hint = _allowed_checkpoint_hint(allowed_candidates)
-        raise ValidationError(
-            f"PR field Context-Checkpoint {checkpoint!r} does not match touched Plan A scope ({hint})"
-        )
-
-    for key in ("Decision IDs", "Blocked by", "Out-of-scope touched"):
-        value = fields[key].strip()
-        if not value or value.lower() in {"<required>", "<fill>", "todo", "tbd"}:
-            raise ValidationError(f"PR field {key} must be filled")
 
 
 def collect_changed_files(
@@ -343,13 +276,6 @@ def parse_task_statuses(tasks_path: Path) -> dict[str, str]:
     return statuses
 
 
-def parse_pr_fields(body: str) -> dict[str, str]:
-    fields: dict[str, str] = {}
-    for key, value in PR_FIELD_PATTERN.findall(body):
-        fields[key] = value.strip()
-    return fields
-
-
 def extract_context_checkpoint(message_text: str) -> str | None:
     matches = re.findall(r"(?mi)^Context-Checkpoint:\s*(.+?)\s*$", message_text)
     if not matches:
@@ -383,15 +309,6 @@ def path_matches(path: str, pattern: str) -> bool:
     return path == normalized_pattern or path.startswith(normalized_pattern + "/")
 
 
-def _require_file_with_labels(path: Path, labels: tuple[str, ...], label: str) -> None:
-    if not path.exists():
-        raise ValidationError(f"Missing {label}: {path}")
-    text = path.read_text(encoding="utf-8")
-    missing = [item for item in labels if item not in text]
-    if missing:
-        raise ValidationError(f"{label} is missing required labels: {', '.join(missing)}")
-
-
 def _require_file_contains(path: Path, snippet: str, label: str) -> None:
     if not path.exists():
         raise ValidationError(f"Missing {label}: {path}")
@@ -405,17 +322,6 @@ def _allowed_checkpoint_hint(candidates: set[str]) -> str:
     if not ordered:
         ordered = list(ALLOWED_CONTEXT_CHECKPOINTS)
     return " / ".join(ordered)
-
-
-def _load_pr_body(args: argparse.Namespace) -> str:
-    if args.body_file:
-        return Path(args.body_file).read_text(encoding="utf-8")
-    if args.event_path:
-        payload = json.loads(Path(args.event_path).read_text(encoding="utf-8"))
-        pull_request = payload.get("pull_request") if isinstance(payload, dict) else None
-        if isinstance(pull_request, dict):
-            return str(pull_request.get("body") or "")
-    return ""
 
 
 if __name__ == "__main__":

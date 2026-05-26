@@ -27,26 +27,3 @@ plans:
     meta:
       source: "runtime_backfill"
       updated_at: "2026-05-05T11:12:58+00:00"
-  - plan_id: "20260522_runtime_slimming_kernel_extraction"
-    snapshot:
-      path: ".sopify-skills/plan/20260522_runtime_slimming_kernel_extraction"
-      title: "Runtime Slimming — Orchestration Kernel Extraction"
-      level: "standard"
-      topic_key: "runtime_slimming_kernel_extraction"
-      lifecycle_state: "active"
-      created_at: "2026-05-22T14:56:02+08:00"
-    governance:
-      priority: null
-      priority_source: null
-      priority_confirmed_at: null
-      status: "todo"
-      note: ""
-    advice:
-      suggested_priority: "p2"
-      suggested_source: "heuristic_v1"
-      suggested_reason:
-        - "当前为审计型收敛任务，未识别明确紧急或降级信号，先按默认建议观察"
-      suggested_at: "2026-05-22T14:56:02+08:00"
-    meta:
-      source: "manual_plan_bootstrap"
-      updated_at: "2026-05-22T14:56:02+08:00"

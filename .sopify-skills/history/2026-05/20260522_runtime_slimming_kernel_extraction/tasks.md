@@ -2,13 +2,14 @@
 plan_id: 20260522_runtime_slimming_kernel_extraction
 feature_key: runtime_slimming_kernel_extraction
 level: standard
-lifecycle_state: active
+lifecycle_state: archived
 knowledge_sync:
-  project: review
-  background: review
-  design: review
-  tasks: review
-archive_ready: false
+  project: skip
+  background: skip
+  design: skip
+  tasks: skip
+archive_ready: true
+plan_status: completed
 ---
 
 # 任务清单: Runtime Slimming — Orchestration Kernel Extraction
@@ -27,7 +28,7 @@ archive_ready: false
 4. 已完成 kernel 提取与非 kernel 面删除，并记录实施结果
 5. 已完成最小必要验证与文档同步，足以决定归档或继续拆下一实施包
 
-## 状态概览 (2026-05-24)
+## 状态概览 (2026-05-26)
 
 > **runtime/ 当前**: 37 个 .py 文件, 16,286 LOC
 
@@ -36,8 +37,8 @@ archive_ready: false
 | 1. 蓝图 delta 校验 | ✅ 完成 | 5 项审计全通过 |
 | 2. 当前消费者扫描 | ✅ 完成 | 4 类清单 + consumer 判定 |
 | 3. 删除就绪结论 | ✅ 完成 | kernel 边界锁定, 退场量级 ~38K LOC |
-| 4. 审计后删除 | ✅ 主线完成 | 4.1-4.5/4.6/4.7-4.10a/4.10b/4.10c/4.10d/4.11/4.13-A/4.13-B ✅; 4.12/4.13 Phase B 待后续 |
-| 5. 文档更新 | ⚠️ 部分完成 | 5.1/5.2/5.3 ✅; 5.4/5.5/5.6/5.7 待后续 |
+| 4. 审计后删除 | ✅ 完成 | 4.1-4.13B 全部完成; 4.12 naming polish ✅ |
+| 5. 文档更新 | ✅ 完成 | 5.1-5.7 全部完成; 5.4 deferred=docs-only; 5.5 B-lite; 5.6 grep 通过 |
 | 6. contract 面清理 + engine 重构 | ✅ 完成 | 6.1-6.6 全部收完, −6,400+ LOC |
 
 ### 执行顺序说明
@@ -316,9 +317,23 @@ archive_ready: false
   > 已回写 `blueprint/design.md` / `blueprint/protocol.md`：冻结 mainline-only keep-list，明确 checkpoint 是主链分叉而非每轮必经主干
 - [x] 5.3 若维护者决定弃养 legacy deep runtime 路径，把该决策显式回写到长期文档而不是只留在临时审计结论
   > 已明确后续 slimming 口径：保 gate + machine truth + handoff + host consume rule，其余 runtime 内围能力默认可删/可内联
-- [ ] 5.4 若 `deferred` 语义需要统一，单列为后续 contract 决策项，不在本审计中顺手修补
-- [ ] 5.5 对齐 user-facing docs/examples：更新 `README.md`、`examples/external-repo-quickstart/README.md`、`examples/external-repo-quickstart/sopify.json.example`，移除或改写因 runtime slimming 失实的安装目标、能力矩阵、目录树、bootstrap 叙述、`runtime_gate` 描述。不做产品定位刷新或营销文案重写
-- [ ] 5.6 文档验收：grep 验证 user-facing docs 不再宣称已删除的 runtime surface / deep runtime path / runtime bundle smoke
+- [x] 5.4 `deferred` 语义统一 ✅ 完成 — docs tightening，不升格为 registry 状态
+  > **决策**: "deferred" 保持文档层面术语，不进入 registry/runtime 作为正式状态/枚举值。
+  > **理由**: runtime 代码中无 `deferred` 作为正式状态（唯一出现是 `_orchestration.py:390` 自然英语注释）。
+  > 现有 3 处使用各自合理，不需要统一：
+  > - `protocol.md:188,205,373` — RFC 风格 "wire format 未定义"，标准用法
+  > - `blueprint/tasks.md:121` — "Registry 状态：active + governance deferred"，治理语境
+  > - `ADR/README.md:26` — ADR-008 "deferred / scoped"，ADR 状态标签
+  > **不做**: 不改 registry parser/schema/test expectation，不新增 deferred 枚举
+- [x] 5.5 对齐 user-facing docs ✅ 完成 — B-lite 最小修正
+  > grep 审计发现 README.md / README.zh-CN.md / examples/ 已无过时引用。
+  > 唯一 stale：CONTRIBUTING.md:47 硬编码 `.sopify-runtime/scripts/runtime_gate.py enter` 作为 first host hop。
+  > 修正：对齐 CN 版表述 — "走 selected bundle 的 `runtime_gate_entry`，仅 repo-local 开发态直接调用 `scripts/runtime_gate.py enter`"。
+  > CONTRIBUTING_CN.md 已准确，无需改动。
+- [x] 5.6 文档验收 ✅ grep 通过
+  > 9 个关键词全 repo 扫描：`_kernel_turn` / `engine.run_runtime` / `decision_bridge` / `develop_callback` /
+  > `go_plan_helper` / `plan_orchestrator` / `.sopify-runtime/manifest.json` / `sopify_runtime_entry` / `check-runtime-smoke.sh`
+  > 结论：历史文档保留原引用（是记录不是活跃约束）；合法 consumer 不改；user-facing docs 仅 CONTRIBUTING.md 一处已修正。
 - [x] 5.7 完成后归档审计结论或继续拆下一实施包
   > 决策：本包继续承接剩余工作 (4.10b/4.11/4.12/4.13 Phase B/5.4/5.5/5.6)，不拆新包
 
@@ -421,12 +436,12 @@ archive_ready: false
 > - ✅ 4.13-A: 停写 legacy workspace stub (.sopify-runtime/manifest.json)，收敛到单 marker (.sopify-skills/sopify.json) + stub 合同对齐 + 文档同步
 > - ✅ 4.13-B: sync-runtime-assets.sh 壳套壳重写为纯 Python (installer/runtime_bundle.py shutil.copytree + write_bundle_manifest) + bundle contract 测试对齐 + bash 脚本删除
 >
-> **Phase B — 需先定义最小 contract (产品设计题)**:
-> - install smoke (check-install-payload-bundle-smoke.py) 最小 contract 重设计
-> - prompt smoke (check-prompt-runtime-gate-smoke.py) 最小 contract 重设计
-> - legacy_fallback 退役 (双 marker Phase 1 完成后自然死亡)
->
-> **风险**: 改 bootstrap_workspace.py (1507 LOC) 核心逻辑，不是边缘脚本
+> **Phase B — ✅ 完成（smoke 稳态化 + legacy_fallback 判定）**:
+> - ✅ check-runtime-smoke.sh: 删除 2 条 legacy 反向断言（wiki overview / history index 不存在检查 — 4.13-A 已收口），其余 ~28 条稳态 contract 保留。脚本保留不删（6 处 bundle/installer 活跃 consumer）
+> - ✅ check-prompt-runtime-gate-smoke.py: 6 个场景全部确认为稳态 gate contract，加 stable contract 标注。与 install smoke 一起加入 CI
+> - ✅ check-install-payload-bundle-smoke.py: 已是稳态 contract，无需重设计。加入 CI
+> - ✅ legacy_fallback 判定: 作为 workspace stub 字段已退役（4.13-A 停写 legacy stub）。`_legacy_payload_bundle_version()` / `_legacy_bundle_manifest_path()` 保留为 versioned layout 兼容路径（bootstrap_workspace.py / validate.py / workspace_preflight.py 共 ~60 LOC），有 hard gate 测试保护，后续随 bundle layout 正式固定后收口
+> - 不碰 bootstrap_workspace.py 核心逻辑（1507 LOC 风险隔离）
 
 ### Tier 3: 验证与 polish
 
@@ -440,9 +455,9 @@ archive_ready: false
 | 编号 | 内容 | 当前状态 |
 |------|------|----------|
 | 5.1 | 回写 `blueprint/tasks.md` | ✅ 已执行 |
-| 5.4 | `deferred` 语义统一 | 延后; 可能另开 contract 决策项 |
-| 5.5 | user-facing docs 更新 (README / examples) | 延后; 待 docs/release 包 |
-| 5.6 | 文档验收 grep | 延后; 依赖 5.5 |
+| 5.4 | `deferred` 语义统一 | ✅ 完成 — docs tightening，不升格为 registry 状态 |
+| 5.5 | user-facing docs 更新 (README / examples) | ✅ 完成 — B-lite: CONTRIBUTING.md host-hop 修正 |
+| 5.6 | 文档验收 grep | ✅ 通过 — 9 关键词全扫，仅 1 处已修 |
 | 5.7 | 归档审计结论或继续拆下一实施包 | ✅ 决策：本包继续，不拆 |
 
 ### 已知技术债 (不在本包范围)

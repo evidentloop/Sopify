@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """Run a focused smoke check for the prompt-level Sopify runtime gate.
 
+Stable contract — all 6 scenarios are long-term gate behaviors:
+  normal_runtime_followup, root_confirm_checkpoint_only,
+  protected_plan_asset_runtime_first, clarification_checkpoint_only,
+  decision_checkpoint_only, fail_closed_missing_handoff.
+
 This validates the Layer 1 gate contract and fail-closed behavior only. It
 does not prove that a real host enforced gate-first ordering at turn ingress.
 """

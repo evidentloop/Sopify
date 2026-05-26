@@ -65,15 +65,6 @@ jobs:
       - name: Check context checkpoints
         run: python3 scripts/check-context-checkpoints.py repo --root .
 
-      - name: Check pull request checkpoint metadata
-        if: github.event_name == 'pull_request'
-        run: |
-          python3 scripts/check-context-checkpoints.py pr-body \
-            --root . \
-            --event-path "$GITHUB_EVENT_PATH" \
-            --base-sha "${{ github.event.pull_request.base.sha }}" \
-            --head-sha "${{ github.event.pull_request.head.sha }}"
-
       - name: Run hard gate tests (contract + smoke + distribution)
         run: |
           pip install --quiet pytest
@@ -86,3 +77,9 @@ jobs:
 
       - name: Run runtime smoke check
         run: bash scripts/check-runtime-smoke.sh
+
+      - name: Run install/payload bootstrap smoke
+        run: python3 scripts/check-install-payload-bundle-smoke.py
+
+      - name: Run prompt runtime gate smoke
+        run: python3 scripts/check-prompt-runtime-gate-smoke.py

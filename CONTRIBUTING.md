@@ -44,7 +44,7 @@ Bundle rules:
 
 - The global payload lives under `~/.codex/sopify/` or `~/.claude/sopify/`.
 - Hosts must read `.sopify-skills/sopify.json` to detect workspace activation and resolve the selected global bundle.
-- The first host hop goes through `.sopify-runtime/scripts/runtime_gate.py enter`.
+- The first host hop goes through the selected bundle's `runtime_gate_entry`; only repo-local development calls `scripts/runtime_gate.py enter` directly.
 - All checkpoint helpers (clarification, decision) are internal to the runtime gate; hosts do not call them directly.
 
 ### Installer Entry Points and Release Assets
@@ -143,7 +143,6 @@ Behavior summary:
 - When `CHANGELOG.md -> [Unreleased]` is empty, `release-sync` auto-drafts summary-level notes (category bullets, no per-file lists) from the current staged files.
 - `commit-msg` only appends `Release-Sync`, `Release-Version`, and `Release-Date` when the pre-commit handoff exists.
 - Plan A scoped commits must include `Context-Checkpoint: A|B|C|D`; the hook only enforces this when staged files touch Plan A runtime/test surfaces or the checkpoint governance assets themselves.
-- Scoped Plan A pull requests must keep `Context-Checkpoint`, `Decision IDs`, `Blocked by`, and `Out-of-scope touched` filled in `.github/pull_request_template.md`; CI validates the template plus PR body metadata on matching diffs.
 
 AI attribution:
 

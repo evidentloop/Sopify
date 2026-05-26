@@ -6,81 +6,25 @@ Format: Summary → Changed → Plan Packages. File-level details live in `git l
 
 ## [Unreleased]
 
-## [2026-05-26.130923] - 2026-05-26
+## [2026-05-26.134110] - 2026-05-26
 
 ### Summary
 
-- Updated 1 active plan package(s); Changes across: Docs, Runtime, Skills, Tests.
+- Updated 1 active plan package(s); Changes across: Docs, Runtime, Scripts, Skills, Tests, Changed.
+- Runtime slimming closeout: `_kernel_turn.py` → `_orchestration.py` rename, kernel turn direct tests, smoke contract stabilization, docs + archive.
 
 ### Changed
 
 - **Docs**: Refined public documentation (2 files)
-- **Runtime**: Updated runtime internals (7 files)
+- **Runtime**: Updated runtime internals — module rename + docstring polish + plan/ package split (15 files)
+- **Scripts**: Adjusted maintenance scripts (2 files)
 - **Skills**: Synced prompt-layer skills (4 files)
-- **Tests**: Updated automated coverage (2 files)
+- **Tests**: Updated automated coverage — 5 kernel turn contract tests + rename alignment (6 files)
+- **Changed**: Updated project files (1 files)
 
 ### Plan Packages
 
 - `20260522_runtime_slimming_kernel_extraction` (active)
-
-## [2026-05-26.130719] - 2026-05-26
-
-### Summary
-
-- Updated 1 active plan package(s); Changes across: Runtime, Tests.
-
-### Changed
-
-- **Runtime**: Updated runtime internals (7 files)
-- **Tests**: Updated automated coverage (2 files)
-
-### Plan Packages
-
-- `20260522_runtime_slimming_kernel_extraction` (active)
-
-## [2026-05-26.112801] - 2026-05-26
-
-### Summary
-
-- Changes across: Scripts.
-
-### Changed
-
-- **Scripts**: Adjusted maintenance scripts (1 files)
-
-## [2026-05-26.092824] - 2026-05-26
-
-### Summary
-
-- Changes across: Docs, Runtime, Skills, Tests.
-
-### Changed
-
-- **Docs**: Refined public documentation (2 files)
-- **Runtime**: Updated runtime internals (12 files)
-- **Skills**: Synced prompt-layer skills (4 files)
-- **Tests**: Updated automated coverage (6 files)
-
-## [2026-05-26.092444] - 2026-05-26
-
-### Summary
-
-- Changes across: Runtime.
-
-### Changed
-
-- **Runtime**: Updated runtime internals (1 files)
-
-## [2026-05-26.092057] - 2026-05-26
-
-### Summary
-
-- Changes across: Runtime, Tests.
-
-### Changed
-
-- **Runtime**: Updated runtime internals (15 files)
-- **Tests**: Updated automated coverage (5 files)
 
 ## [2026-05-25.194723] - 2026-05-25
 
