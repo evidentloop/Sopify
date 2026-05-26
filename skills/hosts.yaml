@@ -1,0 +1,26 @@
+# Host metadata for skill rendering.
+# Each host defines how skills are rendered and installed.
+# Used by scripts/render-host-skills.py to produce host-specific output.
+
+hosts:
+  claude:
+    host_id: claude
+    config_dir: "~/.claude"
+    header_filename: CLAUDE.md
+    destination_dir: ".claude"
+    instruction_surface: header_embedded
+    install_enabled: true
+  codex:
+    host_id: codex
+    config_dir: "~/.codex"
+    header_filename: AGENTS.md
+    destination_dir: ".codex"
+    instruction_surface: header_embedded
+    install_enabled: true
+  copilot:
+    host_id: copilot
+    config_dir: null
+    header_filename: COPILOT.md
+    destination_dir: ".github"
+    instruction_surface: copilot_instructions_md
+    install_enabled: true

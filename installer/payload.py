@@ -10,7 +10,7 @@ import sys
 from tempfile import NamedTemporaryFile
 from typing import Any
 
-from installer.hosts.base import HostAdapter, read_sopify_version
+from installer.hosts.base import HostAdapter, read_sopify_version, HEADER_TEMPLATE_NAME
 from installer.models import BootstrapResult, InstallError, InstallPhaseResult
 from installer.runtime_bundle import sync_runtime_bundle
 from installer.validate import _normalize_payload_bundle_version, resolve_payload_bundle_root, validate_payload_install
@@ -133,7 +133,11 @@ def _payload_is_current(payload_root: Path, desired_version: str | None) -> bool
 
 def _source_payload_version(adapter: HostAdapter, repo_root: Path) -> str | None:
     language_directory = "CN"
-    header_path = adapter.source_root(repo_root, language_directory) / adapter.header_filename
+    source = adapter.source_root(repo_root, language_directory)
+    # Prefer template; fall back to host-specific header
+    header_path = source / HEADER_TEMPLATE_NAME
+    if not header_path.is_file():
+        header_path = source / adapter.header_filename
     return read_sopify_version(header_path)
 
 

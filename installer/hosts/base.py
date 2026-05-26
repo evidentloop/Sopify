@@ -7,10 +7,11 @@ from pathlib import Path
 import re
 import shutil
 
-from installer.models import HostCapability, InstallError, InstallPhaseResult
+from installer.models import HostCapability, InstallError, InstallPhaseResult, language_to_source_dir
 
 _IGNORE_PATTERNS = shutil.ignore_patterns(".DS_Store", "Thumbs.db", "__pycache__")
 _SOPIFY_VERSION_RE = re.compile(r"^<!--\s*SOPIFY_VERSION:\s*(?P<version>.+?)\s*-->$", re.MULTILINE)
+HEADER_TEMPLATE_NAME = "header.md.template"
 
 
 @dataclass(frozen=True)
@@ -18,12 +19,12 @@ class HostAdapter:
     """Host-specific layout for Sopify prompt-layer assets."""
 
     host_name: str
-    source_dirname: str
     destination_dirname: str
     header_filename: str
+    config_dir: str | None = None
 
     def source_root(self, repo_root: Path, language_directory: str) -> Path:
-        return repo_root / self.source_dirname / "Skills" / language_directory
+        return repo_root / "skills" / language_to_source_dir(language_directory)
 
     def destination_root(self, home_root: Path) -> Path:
         return home_root / self.destination_dirname
@@ -71,7 +72,9 @@ def install_host_assets(
 ) -> InstallPhaseResult:
     """Install or update Sopify prompt-layer assets for one host."""
     source_root = adapter.source_root(repo_root, language_directory)
-    header_source = source_root / adapter.header_filename
+    header_template = source_root / HEADER_TEMPLATE_NAME
+    # Fallback to old-style header if template doesn't exist
+    header_source = header_template if header_template.is_file() else source_root / adapter.header_filename
     skills_source = source_root / "skills" / "sopify"
     if not header_source.is_file():
         raise InstallError(f"Missing source header file: {header_source}")
@@ -96,7 +99,7 @@ def install_host_assets(
 
     header_destination = destination_root / adapter.header_filename
     header_destination.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(header_source, header_destination)
+    _render_header(header_source, header_destination, adapter)
 
     skills_destination = destination_root / "skills" / "sopify"
     if skills_destination.exists():
@@ -110,6 +113,16 @@ def install_host_assets(
         version=source_version,
         paths=adapter.expected_paths(home_root),
     )
+
+
+def _render_header(source: Path, destination: Path, adapter: HostAdapter) -> None:
+    """Render header template with host-specific variables and write to destination."""
+    content = source.read_text(encoding="utf-8")
+    if adapter.config_dir is not None:
+        content = content.replace("{{config_dir}}", adapter.config_dir)
+    else:
+        content = content.replace("{{config_dir}}", "")
+    destination.write_text(content, encoding="utf-8")
 
 
 def read_sopify_version(path: Path) -> str | None:

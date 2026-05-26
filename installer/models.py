@@ -11,6 +11,24 @@ LANGUAGE_DIRECTORY_MAP = {
     "en-US": "EN",
 }
 
+LANGUAGE_SOURCE_MAP: dict[str, str] = {
+    "zh-CN": "zh",
+    "en-US": "en",
+    "CN": "zh",
+    "EN": "en",
+}
+
+
+def language_to_source_dir(language: str) -> str:
+    """Map install language code to skills/ source directory name.
+
+    Accepts both locale codes (zh-CN, en-US) and legacy directory names (CN, EN).
+    """
+    try:
+        return LANGUAGE_SOURCE_MAP[language]
+    except KeyError as exc:
+        raise ValueError(f"Unsupported language: {language}") from exc
+
 
 class InstallError(RuntimeError):
     """Raised when the installer cannot complete safely."""
