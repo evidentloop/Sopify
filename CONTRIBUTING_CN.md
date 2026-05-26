@@ -149,7 +149,6 @@ git config core.hooksPath .githooks
 - 当 `CHANGELOG.md -> [Unreleased]` 为空时，`release-sync` 会根据当前 staged files 自动生成摘要级草稿（分类 bullet，不含逐文件列表）
 - `commit-msg` 只有在存在 pre-commit handoff 时，才会追加 `Release-Sync`、`Release-Version`、`Release-Date`
 - 命中 Plan A 作用域的提交必须带上 `Context-Checkpoint: A|B|C|D`；hook 只会在 staged files 命中 Plan A runtime/test 面或治理入口资产时强制校验
-- 命中 Plan A 作用域的 PR 必须在 `.github/pull_request_template.md` 中填写 `Context-Checkpoint`、`Decision IDs`、`Blocked by`、`Out-of-scope touched`；CI 会同时校验模板和 PR body 元数据
 
 AI attribution 说明：
 

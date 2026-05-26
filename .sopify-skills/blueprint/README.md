@@ -13,8 +13,8 @@
 ## 当前焦点
 
 <!-- sopify:auto:focus:start -->
-- 当前活动 plan：`../plan/20260522_runtime_slimming_kernel_extraction`。
-- history 归档：已可用；最近归档为 `../history/2026-05/20260522_p7_payload_only_onboarding_mainline`。
+- 当前活动 plan：暂无。
+- history 归档：已可用；最近归档为 `../history/2026-05/20260522_runtime_slimming_kernel_extraction`。
 <!-- sopify:auto:focus:end -->
 
 ## 深入阅读入口
@@ -27,5 +27,5 @@
 - [Sopify 宿主接入规范 (Protocol v0)](./protocol.md)
 - [Skill 标准对齐蓝图](./skill-standards-refactor.md)
 - [变更历史](../history/index.md)
-- 最近归档：`../history/2026-05/20260522_p7_payload_only_onboarding_mainline`
+- 最近归档：`../history/2026-05/20260522_runtime_slimming_kernel_extraction`
 <!-- sopify:auto:read-next:end -->
