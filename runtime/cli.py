@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Callable, Mapping, Optional
 
 from .config import ConfigError, load_runtime_config
-from ._kernel_turn import execute_kernel_turn
+from ._orchestration import execute_kernel_turn
 from .output import render_runtime_error, render_runtime_output
 
 RequestTransform = Callable[[str], str]

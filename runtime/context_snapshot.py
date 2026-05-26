@@ -968,7 +968,7 @@ def _freeze_mapping(value: Mapping[str, Any]) -> Mapping[str, Any]:
     return MappingProxyType(frozen)
 
 
-# -- Snapshot query helpers (consolidated from engine.py / _kernel_turn.py) ----
+# -- Snapshot query helpers (consolidated from engine.py / _orchestration.py) --
 
 GLOBAL_EXECUTION_ROUTES = frozenset({"resume_active", "exec_plan", "archive_lifecycle"})
 PROMOTABLE_REVIEW_STAGES = frozenset({"plan_generated", "ready_for_execution", "develop_pending"})

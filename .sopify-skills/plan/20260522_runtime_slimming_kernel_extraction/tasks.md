@@ -291,16 +291,23 @@ archive_ready: false
   >   4. state_conflict inspect 严格只读（store 不变, last_route 不写）
   >   5. state_conflict abort tombstone 语义（plan/run 存活, stage 不变）
   > - 全量 631 passed, 49 subtests passed
-- [ ] 4.12 post-cutover naming/comment polish（deferred，非行为变更）
-  > 进入条件: Package A + C 完成，retained 模块集合稳定
-  > 范围:
-  > - 确认 `runtime/_kernel_turn.py` 的最终命名，按最终职责改名
-  > - 审查其他 retained/internal 文件名是否仍带过渡态语义
-  > - 对难以直读的 orchestration / state-ownership / resolution-id 代码补充选择性注释
-  > 非目标:
-  > - 不改业务逻辑
-  > - 不新增 public surface / 抽象层
-  > - 不做大规模重构
+- [x] 4.12 post-cutover naming/comment polish ✅ 完成
+  > **命名决策**: `runtime/_kernel_turn.py` → `runtime/_orchestration.py`
+  > - 保留下划线 internal 语义（external 进入点仍为 gate.py）
+  > - `execute_kernel_turn()` 函数名保留不改，不扩大变更面
+  > - 不留 `_kernel_turn.py` 兼容 shim — 内部模块不承诺 import 稳定性
+  > - 理由：orchestration 是稳态职责描述，kernel_turn 带迁移过程味道
+  >
+  > **docstring/comment polish**:
+  > - `_orchestration.py` 模块 docstring 重写（去迁移语言，写稳态描述）
+  > - `_derived_resolution_id()` 加 docstring（优先级链说明）
+  > - `_result_state_store_for_route()` 加 docstring（store 选择逻辑说明）
+  > - `engine.py` 模块 docstring 更正（"Top-level orchestration" → legacy wrapper）
+  > - `run_runtime()` deprecation docstring 修正（去 "will be removed in Package A"）
+  > - `state.py` / `context_snapshot.py` 注释同步更新
+  >
+  > **import 更新**: gate.py, cli.py, engine.py (3 处), test_runtime_orchestration.py (1 处)
+  > **测试**: 全量 631 passed, 49 subtests passed — 0 行为变更
 
 ## 5. 文档更新 (⚠️ 部分完成 — 剩余项见"后续路线"节)
 - [x] 5.1 按审计结果决定是否需要回写 `blueprint/tasks.md`
@@ -425,8 +432,8 @@ archive_ready: false
 
 | 编号 | 内容 | 当前状态 |
 |------|------|----------|
-| 4.11 | kernel 验证 (gate→route→handoff→checkpoint) | ✅ 完成 — `test_runtime_kernel_turn.py` (5 cases) |
-| 4.12 | naming/comment polish | deferred — 进入条件: 模块集合稳定 |
+| 4.11 | kernel 验证 (gate→route→handoff→checkpoint) | ✅ 完成 — `test_runtime_orchestration.py` (5 cases) |
+| 4.12 | naming/comment polish | ✅ 完成 — `_kernel_turn.py` → `_orchestration.py` + docstring polish |
 
 ### Tier 4: 文档更新
 

@@ -15,7 +15,7 @@ def _workspace_manifest_found(workspace: Path) -> bool:
     return (workspace / ".sopify-skills" / "sopify.json").is_file()
 
 from .config import ConfigError, load_runtime_config
-from ._kernel_turn import execute_kernel_turn
+from ._orchestration import execute_kernel_turn
 from .entry_guard import ENTRY_GUARD_PENDING_ACTIONS
 from .action_intent import (
     ACTION_TYPES,

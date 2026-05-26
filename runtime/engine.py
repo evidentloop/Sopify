@@ -1,4 +1,4 @@
-"""Top-level orchestration for Sopify runtime — conflict handling, activation, archive."""
+"""Legacy compatibility wrapper + non-kernel route handlers (conflict, cancel, archive)."""
 
 from __future__ import annotations
 
@@ -214,12 +214,11 @@ def run_runtime(
     """Run the Sopify runtime pipeline for a single input.
 
     .. deprecated::
-        Legacy wrapper — delegates to ``_kernel_turn.execute_kernel_turn()``.
-        Direct callers should import from ``_kernel_turn`` instead.
-        This wrapper exists only for backward-compatible test imports
-        and will be removed in Package A.
+        Legacy wrapper — delegates to ``_orchestration.execute_kernel_turn()``.
+        Direct callers should import from ``_orchestration`` instead.
+        Kept for backward-compatible test imports (50+ callers use this path).
     """
-    from ._kernel_turn import execute_kernel_turn  # lazy to avoid circular
+    from ._orchestration import execute_kernel_turn  # lazy to avoid circular
 
     return execute_kernel_turn(
         user_input,

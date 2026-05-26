@@ -1,16 +1,12 @@
-"""Kernel orchestration entry point (internal).
+"""Internal orchestration entry point for the Sopify runtime kernel.
 
-Guarantees achieved:
-  - gate.py imports execute_kernel_turn() from this module instead of
-    engine.run_runtime().
-  - engine.run_runtime() is a deprecated lazy-import wrapper.
-  - No runtime.models bridge consumption — types come from sopify_contracts.
-  - Kernel-path helpers are inlined (A1 complete) — no engine.py
-    implementation coupling for the core orchestration pipeline.
+Exports ``execute_kernel_turn()`` — the single pipeline that resolves context,
+routes a request, builds a handoff, and writes result state.  All production
+callers (gate.py, cli.py) import from this module; engine.run_runtime() is a
+deprecated compatibility wrapper.
 
-Remaining engine dependency:
-  - 10 non-kernel route handlers still imported from engine.py.
-    A2 contract audit determined 9 retain + 1 deleted (skill execution sidecar).
+The underscore prefix marks this as an internal module: external host code
+should enter through ``gate.py``, never import ``_orchestration`` directly.
 """
 
 from __future__ import annotations
@@ -136,6 +132,10 @@ def _derived_resolution_id(
     current_run: RunState | None = None,
     current_handoff: RuntimeHandoff | None = None,
 ) -> str:
+    """Pick the best existing resolution ID, falling back to a fresh one.
+
+    Priority: explicit resolved > current run > current handoff > new UUID.
+    """
     for candidate in (
         resolved_resolution_id,
         current_run.resolution_id if current_run is not None else "",
@@ -242,6 +242,7 @@ def _result_state_store_for_route(
     current_decision: DecisionState | None = None,
     snapshot: ContextResolvedSnapshot | None = None,
 ) -> StateStore:
+    """Choose review or global store based on route and checkpoint phase."""
     if canceled_store is not None:
         if canceled_store is global_store and preserved_review_after_cancel:
             return review_store

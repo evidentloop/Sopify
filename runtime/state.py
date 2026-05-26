@@ -139,7 +139,7 @@ def _read_json_file(path: Path) -> Optional[dict[str, Any]]:
     return payload if isinstance(payload, dict) else None
 
 
-# -- Run state construction (consolidated from engine.py / _kernel_turn.py) ----
+# -- Run state construction (consolidated from engine.py / _orchestration.py) --
 
 
 def make_run_id(request_text: str) -> str:

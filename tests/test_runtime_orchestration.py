@@ -1,13 +1,13 @@
 # Test classification: contract
 #
-# 4.11 — Direct tests for execute_kernel_turn().
+# 4.11 — Direct tests for execute_kernel_turn() through the orchestration module.
 # Proves the kernel orchestration seam works independently of the
 # run_runtime() wrapper in engine.py.
 from __future__ import annotations
 
 from tests.runtime_test_support import *
 
-from runtime._kernel_turn import execute_kernel_turn
+from runtime._orchestration import execute_kernel_turn
 
 
 class TestKernelTurnDirect(unittest.TestCase):
