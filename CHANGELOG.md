@@ -6,6 +6,16 @@ Format: Summary → Changed → Plan Packages. File-level details live in `git l
 
 ## [Unreleased]
 
+## [2026-05-26.112801] - 2026-05-26
+
+### Summary
+
+- Changes across: Scripts.
+
+### Changed
+
+- **Scripts**: Adjusted maintenance scripts (1 files)
+
 ## [2026-05-26.092824] - 2026-05-26
 
 ### Summary
