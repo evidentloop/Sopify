@@ -13,6 +13,7 @@ COPILOT_ADAPTER = HostAdapter(
     config_dir=None,
     instruction_surface=INSTRUCTION_SURFACE_SINGLE_FILE,
     instruction_file_relpath=None,
+    default_language="en-US",
 )
 
 COPILOT_CAPABILITY = HostCapability(

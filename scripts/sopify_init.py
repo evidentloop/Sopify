@@ -48,7 +48,6 @@ _MANAGED_IGNORE_ENTRIES = (
 
 _INSTRUCTION_BLOCK_BEGIN = "<!-- BEGIN SOPIFY MANAGED BLOCK -->"
 _INSTRUCTION_BLOCK_END = "<!-- END SOPIFY MANAGED BLOCK -->"
-_COPILOT_INSTRUCTIONS_RELPATH = Path(".github") / "copilot-instructions.md"
 
 _SOPIFY_VERSION_RE = re.compile(r"^<!--\s*SOPIFY_VERSION:\s*(?P<version>.+?)\s*-->$", re.MULTILINE)
 
@@ -183,25 +182,30 @@ def _write_managed_instruction_block(path: Path, content: str) -> bool:
     return _write_text_if_changed(path, _ensure_trailing_newline(new_content))
 
 
-def _sync_copilot_instructions(workspace_root: Path, *, source_root: Path) -> bool:
-    """Render full Copilot rules from skills/{lang} and write to managed block."""
+def _sync_workspace_scope_instructions(workspace_root: Path, *, source_root: Path) -> bool:
+    """Render full rules from skills/{lang} and write managed blocks for workspace-scope hosts."""
     try:
+        from installer.hosts import iter_host_registrations
         from installer.hosts.base import render_single_file, HEADER_TEMPLATE_NAME as _HTN
-        from installer.hosts.copilot import COPILOT_ADAPTER
     except ImportError:
         return False
-    language_directory = "CN"
-    skills_root = COPILOT_ADAPTER.source_root(source_root, language_directory)
-    header_template = skills_root / _HTN
-    header_source = header_template if header_template.is_file() else skills_root / COPILOT_ADAPTER.header_filename
-    skills_source = skills_root / "skills" / "sopify"
-    if not header_source.is_file() or not skills_source.is_dir():
-        return False
-    full_content = render_single_file(header_source, skills_source, COPILOT_ADAPTER)
-    # Managed block must be self-contained — Copilot CLI only reads copilot-instructions.md
-    return _write_managed_instruction_block(
-        workspace_root / _COPILOT_INSTRUCTIONS_RELPATH, full_content,
-    )
+    changed = False
+    for reg in iter_host_registrations():
+        adapter = reg.adapter
+        if not adapter.is_workspace_scope or not reg.capability.install_enabled:
+            continue
+        language_directory = "CN"
+        skills_root = adapter.source_root(source_root, language_directory)
+        header_template = skills_root / _HTN
+        header_source = header_template if header_template.is_file() else skills_root / adapter.header_filename
+        skills_source = skills_root / "skills" / "sopify"
+        if not header_source.is_file() or not skills_source.is_dir():
+            continue
+        full_content = render_single_file(header_source, skills_source, adapter)
+        target_path = workspace_root / adapter.destination_dirname / adapter.header_filename
+        if _write_managed_instruction_block(target_path, full_content):
+            changed = True
+    return changed
 
 
 # ── Main ─────────────────────────────────────────────────────────────────
@@ -211,7 +215,7 @@ def init_workspace(
     workspace: Path,
     *,
     source_root: Path = REPO_ROOT,
-    copilot: bool = True,
+    workspace_instructions: bool = True,
 ) -> dict:
     workspace = workspace.resolve()
     if not workspace.is_dir():
@@ -237,12 +241,12 @@ def init_workspace(
     else:
         results.append(".gitignore skipped (not a git repo)")
 
-    # 3. Copilot instructions (if resources available)
-    if copilot:
-        if _sync_copilot_instructions(workspace, source_root=source_root):
-            results.append("copilot instructions synced")
+    # 3. Workspace-scope host instructions (if resources available)
+    if workspace_instructions:
+        if _sync_workspace_scope_instructions(workspace, source_root=source_root):
+            results.append("workspace instructions synced")
         else:
-            results.append("copilot instructions unchanged")
+            results.append("workspace instructions unchanged")
 
     sopify_json_path = workspace / _SOPIFY_SKILLS_DIR / _SOPIFY_JSON_FILENAME
     return {
@@ -333,7 +337,7 @@ def main(argv: list[str] | None = None) -> int:
     result = init_workspace(
         workspace,
         source_root=REPO_ROOT,
-        copilot=not args.no_copilot,
+        workspace_instructions=not args.no_copilot,
     )
 
     if sys.stdout.isatty() and result.get("action") != "failed":

@@ -178,14 +178,23 @@ class BootstrapResult:
 def parse_install_target(raw_value: str) -> InstallTarget:
     """Parse a CLI target like `codex:zh-CN`.
 
-    Bare ``copilot`` (without ``:lang``) defaults to ``copilot:en-US``.
+    Bare host names (without ``:lang``) are expanded using the adapter's
+    ``default_language`` when available.
     """
     value = raw_value.strip()
-    if value == "copilot":
-        value = "copilot:en-US"
     host, separator, language = value.partition(":")
     if not separator:
-        raise InstallError("Target must use the format <host:lang>, for example codex:zh-CN")
+        from installer.hosts import get_host_adapter
+
+        try:
+            adapter = get_host_adapter(value)
+        except ValueError:
+            raise InstallError("Target must use the format <host:lang>, for example codex:zh-CN")
+        if adapter.default_language:
+            host = value
+            language = adapter.default_language
+        else:
+            raise InstallError("Target must use the format <host:lang>, for example codex:zh-CN")
     from installer.hosts import get_host_capability
 
     try:

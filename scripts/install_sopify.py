@@ -23,7 +23,7 @@ from installer.distribution import (
     render_distribution_user_result,
     run_distribution_install,
 )
-from installer.hosts import get_host_adapter, iter_installable_hosts
+from installer.hosts import get_host_adapter, iter_host_registrations, iter_installable_hosts
 from installer.hosts.base import install_host_assets
 from installer.models import BootstrapResult, InstallError, InstallPhaseResult, InstallResult, LANGUAGE_DIRECTORY_MAP, parse_install_target
 from installer.payload import install_global_payload, run_workspace_bootstrap
@@ -44,10 +44,17 @@ def build_parser() -> argparse.ArgumentParser:
         for capability in iter_installable_hosts()
         for language in LANGUAGE_DIRECTORY_MAP
     )
-    supported_targets = f"copilot, {supported_targets}"
+    # Append bare targets for hosts that accept them (have default_language)
+    bare_targets = [
+        reg.adapter.host_name
+        for reg in iter_host_registrations()
+        if reg.capability.install_enabled and reg.adapter.default_language
+    ]
+    if bare_targets:
+        supported_targets = supported_targets + ", " + ", ".join(bare_targets)
     parser = argparse.ArgumentParser(
         description=(
-            "Install Sopify for a host. Use `--target copilot` to bootstrap a workspace; "
+            "Install Sopify for a host. Workspace-scope hosts (e.g. copilot) bootstrap directly; "
             "for Codex / Claude this installs the host prompt and Sopify kernel only, and "
             "project files are initialized later when you run `~go` in a workspace."
         )
@@ -61,12 +68,13 @@ def build_parser() -> argparse.ArgumentParser:
         "--workspace",
         default=None,
         help=(
-            "For copilot: bootstrap this workspace now (defaults to current directory when omitted). "
+            "For workspace-scope hosts (e.g. copilot): bootstrap this workspace now "
+            "(defaults to current directory when omitted). "
             "For other hosts: advanced prewarm path. Most users should omit this and let `~go` initialize "
             "project files on first use."
         ),
     )
-    parser.add_argument("--language", choices=("en-US", "zh-CN"), default=None, help="Copilot bootstrap output language.")
+    parser.add_argument("--language", choices=("en-US", "zh-CN"), default=None, help="Override output language for bare targets.")
     parser.add_argument(
         "--ref",
         default=None,
@@ -174,9 +182,15 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     verbose = args.verbose or _env_flag_enabled(os.environ.get("SOPIFY_DEBUG"))
     normalized_target = args.target
-    if normalized_target == "copilot":
-        copilot_language = args.language or _detect_default_output_language()
-        normalized_target = f"copilot:{copilot_language}"
+    # Expand bare targets for hosts with default_language (e.g. "copilot" → "copilot:zh-CN")
+    if normalized_target and ":" not in normalized_target:
+        try:
+            adapter = get_host_adapter(normalized_target)
+            if adapter.default_language:
+                lang = args.language or _detect_default_output_language()
+                normalized_target = f"{normalized_target}:{lang}"
+        except ValueError:
+            pass
     output_language = _infer_output_language(normalized_target)
     source_metadata = DistributionSourceMetadata(
         resolved_ref=args.source_resolved_ref,

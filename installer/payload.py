@@ -20,7 +20,7 @@ PAYLOAD_MANIFEST_FILENAME = "payload-manifest.json"
 PAYLOAD_DIRNAME = "sopify"
 PAYLOAD_BUNDLES_RELATIVE_PATH = Path("bundles")
 PAYLOAD_HELPER_RELATIVE_PATH = Path("helpers") / "bootstrap_workspace.py"
-PAYLOAD_INSTRUCTION_RESOURCES_DIR = Path("resources") / "copilot"
+PAYLOAD_INSTRUCTION_RESOURCES_DIR = Path("resources")
 _REQUIRED_BUNDLE_CAPABILITIES = {
     "bundle_role": "control_plane",
     "manifest_first": True,
@@ -42,7 +42,7 @@ def install_global_payload(
     desired_version = _normalize_payload_bundle_version(_source_payload_version(adapter, repo_root))
 
     if _payload_is_current(payload_root, desired_version):
-        resources_changed = _ensure_copilot_instruction_resources(repo_root=repo_root, payload_root=payload_root)
+        resources_changed = _ensure_workspace_instruction_resources(repo_root=repo_root, payload_root=payload_root)
         return InstallPhaseResult(
             action="updated" if resources_changed else "skipped",
             root=payload_root,
@@ -57,7 +57,7 @@ def install_global_payload(
         desired_bundle_version=desired_version,
     )
     _install_bootstrap_helper(repo_root=repo_root, payload_root=payload_root)
-    _install_copilot_instruction_resources(repo_root=repo_root, payload_root=payload_root)
+    _install_workspace_instruction_resources(repo_root=repo_root, payload_root=payload_root)
     _write_payload_manifest(payload_root=payload_root, bundle_root=bundle_root, payload_version=desired_version)
     return InstallPhaseResult(
         action=action,
@@ -152,42 +152,64 @@ def _install_bootstrap_helper(*, repo_root: Path, payload_root: Path) -> Path:
     return helper_target
 
 
-def _install_copilot_instruction_resources(*, repo_root: Path, payload_root: Path) -> None:
-    """Render full Copilot rules from skills/{lang} and store as full.md in payload."""
-    from installer.hosts.copilot import COPILOT_ADAPTER
+def _install_workspace_instruction_resources(*, repo_root: Path, payload_root: Path) -> None:
+    """Render instruction resources for all workspace-scope hosts into payload."""
+    from installer.hosts import iter_host_registrations
 
-    language_directory = "CN"
-    skills_root = COPILOT_ADAPTER.source_root(repo_root, language_directory)
-    header_template = skills_root / HEADER_TEMPLATE_NAME
-    header_source = header_template if header_template.is_file() else skills_root / COPILOT_ADAPTER.header_filename
-    skills_source = skills_root / "skills" / "sopify"
-    if not header_source.is_file() or not skills_source.is_dir():
-        return
-    full_content = render_single_file(header_source, skills_source, COPILOT_ADAPTER)
-    target_dir = payload_root / PAYLOAD_INSTRUCTION_RESOURCES_DIR
-    target_dir.mkdir(parents=True, exist_ok=True)
-    (target_dir / "full.md").write_text(full_content, encoding="utf-8")
+    for reg in iter_host_registrations():
+        adapter = reg.adapter
+        if not adapter.is_workspace_scope or not reg.capability.install_enabled:
+            continue
+        language_directory = "CN"
+        skills_root = adapter.source_root(repo_root, language_directory)
+        header_template = skills_root / HEADER_TEMPLATE_NAME
+        header_source = header_template if header_template.is_file() else skills_root / adapter.header_filename
+        skills_source = skills_root / "skills" / "sopify"
+        if not header_source.is_file() or not skills_source.is_dir():
+            continue
+        full_content = render_single_file(header_source, skills_source, adapter)
+        target_dir = payload_root / PAYLOAD_INSTRUCTION_RESOURCES_DIR / adapter.host_name
+        target_dir.mkdir(parents=True, exist_ok=True)
+        (target_dir / "full.md").write_text(full_content, encoding="utf-8")
+        # Write resource manifest so bootstrap_workspace.py knows the target path
+        manifest = {"destination_dirname": adapter.destination_dirname, "header_filename": adapter.header_filename}
+        (target_dir / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False), encoding="utf-8")
 
 
-def _ensure_copilot_instruction_resources(*, repo_root: Path, payload_root: Path) -> bool:
-    """Ensure rendered instruction resource is present and current; return True if changed."""
-    from installer.hosts.copilot import COPILOT_ADAPTER
+def _ensure_workspace_instruction_resources(*, repo_root: Path, payload_root: Path) -> bool:
+    """Ensure rendered instruction resources for workspace-scope hosts are current; return True if any changed."""
+    from installer.hosts import iter_host_registrations
 
-    language_directory = "CN"
-    skills_root = COPILOT_ADAPTER.source_root(repo_root, language_directory)
-    header_template = skills_root / HEADER_TEMPLATE_NAME
-    header_source = header_template if header_template.is_file() else skills_root / COPILOT_ADAPTER.header_filename
-    skills_source = skills_root / "skills" / "sopify"
-    if not header_source.is_file() or not skills_source.is_dir():
-        return False
-    full_content = render_single_file(header_source, skills_source, COPILOT_ADAPTER)
-    target_dir = payload_root / PAYLOAD_INSTRUCTION_RESOURCES_DIR
-    target_file = target_dir / "full.md"
-    if target_file.is_file() and target_file.read_text(encoding="utf-8") == full_content:
-        return False
-    target_dir.mkdir(parents=True, exist_ok=True)
-    target_file.write_text(full_content, encoding="utf-8")
-    return True
+    changed = False
+    for reg in iter_host_registrations():
+        adapter = reg.adapter
+        if not adapter.is_workspace_scope or not reg.capability.install_enabled:
+            continue
+        language_directory = "CN"
+        skills_root = adapter.source_root(repo_root, language_directory)
+        header_template = skills_root / HEADER_TEMPLATE_NAME
+        header_source = header_template if header_template.is_file() else skills_root / adapter.header_filename
+        skills_source = skills_root / "skills" / "sopify"
+        if not header_source.is_file() or not skills_source.is_dir():
+            continue
+        full_content = render_single_file(header_source, skills_source, adapter)
+        target_dir = payload_root / PAYLOAD_INSTRUCTION_RESOURCES_DIR / adapter.host_name
+        target_file = target_dir / "full.md"
+        manifest = {"destination_dirname": adapter.destination_dirname, "header_filename": adapter.header_filename}
+        manifest_text = json.dumps(manifest, ensure_ascii=False)
+        manifest_file = target_dir / "manifest.json"
+        if (
+            target_file.is_file()
+            and target_file.read_text(encoding="utf-8") == full_content
+            and manifest_file.is_file()
+            and manifest_file.read_text(encoding="utf-8") == manifest_text
+        ):
+            continue
+        target_dir.mkdir(parents=True, exist_ok=True)
+        target_file.write_text(full_content, encoding="utf-8")
+        manifest_file.write_text(manifest_text, encoding="utf-8")
+        changed = True
+    return changed
 
 
 def _install_versioned_runtime_bundle(

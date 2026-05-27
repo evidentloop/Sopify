@@ -30,6 +30,7 @@ class HostAdapter:
     config_dir: str | None = None
     instruction_surface: str = field(default=INSTRUCTION_SURFACE_HEADER_EMBEDDED)
     instruction_file_relpath: str | None = field(default=None)
+    default_language: str | None = field(default=None)
 
     @property
     def is_workspace_scope(self) -> bool:

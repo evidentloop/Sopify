@@ -7,7 +7,7 @@ from pathlib import Path
 import sys
 from typing import Callable, TextIO
 
-from installer.hosts import get_host_adapter, iter_installable_hosts
+from installer.hosts import get_host_adapter, iter_host_registrations, iter_installable_hosts
 from installer.inspection import build_doctor_payload, build_status_payload
 from installer.models import InstallError, InstallResult, InstallTarget, LANGUAGE_DIRECTORY_MAP
 from installer.outcome_contract import render_outcome_summary
@@ -368,7 +368,10 @@ def _target_options() -> tuple[str, ...]:
         for capability in iter_installable_hosts()
         for language in LANGUAGE_DIRECTORY_MAP
     ]
-    options.append("copilot")
+    # Append bare targets for hosts that accept them (have default_language)
+    for reg in iter_host_registrations():
+        if reg.capability.install_enabled and reg.adapter.default_language:
+            options.append(reg.adapter.host_name)
     return tuple(options)
 
 
@@ -467,10 +470,11 @@ def _map_install_error(exc: InstallError) -> DistributionError:
 
 
 def _build_next_step(target: InstallTarget, workspace_root: Path | None) -> str:
-    if target.host == "copilot":
+    adapter = get_host_adapter(target.host)
+    if adapter.is_workspace_scope:
         if workspace_root is None:
-            return "Open Copilot in your project workspace to start using Sopify."
-        return f"Open Copilot in {workspace_root} to start using Sopify."
+            return f"Open {target.host.title()} in your project workspace to start using Sopify."
+        return f"Open {target.host.title()} in {workspace_root} to start using Sopify."
     if workspace_root is None:
         return (
             f"Open {target.host} in any project workspace and trigger Sopify. "
