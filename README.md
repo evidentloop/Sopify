@@ -8,7 +8,7 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 [![Docs](https://img.shields.io/badge/docs-CC%20BY%204.0-green.svg)](./LICENSE-docs)
-[![Version](https://img.shields.io/badge/version-2026--05--27.132948-orange.svg)](#version-history)
+[![Version](https://img.shields.io/badge/version-2026--05--27.161019-orange.svg)](#version-history)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
 English · [简体中文](./README.zh-CN.md) · [Quick Start](#quick-start) · [Contributors](./CONTRIBUTORS.md)
@@ -213,13 +213,13 @@ sopify/
 ├── examples/              # configuration examples
 ├── docs/                  # workflow guides and developer references
 ├── runtime/               # built-in runtime / skill packages
+├── skills/                # prompt-layer source of truth
 ├── .sopify-skills/        # project knowledge base
 │   ├── blueprint/         # design baseline, reduction targets
 │   │   └── architecture-decision-records/  # ADR entity files
 │   ├── plan/              # active plans
 │   └── history/           # archived plans
-├── Codex/                 # Codex host prompt layer
-└── Claude/                # Claude host prompt layer
+└── installer/             # host adapters and install orchestration
 ```
 
 This is a simplified view of the core layout. See [docs/how-sopify-works.en.md](./docs/how-sopify-works.en.md) for the full workflow, checkpoints, and knowledge layout.

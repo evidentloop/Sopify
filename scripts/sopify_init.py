@@ -58,8 +58,8 @@ _SOPIFY_VERSION_RE = re.compile(r"^<!--\s*SOPIFY_VERSION:\s*(?P<version>.+?)\s*-
 def _read_source_version() -> str | None:
     """Read the embedded Sopify version from the source host header."""
     for candidate in (
-        REPO_ROOT / "Codex" / "Skills" / "EN" / "AGENTS.md",
-        REPO_ROOT / "Codex" / "Skills" / "CN" / "AGENTS.md",
+        REPO_ROOT / "skills" / "en" / "header.md.template",
+        REPO_ROOT / "skills" / "zh" / "header.md.template",
     ):
         if candidate.is_file():
             match = _SOPIFY_VERSION_RE.search(candidate.read_text(encoding="utf-8"))

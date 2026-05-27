@@ -22,14 +22,6 @@ snapshot_managed_release_paths() {
     "CHANGELOG.md"
     "skills/zh/header.md.template"
     "skills/en/header.md.template"
-    "Codex/Skills/CN/AGENTS.md"
-    "Codex/Skills/EN/AGENTS.md"
-    "Claude/Skills/CN/CLAUDE.md"
-    "Claude/Skills/EN/CLAUDE.md"
-    "Codex/Skills/CN/skills/sopify"
-    "Codex/Skills/EN/skills/sopify"
-    "Claude/Skills/CN/skills/sopify"
-    "Claude/Skills/EN/skills/sopify"
   )
   local path
   local src
@@ -91,10 +83,10 @@ trap on_exit EXIT
 is_release_relevant_file() {
   local path="$1"
   case "$path" in
-    runtime/*|installer/*|skills/*|Codex/Skills/*|Claude/Skills/*|README.md|README.zh-CN.md|CHANGELOG.md)
+    runtime/*|installer/*|skills/*|README.md|README.zh-CN.md|CHANGELOG.md)
       return 0
       ;;
-    scripts/sopify_runtime.py|scripts/model_compare_runtime.py|scripts/check-runtime-smoke.sh|scripts/release-sync.sh|scripts/release-preflight.sh|scripts/sync-skills.sh|scripts/check-skills-sync.sh|scripts/check-version-consistency.sh)
+    scripts/sopify_runtime.py|scripts/model_compare_runtime.py|scripts/check-runtime-smoke.sh|scripts/release-sync.sh|scripts/release-preflight.sh|scripts/sync-skills.sh|scripts/check-version-consistency.sh)
       return 0
       ;;
     *)
@@ -159,15 +151,7 @@ git -C "$ROOT_DIR" add \
   README.zh-CN.md \
   CHANGELOG.md \
   skills/zh/header.md.template \
-  skills/en/header.md.template \
-  Codex/Skills/CN/AGENTS.md \
-  Codex/Skills/EN/AGENTS.md \
-  Claude/Skills/CN/CLAUDE.md \
-  Claude/Skills/EN/CLAUDE.md \
-  Codex/Skills/CN/skills/sopify \
-  Codex/Skills/EN/skills/sopify \
-  Claude/Skills/CN/skills/sopify \
-  Claude/Skills/EN/skills/sopify
+  skills/en/header.md.template
 
 cat >"$STATE_FILE" <<EOF
 RELEASE_VERSION=$RELEASE_VERSION

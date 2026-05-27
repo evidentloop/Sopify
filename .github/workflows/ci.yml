@@ -13,15 +13,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Sync skills
-        run: bash scripts/sync-skills.sh
-
-      - name: Ensure sync produced no changes
-        run: git diff --exit-code
-
-      - name: Check skills sync
-        run: bash scripts/check-skills-sync.sh
-
       - name: Check version consistency
         run: bash scripts/check-version-consistency.sh
 

@@ -71,6 +71,18 @@ def _minimal_agents(version: str, *, claude: bool, english: bool) -> str:
     )
 
 
+def _minimal_source_template(version: str, *, english: bool) -> str:
+    body = "Note: {{config_dir}}/sopify/" if english else "说明：{{config_dir}}/sopify/"
+    return textwrap.dedent(
+        f"""\
+        <!-- SOPIFY_VERSION: {version} -->
+        # HEADER
+
+        {body}
+        """
+    )
+
+
 def _configure_module(module, root: Path) -> None:
     readme_sections_primary = module.EXPECTED_LEVEL2_SECTIONS[module.README_FILES[0]]
     readme_sections_zh = module.EXPECTED_LEVEL2_SECTIONS[module.README_FILES[1]]
@@ -90,10 +102,8 @@ def _configure_module(module, root: Path) -> None:
         module.README_FILES + module.WORKFLOW_DOC_FILES + module.CONTRIBUTING_FILES
     )
     module.VERSION_HEADERS = (
-        root / "Codex/Skills/CN/AGENTS.md",
-        root / "Codex/Skills/EN/AGENTS.md",
-        root / "Claude/Skills/CN/CLAUDE.md",
-        root / "Claude/Skills/EN/CLAUDE.md",
+        root / "skills/zh/header.md.template",
+        root / "skills/en/header.md.template",
     )
     module.EXPECTED_LEVEL2_SECTIONS = {
         module.README_FILES[0]: readme_sections_primary,
@@ -122,15 +132,13 @@ def _init_fixture(root: Path, module, *, broken_workflow_link: bool = False, reo
         "LICENSE",
         "LICENSE-docs",
         "CHANGELOG.md",
-        "Codex/Skills/CN/skills/sopify/.gitkeep",
-        "Codex/Skills/EN/skills/sopify/.gitkeep",
+        "skills/zh/skills/sopify/.gitkeep",
+        "skills/en/skills/sopify/.gitkeep",
     ):
         _write(root / relative, "placeholder\n")
 
-    _write(root / "Codex/Skills/CN/AGENTS.md", _minimal_agents(VERSION, claude=False, english=False))
-    _write(root / "Codex/Skills/EN/AGENTS.md", _minimal_agents(VERSION, claude=False, english=True))
-    _write(root / "Claude/Skills/CN/CLAUDE.md", _minimal_agents(VERSION, claude=True, english=False))
-    _write(root / "Claude/Skills/EN/CLAUDE.md", _minimal_agents(VERSION, claude=True, english=True))
+    _write(root / "skills/zh/header.md.template", _minimal_source_template(VERSION, english=False))
+    _write(root / "skills/en/header.md.template", _minimal_source_template(VERSION, english=True))
 
     _write(
         root / "README.md",
@@ -191,7 +199,7 @@ def _init_fixture(root: Path, module, *, broken_workflow_link: bool = False, reo
             "贡献指南",
             contributing_cn_sections,
             intro="中文维护者入口。",
-            links=("[Codex CN](./Codex/Skills/CN/skills/sopify/)",),
+            links=("[Skills ZH](./skills/zh/skills/sopify/)",),
         ),
     )
     _write(
@@ -200,7 +208,7 @@ def _init_fixture(root: Path, module, *, broken_workflow_link: bool = False, reo
             "Contributing",
             contributing_en_sections,
             intro="English maintainer entry.",
-            links=("[Codex EN](./Codex/Skills/EN/skills/sopify/)",),
+            links=("[Skills EN](./skills/en/skills/sopify/)",),
         ),
     )
 

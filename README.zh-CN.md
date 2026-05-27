@@ -8,7 +8,7 @@
 
 [![许可证](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 [![文档](https://img.shields.io/badge/docs-CC%20BY%204.0-green.svg)](./LICENSE-docs)
-[![版本](https://img.shields.io/badge/version-2026--05--27.132948-orange.svg)](#版本历史)
+[![版本](https://img.shields.io/badge/version-2026--05--27.161019-orange.svg)](#版本历史)
 [![欢迎PR](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING_CN.md)
 
 [English](./README.md) · 简体中文 · [快速开始](#快速开始) · [贡献者](./CONTRIBUTORS.md)
@@ -213,13 +213,13 @@ sopify/
 ├── examples/              # 配置示例
 ├── docs/                  # 工作流指南与开发者参考
 ├── runtime/               # 内置 runtime / skill packages
+├── skills/                # prompt-layer 真源
 ├── .sopify-skills/        # 项目知识库
 │   ├── blueprint/         # 设计基线与削减目标
 │   │   └── architecture-decision-records/  # ADR 实体文件
 │   ├── plan/              # 活跃方案
 │   └── history/           # 已归档方案
-├── Codex/                 # Codex 宿主提示层
-└── Claude/                # Claude 宿主提示层
+└── installer/             # 宿主适配器与安装编排
 ```
 
 上面是核心目录的精简视图；完整工作流、checkpoint 和知识库层级说明见 [docs/how-sopify-works.md](./docs/how-sopify-works.md)。

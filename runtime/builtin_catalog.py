@@ -10,10 +10,9 @@ from typing import Any, Mapping
 from sopify_contracts.core import SkillMeta
 
 _DEFAULT_CONTRACT_VERSION = "1"
-_SOPIFY_DOC_ROOT = ("Codex", "Skills")
 _LANGUAGE_DIRS = {
-    "zh-CN": ("CN", "EN"),
-    "en-US": ("EN", "CN"),
+    "zh-CN": ("zh", "en"),
+    "en-US": ("en", "zh"),
 }
 _GENERATED_CATALOG_PATH = Path("runtime") / "builtin_catalog.generated.json"
 
@@ -194,10 +193,7 @@ def _resolve_instruction_path(repo_root: Path, language: str, skill_id: str) -> 
     candidates: list[Path] = []
     for language_dir in language_dirs:
         candidates.append(
-            repo_root / _SOPIFY_DOC_ROOT[0] / _SOPIFY_DOC_ROOT[1] / language_dir / "skills" / "sopify" / skill_id / "SKILL.md"
-        )
-        candidates.append(
-            repo_root / "Claude" / "Skills" / language_dir / "skills" / "sopify" / skill_id / "SKILL.md"
+            repo_root / "skills" / language_dir / "skills" / "sopify" / skill_id / "SKILL.md"
         )
     for candidate in candidates:
         if candidate.exists():

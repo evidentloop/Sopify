@@ -53,7 +53,7 @@
 统一逻辑模型：
 
 ```text
-Codex/Skills/{CN,EN}/skills/sopify/my-skill/
+skills/{zh,en}/skills/sopify/my-skill/
 ├── SKILL.md
 ├── scripts/
 ├── references/

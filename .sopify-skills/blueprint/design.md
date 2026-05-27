@@ -665,8 +665,9 @@ _治理期望表_
 ### Prompt 镜像治理原则
 
 - prompt asset 属于 payload/install surface（P4a keep-list 已冻结此消费面）
-- 现有 Claude/Skills/ 和 Codex/Skills/ 目录树是 legacy exception，只维护现有内容，不再扩张
-- 新宿主不进现有目录树结构；新宿主如需 prompt asset，走 payload 机制
+- `skills/{zh,en}` 是 prompt-layer source of truth；宿主安装产物由 installer / host adapter 渲染
+- `Codex/Skills/` 和 `Claude/Skills/` 仅可作为本地 generated cache，不再进入 git source-of-truth
+- 新宿主不进 legacy 目录树结构；新宿主如需 prompt asset，走 host adapter / payload 机制
 - 讨论框架不是"要不要再开目录树"，而是"payload 机制是否满足需求"
 
 

@@ -137,7 +137,6 @@ def _init_release_hook_fixture(root: Path, *, inject_sync_failure: bool = False)
         "scripts/release-preflight.sh",
         "scripts/check-context-checkpoints.py",
         "scripts/sync-skills.sh",
-        "scripts/check-skills-sync.sh",
         "scripts/check-version-consistency.sh",
         "scripts/render-host-skills.py",
         ".githooks/pre-commit",
@@ -145,11 +144,14 @@ def _init_release_hook_fixture(root: Path, *, inject_sync_failure: bool = False)
     ):
         _copy_script(relative, root)
 
-    # Copy skills/hosts.yaml (needed by sync-skills.sh -> render-host-skills.py).
-    # Skip when inject_sync_failure to make sync-skills.sh fail after
-    # release-sync has already modified README/CHANGELOG, testing rollback.
-    if not inject_sync_failure:
-        _copy_script("skills/hosts.yaml", root)
+    # Inject a post-update check failure to verify pre-commit rollback after
+    # release-sync has already modified README/CHANGELOG and source templates.
+    _copy_script("skills/hosts.yaml", root)
+    if inject_sync_failure:
+        _write(
+            root / "scripts/check-version-consistency.sh",
+            "#!/usr/bin/env bash\nexit 1\n",
+        )
 
     old_version = "2026-03-20.183348"
     old_date = "2026-03-20"
@@ -162,16 +164,6 @@ def _init_release_hook_fixture(root: Path, *, inject_sync_failure: bool = False)
     _write(root / "skills/en/header.md.template", _minimal_source_template(old_version, english=True))
     _write(root / "skills/zh/skills/sopify/SKILL.md", "# skill\n")
     _write(root / "skills/en/skills/sopify/SKILL.md", "# skill\n")
-
-    _write(root / "Codex/Skills/CN/AGENTS.md", _minimal_agents(old_version, claude=False, english=False))
-    _write(root / "Codex/Skills/EN/AGENTS.md", _minimal_agents(old_version, claude=False, english=True))
-    _write(root / "Codex/Skills/CN/skills/sopify/SKILL.md", "# skill\n")
-    _write(root / "Codex/Skills/EN/skills/sopify/SKILL.md", "# skill\n")
-
-    _write(root / "Claude/Skills/CN/CLAUDE.md", _minimal_agents(old_version, claude=True, english=False))
-    _write(root / "Claude/Skills/EN/CLAUDE.md", _minimal_agents(old_version, claude=True, english=True))
-    _write(root / "Claude/Skills/CN/skills/sopify/SKILL.md", "# skill\n")
-    _write(root / "Claude/Skills/EN/skills/sopify/SKILL.md", "# skill\n")
 
     _write(root / "runtime/gate.py", "print('baseline')\n")
     _write(root / "tests/test_runtime_gate.py", "print('baseline test')\n")
@@ -355,8 +347,8 @@ class ReleaseHookTests(unittest.TestCase):
             self.assertIn("**Tests**", release_body)
             self.assertNotIn("<details>", release_body)
             self.assertIn("badge/version-2026--03--21.010203-orange.svg", (root / "README.md").read_text(encoding="utf-8"))
-            self.assertIn("<!-- SOPIFY_VERSION: 2026-03-21.010203 -->", (root / "Codex/Skills/CN/AGENTS.md").read_text(encoding="utf-8"))
-            self.assertIn("<!-- SOPIFY_VERSION: 2026-03-21.010203 -->", (root / "Claude/Skills/CN/CLAUDE.md").read_text(encoding="utf-8"))
+            self.assertIn("<!-- SOPIFY_VERSION: 2026-03-21.010203 -->", (root / "skills/zh/header.md.template").read_text(encoding="utf-8"))
+            self.assertIn("<!-- SOPIFY_VERSION: 2026-03-21.010203 -->", (root / "skills/en/header.md.template").read_text(encoding="utf-8"))
 
     def test_release_draft_only_renders_non_empty_sections(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -462,7 +454,7 @@ class ReleaseHookTests(unittest.TestCase):
 
             original_readme = (root / "README.md").read_text(encoding="utf-8")
             original_changelog = (root / "CHANGELOG.md").read_text(encoding="utf-8")
-            original_agents = (root / "Codex/Skills/CN/AGENTS.md").read_text(encoding="utf-8")
+            original_template = (root / "skills/zh/header.md.template").read_text(encoding="utf-8")
 
             completed = subprocess.run(
                 ["bash", str(root / ".githooks" / "pre-commit")],
@@ -476,7 +468,7 @@ class ReleaseHookTests(unittest.TestCase):
             self.assertNotEqual(completed.returncode, 0)
             self.assertEqual((root / "README.md").read_text(encoding="utf-8"), original_readme)
             self.assertEqual((root / "CHANGELOG.md").read_text(encoding="utf-8"), original_changelog)
-            self.assertEqual((root / "Codex/Skills/CN/AGENTS.md").read_text(encoding="utf-8"), original_agents)
+            self.assertEqual((root / "skills/zh/header.md.template").read_text(encoding="utf-8"), original_template)
             self.assertFalse((root / ".git" / ".sopify-release-sync-state").exists())
 
 

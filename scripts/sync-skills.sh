@@ -7,7 +7,11 @@ usage() {
   cat <<'EOF'
 Usage: scripts/sync-skills.sh
 
-Render host distribution files from skills/ source of truth:
+Local maintainer cache helper — NOT part of release / CI / pre-commit pipeline.
+Generates Codex/Skills/ and Claude/Skills/ directories (gitignored) from the
+skills/ source of truth so maintainers can inspect the traditional host layout.
+
+Rendered output:
   - skills/zh/header.md.template -> Codex/Skills/CN/AGENTS.md (with codex vars)
   - skills/zh/header.md.template -> Claude/Skills/CN/CLAUDE.md (with claude vars)
   - skills/en/header.md.template -> Codex/Skills/EN/AGENTS.md (with codex vars)

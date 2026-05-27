@@ -306,7 +306,7 @@ def _resolve_bundle_version(*, source_root: Path, bundle_root: Path, explicit_ve
     if explicit_version:
         return explicit_version
 
-    version = _read_version_header(source_root / "Codex" / "Skills" / "CN" / "AGENTS.md")
+    version = _read_version_header(source_root / "skills" / "zh" / "header.md.template")
     if version is not None:
         return version
 

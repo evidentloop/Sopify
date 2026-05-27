@@ -20,7 +20,7 @@ Synchronize release version across key files:
      - move current [Unreleased] content into
        ## [<version>] - <date>
   3) skills/ source template SOPIFY_VERSION headers (zh/en)
-  4) Render skills/ -> host distributions and run consistency checks
+  4) Run consistency checks
 
 Arguments:
   <version>   release version, e.g. 2026-02-13 or 2026-01-15.1
@@ -72,8 +72,6 @@ required_files=(
   "$SKILLS_ZH"
   "$SKILLS_EN"
   "$CHANGELOG_DRAFT_SCRIPT"
-  "$ROOT_DIR/scripts/sync-skills.sh"
-  "$ROOT_DIR/scripts/check-skills-sync.sh"
   "$ROOT_DIR/scripts/check-version-consistency.sh"
 )
 
@@ -297,8 +295,6 @@ promote_unreleased_to_release "$CHANGELOG"
 replace_once "$SKILLS_ZH" '^<!-- SOPIFY_VERSION: .* -->$' "<!-- SOPIFY_VERSION: $VERSION -->"
 replace_once "$SKILLS_EN" '^<!-- SOPIFY_VERSION: .* -->$' "<!-- SOPIFY_VERSION: $VERSION -->"
 
-bash "$ROOT_DIR/scripts/sync-skills.sh"
-bash "$ROOT_DIR/scripts/check-skills-sync.sh"
 bash "$ROOT_DIR/scripts/check-version-consistency.sh"
 
 echo "Release sync completed successfully."

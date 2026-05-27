@@ -6,6 +6,36 @@ Format: Summary → Changed → Plan Packages. File-level details live in `git l
 
 ## [Unreleased]
 
+## [2026-05-27.161019] - 2026-05-27
+
+### Summary
+
+- Changes across: Docs, Runtime, Scripts, Skills, Tests, Changed.
+
+### Changed
+
+- **Docs**: Refined public documentation (5 files)
+- **Runtime**: Updated runtime internals (2 files)
+- **Scripts**: Adjusted maintenance scripts (5 files)
+- **Skills**: Synced prompt-layer skills (92 files)
+- **Tests**: Updated automated coverage (3 files)
+- **Changed**: Updated project files (4 files)
+
+## [2026-05-27.160548] - 2026-05-27
+
+### Summary
+
+- Changes across: Docs, Runtime, Scripts, Skills, Tests, Changed.
+
+### Changed
+
+- **Docs**: Refined public documentation (5 files)
+- **Runtime**: Updated runtime internals (2 files)
+- **Scripts**: Adjusted maintenance scripts (5 files)
+- **Skills**: Synced prompt-layer skills (92 files)
+- **Tests**: Updated automated coverage (2 files)
+- **Changed**: Updated project files (2 files)
+
 ## [2026-05-27.132948] - 2026-05-27
 
 ### Summary

@@ -8,9 +8,8 @@ usage() {
 Usage: scripts/release-preflight.sh
 
 Run release preflight checks before bumping Sopify version:
-  1) Sync Codex -> Claude skills mirrors
-  2) Verify mirrors and version consistency
-  3) Run runtime unit tests + installer/runtime smoke checks
+  1) Verify version consistency and golden snapshots
+  2) Run runtime unit tests + installer/runtime smoke checks
 EOF
 }
 
@@ -57,9 +56,8 @@ PY
   rm -f "$tmp"
 }
 
-run_step "Sync skills" bash "$ROOT_DIR/scripts/sync-skills.sh"
-run_step "Check skills sync" bash "$ROOT_DIR/scripts/check-skills-sync.sh"
 run_step "Check version consistency" bash "$ROOT_DIR/scripts/check-version-consistency.sh"
+run_step "Check golden snapshots" python3 -m pytest "$ROOT_DIR/tests/test_golden_snapshots.py" -q
 run_step "Check builtin catalog drift" check_builtin_catalog_drift
 run_step "Check context checkpoints" python3 "$ROOT_DIR/scripts/check-context-checkpoints.py" repo --root "$ROOT_DIR"
 run_step "Run hard gate tests (contract + smoke + distribution)" python3 -m pytest "$ROOT_DIR/tests" -m "not implementation_mirror" -v

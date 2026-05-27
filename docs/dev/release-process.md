@@ -20,7 +20,7 @@ git config core.hooksPath .githooks
 bash scripts/release-preflight.sh
 ```
 
-依次跑：skill 同步与镜像一致性、版本一致性、builtin catalog 漂移检测、runtime 单元测试 + smoke、skill eval 质量门禁。全部通过再继续。
+依次跑：版本一致性、golden snapshot、builtin catalog 漂移检测、runtime 单元测试 + smoke、skill eval 质量门禁。全部通过再继续。
 
 ### 2. 确认版本号
 
@@ -55,13 +55,11 @@ bash scripts/check-version-consistency.sh
 version-2026--03--26.103000-orange.svg
 ```
 
-**四个宿主文件顶部注释**：
+**两个源模板顶部注释**：
 
 ```
-Codex/Skills/CN/AGENTS.md  →  <!-- SOPIFY_VERSION: 2026-03-26.103000 -->
-Codex/Skills/EN/AGENTS.md
-Claude/Skills/CN/CLAUDE.md
-Claude/Skills/EN/CLAUDE.md
+skills/zh/header.md.template  →  <!-- SOPIFY_VERSION: 2026-03-26.103000 -->
+skills/en/header.md.template
 ```
 
 更新后验证：
@@ -76,8 +74,7 @@ bash scripts/check-version-consistency.sh
 ```bash
 TAG="2026-03-26.103000"
 git add CHANGELOG.md README.md README.zh-CN.md \
-  Codex/Skills/CN/AGENTS.md Codex/Skills/EN/AGENTS.md \
-  Claude/Skills/CN/CLAUDE.md Claude/Skills/EN/CLAUDE.md
+  skills/zh/header.md.template skills/en/header.md.template
 git commit -m "release: $TAG"
 git push
 ```
