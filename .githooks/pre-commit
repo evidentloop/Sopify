@@ -86,7 +86,7 @@ is_release_relevant_file() {
     runtime/*|installer/*|skills/*|README.md|README.zh-CN.md|CHANGELOG.md)
       return 0
       ;;
-    scripts/sopify_runtime.py|scripts/model_compare_runtime.py|scripts/check-runtime-smoke.sh|scripts/release-sync.sh|scripts/release-preflight.sh|scripts/sync-skills.sh|scripts/check-skills-sync.sh|scripts/check-version-consistency.sh)
+    scripts/sopify_runtime.py|scripts/model_compare_runtime.py|scripts/check-runtime-smoke.sh|scripts/release-sync.sh|scripts/release-preflight.sh|scripts/sync-skills.sh|scripts/check-version-consistency.sh)
       return 0
       ;;
     *)

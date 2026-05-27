@@ -12,7 +12,7 @@
 ## Prompt 层与 Skill Authoring
 
 - `skills/{zh,en}` 是 prompt-layer 真源。每个语言目录包含 `header.md.template`（宿主无关模板）和 `skills/sopify/`（skill 包）。
-- `Codex/Skills/{CN,EN}` 和 `Claude/Skills/{CN,EN}` 是由 `scripts/sync-skills.sh` 从 `skills/` 渲染出的本地缓存，已被 git 忽略。
+- `Codex/Skills/{CN,EN}` 和 `Claude/Skills/{CN,EN}` 已被 git 忽略。可通过 `bash scripts/sync-skills.sh` 本地生成，用于调试或查看传统宿主目录结构，但不参与发版、CI 或 pre-commit。
 - `runtime/builtin_skill_packages/*/skill.yaml` 是 builtin machine metadata 真源。
 - Skill package 变更时，参考 [skills/zh/skills/sopify/](./skills/zh/skills/sopify/) / [skills/en/skills/sopify/](./skills/en/skills/sopify/) 下各自的 `SKILL.md`。
 
@@ -106,8 +106,6 @@ python3 scripts/render-release-installers.py --release-tag "$TAG" --output-dir "
 Prompt 层与 metadata 同步：
 
 ```bash
-bash scripts/sync-skills.sh
-bash scripts/check-skills-sync.sh
 bash scripts/check-version-consistency.sh
 python3 scripts/generate-builtin-catalog.py
 python3 -m pytest tests -v

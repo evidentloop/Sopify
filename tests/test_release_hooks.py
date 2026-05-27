@@ -137,7 +137,6 @@ def _init_release_hook_fixture(root: Path, *, inject_sync_failure: bool = False)
         "scripts/release-preflight.sh",
         "scripts/check-context-checkpoints.py",
         "scripts/sync-skills.sh",
-        "scripts/check-skills-sync.sh",
         "scripts/check-version-consistency.sh",
         "scripts/render-host-skills.py",
         ".githooks/pre-commit",

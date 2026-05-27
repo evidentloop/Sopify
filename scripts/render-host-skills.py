@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """Render host-specific headers from header.md.template + hosts.yaml.
 
+Local maintainer helper — NOT part of release / CI / pre-commit pipeline.
+Used by sync-skills.sh to generate gitignored Codex/Skills/ and Claude/Skills/
+local cache directories.
+
 Usage:
     python3 scripts/render-host-skills.py --hosts-file skills/hosts.yaml --lang en --host claude
     python3 scripts/render-host-skills.py --hosts-file skills/hosts.yaml --lang en --host claude --output /tmp/CLAUDE.md
@@ -11,7 +15,7 @@ host-specific value from hosts.yaml, and writes (or prints) the rendered header.
 
 --verify-all renders all host:lang header combos and prints their sha256.
 Note: this only covers header rendering, not full install-product hashes.
-Full install-product verification is in T6 (golden snapshot comparison).
+Full install-product verification is in tests/test_golden_snapshots.py.
 
 No external dependencies — stdlib only.
 """
