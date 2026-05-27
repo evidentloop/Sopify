@@ -6,7 +6,7 @@ Format: Summary → Changed → Plan Packages. File-level details live in `git l
 
 ## [Unreleased]
 
-## [2026-05-27.214655] - 2026-05-27
+## [2026-05-27.215748] - 2026-05-27
 
 ### Summary
 
