@@ -52,24 +52,24 @@ plans:
       updated_at: "2026-05-26T14:30:00+08:00"
   - plan_id: "20260527_skill_writing_quality"
     snapshot:
-      path: ".sopify-skills/plan/20260527_skill_writing_quality"
+      path: ".sopify-skills/history/2026-05/20260527_skill_writing_quality"
       title: "Skill 写作质量收敛"
       level: "standard"
       topic_key: "skill_writing_quality_convergence"
-      lifecycle_state: "active"
+      lifecycle_state: "archived"
       created_at: "2026-05-27T21:00:00+08:00"
     governance:
       priority: "p1"
       priority_source: "user"
-      priority_confirmed_at: "2026-06-10T00:00:00+08:00"
-      status: "ready"
-      note: "共享写作 DNA（6 规则）+ 输出模板 v2 + render 管线修复"
+      priority_confirmed_at: "2026-05-27T21:00:00+08:00"
+      status: "done"
+      note: "共享写作 DNA（6 规则）+ 输出模板 v2 + render 管线修复；15/15 任务完成"
     advice:
       suggested_priority: "p1"
       suggested_source: "user_confirmed"
       suggested_reason:
         - "输出模板与规则脱节是当前首要质量缺口"
-      suggested_at: "2026-06-10T00:00:00+08:00"
+      suggested_at: "2026-05-27T21:00:00+08:00"
     meta:
       source: "manual"
-      updated_at: "2026-06-10T00:00:00+08:00"
+      updated_at: "2026-05-27T23:00:00+08:00"
