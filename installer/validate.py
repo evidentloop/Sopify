@@ -51,7 +51,7 @@ def validate_payload_install(payload_root: Path) -> tuple[Path, ...]:
 
 def run_bundle_smoke_check(bundle_root: Path, *, payload_manifest_path: Path | None = None) -> str:
     """Run the vendored bundle smoke check and return its stdout."""
-    smoke_script = bundle_root / "scripts" / "check-runtime-smoke.sh"
+    smoke_script = bundle_root / "scripts" / "check-bundle-smoke.sh"
     if not smoke_script.is_file():
         raise InstallError(f"Missing bundle smoke script: {smoke_script}")
 

@@ -10,65 +10,21 @@ Format: Summary → Changed → Plan Packages. File-level details live in `git l
 
 ### Summary
 
+- Host bundle unification closeout: `runtime_bundle` → `sopify_bundle` rename, plan `20260526_pre_launch_host_and_bundle_unification` finalized and archived.
 - Changes across: Docs, Runtime, Scripts, Skills, Tests, Changed.
 
 ### Changed
 
 - **Docs**: Refined public documentation (5 files)
 - **Runtime**: Updated runtime internals (2 files)
-- **Scripts**: Adjusted maintenance scripts (5 files)
+- **Scripts**: Adjusted maintenance scripts (5 files) — `check-runtime-smoke` → `check-bundle-smoke` rename
 - **Skills**: Synced prompt-layer skills (92 files)
-- **Tests**: Updated automated coverage (3 files)
-- **Changed**: Updated project files (4 files)
-
-## [2026-05-27.160548] - 2026-05-27
-
-### Summary
-
-- Changes across: Docs, Runtime, Scripts, Skills, Tests, Changed.
-
-### Changed
-
-- **Docs**: Refined public documentation (5 files)
-- **Runtime**: Updated runtime internals (2 files)
-- **Scripts**: Adjusted maintenance scripts (5 files)
-- **Skills**: Synced prompt-layer skills (92 files)
-- **Tests**: Updated automated coverage (2 files)
-- **Changed**: Updated project files (2 files)
-
-## [2026-05-27.132948] - 2026-05-27
-
-### Summary
-
-- Changes across: Changed.
-
-### Changed
-
-- **Changed**: Updated project files (1 files)
-
-## [2026-05-27.111148] - 2026-05-27
-
-### Summary
-
-- Changes across: Scripts, Tests, Changed.
-
-### Changed
-
-- **Scripts**: Adjusted maintenance scripts (2 files)
-- **Tests**: Updated automated coverage (1 files)
-- **Changed**: Updated project files (6 files)
-
-## [2026-05-27.094217] - 2026-05-27
-
-### Summary
-
-- Changes across: Scripts, Tests, Changed.
-
-### Changed
-
-- **Scripts**: Adjusted maintenance scripts (2 files)
 - **Tests**: Updated automated coverage (4 files)
 - **Changed**: Updated project files (10 files)
+
+### Plan Packages
+
+- `20260526_pre_launch_host_and_bundle_unification` (completed → archived)
 
 ## [2026-05-26.221112] - 2026-05-26
 

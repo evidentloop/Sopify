@@ -29,18 +29,18 @@ plans:
       updated_at: "2026-05-05T11:12:58+00:00"
   - plan_id: "20260526_pre_launch_host_and_bundle_unification"
     snapshot:
-      path: ".sopify-skills/plan/20260526_pre_launch_host_and_bundle_unification"
+      path: ".sopify-skills/history/2026-05/20260526_pre_launch_host_and_bundle_unification"
       title: "推广前宿主分发与 Bundle 统一"
       level: "standard"
       topic_key: "pre_launch_host_and_bundle_unification"
-      lifecycle_state: "active"
+      lifecycle_state: "completed"
       created_at: "2026-05-26T14:30:00+08:00"
     governance:
       priority: "p0"
       priority_source: "explicit"
       priority_confirmed_at: "2026-05-26T14:30:00+08:00"
-      status: "active"
-      note: "推广前必做，当前最高优先级"
+      status: "completed"
+      note: "T0-T7 全部完成，2026-05-27 归档"
     advice:
       suggested_priority: "p0"
       suggested_source: "explicit"

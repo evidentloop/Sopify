@@ -4,6 +4,7 @@
 
 ## 索引
 
+- `2026-05-27` [`20260526_pre_launch_host_and_bundle_unification`](2026-05/20260526_pre_launch_host_and_bundle_unification/) - standard - 推广前宿主分发与 Bundle 统一: 4 套宿主语言内容→2 套语言源 + 安装时 host 渲染，Copilot 纳入统一 registry，runtime_bundle→sopify_bundle 命名收口，三宿主双语言端到端验证通过（6 条安装路径 + 8 项 golden snapshot 全绿），旧宿主目录删除
 - `2026-05-26` [`20260522_runtime_slimming_kernel_extraction`](2026-05/20260522_runtime_slimming_kernel_extraction/) - standard - 任务清单: Runtime Slimming — Orchestration Kernel Extraction
 - `2026-05-22` [`20260522_p7_payload_only_onboarding_mainline`](2026-05/20260522_p7_payload_only_onboarding_mainline/) - standard - P7 Payload-Only Onboarding Mainline: 外部仓库一键初始化（sopify_init.py + bootstrap.sh），Copilot 指令分发（managed block + owned file），统一 workspace marker（sopify.json），README/docs/example 文档收口，ANSI Shadow ASCII art logo
 - `2026-05-20` [`20260520_p5_contract_surface_shrinkage`](2026-05/20260520_p5_contract_surface_shrinkage/) - standard - P5 Contract Surface Shrinkage: 58 sub-surface 裁定（10 cross-tier / 1 candidate-kernel / 46 deep-only / 1 deleted），Shadow Writer Gap Analysis 结论 B（candidate-kernel 680→210 LOC = StateStore only），Runtime 退场路线写入蓝图（三层分离 + 激进版：无用户零迁移），write_runtime_handoff 死代码删除 8 LOC

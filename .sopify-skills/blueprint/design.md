@@ -794,7 +794,7 @@ P6:          直接切 canonical writer 新栈 + 定义 writer_input 契约
 2. 停止维护 deep-capable host（Claude / Codex / Copilot）的宿主专属 legacy glue（bridge / renderer / bundle / smoke），但 kernel 通过协议对所有 deep-capable host 保持可达
 3. runtime 退场的真实门槛收敛为：
    - 先解耦仍需保留的非 runtime 面：`installer/validate.py`、`installer/bootstrap_workspace.py`、`installer/inspection.py`、`scripts/install_sopify.py`、`scripts/sopify_init.py`
-   - 再同步删除 `runtime/`、`installer/runtime_bundle.py`、legacy deep scripts 与 runtime-coupled tests
+   - 再同步删除 `runtime/`、`installer/sopify_bundle.py`、legacy deep scripts 与 runtime-coupled tests
 4. `scripts/sopify_status.py` / `scripts/sopify_doctor.py` 不作为独立解耦目标；它们仅通过 `installer/inspection.py` 的 cutover 继续保留
 
 

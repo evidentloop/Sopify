@@ -5,7 +5,7 @@ import pytest
 
 from dataclasses import replace
 
-from installer.runtime_bundle import sync_runtime_bundle
+from installer.sopify_bundle import sync_runtime_bundle
 from tests.runtime_test_support import *
 from runtime._planning import _advance_planning_route
 
@@ -1865,7 +1865,7 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertTrue((bundle_root / "runtime" / "__init__.py").exists())
             self.assertTrue((bundle_root / "runtime" / "gate.py").exists())
             self.assertTrue((bundle_root / "runtime" / "workspace_preflight.py").exists())
-            self.assertTrue((bundle_root / "scripts" / "check-runtime-smoke.sh").exists())
+            self.assertTrue((bundle_root / "scripts" / "check-bundle-smoke.sh").exists())
             self.assertTrue((bundle_root / "scripts" / "runtime_gate.py").exists())
             self.assertFalse((bundle_root / "runtime" / "clarification_bridge.py").exists())
             self.assertFalse((bundle_root / "runtime" / "cli_interactive.py").exists())

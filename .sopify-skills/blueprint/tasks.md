@@ -124,7 +124,7 @@ P0→P4c 主航道已全部完成。后续执行遵循以下原则：
 
 ## 流程与工具项
 
-- [ ] Runtime retirement cutover（`target-state-first` 已于 2026-05-22 拍板）：先解耦 `installer/validate.py`、`installer/bootstrap_workspace.py`、`installer/inspection.py`、`scripts/install_sopify.py`、`scripts/sopify_init.py`，再同步删除 `runtime/`、`installer/runtime_bundle.py` 与 legacy deep path
+- [ ] Runtime retirement cutover（`target-state-first` 已于 2026-05-22 拍板）：先解耦 `installer/validate.py`、`installer/bootstrap_workspace.py`、`installer/inspection.py`、`scripts/install_sopify.py`、`scripts/sopify_init.py`，再同步删除 `runtime/`、`installer/sopify_bundle.py` 与 legacy deep path
   - Phase 1 已完成（方案包 `20260522_runtime_slimming_kernel_extraction`）：contract 面清理 −6,400 LOC + engine 重构 + 34 退役测试块清理 −1,400 LOC + installer bundle 纯 Python 重写 + legacy workspace marker 退场。runtime/ 从 ~22K LOC 收至 37 文件 / 16,286 LOC
   - Phase 2 未启动：installer 5 文件解耦 + runtime/ 全删 + legacy deep path 退场
 - [ ] Plan intake checklist（后续新 plan 开包时手工回答以下问题）：

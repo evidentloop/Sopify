@@ -67,7 +67,7 @@ jobs:
         run: python3 -m pytest tests -m "implementation_mirror" -v
 
       - name: Run runtime smoke check
-        run: bash scripts/check-runtime-smoke.sh
+        run: bash scripts/check-bundle-smoke.sh
 
       - name: Run install/payload bootstrap smoke
         run: python3 scripts/check-install-payload-bundle-smoke.py

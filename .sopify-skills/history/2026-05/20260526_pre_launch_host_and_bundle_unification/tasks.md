@@ -3,7 +3,7 @@ plan_id: "20260526_pre_launch_host_and_bundle_unification"
 title: "推广前宿主分发与 Bundle 统一"
 level: standard
 topic_key: pre_launch_host_and_bundle_unification
-lifecycle_state: active
+lifecycle_state: completed
 created_at: "2026-05-26T14:30:00+08:00"
 ---
 
@@ -66,6 +66,7 @@ created_at: "2026-05-26T14:30:00+08:00"
 
 ## T1 | 单一事实源建立 + installer source cutover（合并原 T1+T2）
 
+
 **动作**：
 
 1. ~~从 **Codex** 树移入 `skills/en/` 和 `skills/zh/`~~ — ✅ 已存在，白名单校验通过（6 个 SKILL.md 仅脚本路径替换，其余与 Codex 等价）
@@ -83,7 +84,7 @@ created_at: "2026-05-26T14:30:00+08:00"
 - 渲染脚本 `render-host-skills.py` 输出的 claude/codex header 与 golden snapshot 内容等价
 - skill 文件内部不再引用旧宿主目录路径
 
-**状态**：pending
+**状态**：done
 
 ---
 
@@ -103,7 +104,7 @@ created_at: "2026-05-26T14:30:00+08:00"
 - `install.sh --target copilot` 走统一主链路
 - 渲染产物与 golden snapshot 中 copilot:zh-CN 基线内容等价；copilot:en-US 无旧基线（hash == null），只验证新产物存在、可安装、由 `skills/en/` 渲染且通过 smoke
 
-**状态**：pending
+**状态**：done
 
 ---
 
@@ -137,7 +138,7 @@ created_at: "2026-05-26T14:30:00+08:00"
 - `installer/resources/copilot/` 目录已删除
 - 全量测试通过
 
-**状态**：pending
+**状态**：done
 
 ---
 
@@ -161,7 +162,7 @@ created_at: "2026-05-26T14:30:00+08:00"
 - `runtime_bundle` / `runtime-smoke` 作为文件名和对外接口名不再存在
 - CI + 全量测试通过
 
-**状态**：pending
+**状态**：done
 
 ---
 
@@ -176,7 +177,7 @@ created_at: "2026-05-26T14:30:00+08:00"
 - 社区用户按指南可独立完成新宿主接入
 - 文档中不再引用 `Claude/`、`Codex/`、`Copilot/` 目录
 
-**状态**：pending
+**状态**：done
 
 ---
 
@@ -199,7 +200,7 @@ created_at: "2026-05-26T14:30:00+08:00"
 - smoke 脚本全通过
 - 全量测试通过
 
-**状态**：pending
+**状态**：done
 
 ---
 
@@ -233,7 +234,7 @@ created_at: "2026-05-26T14:30:00+08:00"
 - 旧同步脚本不再引用已删目录
 - CI + 全量测试通过
 
-**状态**：pending
+**状态**：done
 
 ---
 

@@ -38,7 +38,7 @@ python3 scripts/runtime_gate.py enter \
   --request "~go plan 重构数据库层"
 
 # 验证 bundle 完整性
-bash scripts/check-runtime-smoke.sh
+bash scripts/check-bundle-smoke.sh
 
 # 验证“一次安装 + 项目触发 bootstrap + selected bundle 接管”
 python3 scripts/check-install-payload-bundle-smoke.py
@@ -118,7 +118,7 @@ python3 scripts/sopify_runtime.py "重构数据库层"
 python3 scripts/runtime_gate.py enter --workspace-root . --request "重构数据库层"
 python3 scripts/sopify_runtime.py "~go plan 重构数据库层"
 python3 scripts/sopify_runtime.py "~go finalize"
-bash scripts/check-runtime-smoke.sh
+bash scripts/check-bundle-smoke.sh
 ```
 
 文档与发布校验：
