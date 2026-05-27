@@ -12,6 +12,8 @@ host-specific value from hosts.yaml, and writes (or prints) the rendered header.
 --verify-all renders all host:lang header combos and prints their sha256.
 Note: this only covers header rendering, not full install-product hashes.
 Full install-product verification is in T6 (golden snapshot comparison).
+
+No external dependencies — stdlib only.
 """
 
 from __future__ import annotations
@@ -22,16 +24,74 @@ import re
 import sys
 from pathlib import Path
 
-try:
-    import yaml
-except ImportError:
-    raise SystemExit("PyYAML is required. Install with: pip install pyyaml")
+
+def _parse_hosts_yaml(text: str) -> dict:
+    """Minimal parser for skills/hosts.yaml.
+
+    Supports the two-level structure used in this repo:
+        hosts:
+          host_id:
+            key: value
+
+    Values: bare strings, "quoted strings", null, true/false.
+    Does NOT support arrays, anchors, flow mappings, or multi-line values.
+    """
+    result: dict[str, dict[str, object]] = {}
+    current_host: str | None = None
+    in_hosts = False
+
+    for raw_line in text.splitlines():
+        stripped = raw_line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+
+        indent = len(raw_line) - len(raw_line.lstrip())
+
+        if stripped == "hosts:":
+            in_hosts = True
+            continue
+
+        if not in_hosts:
+            continue
+
+        # Top-level key resets hosts section
+        if indent == 0:
+            in_hosts = False
+            continue
+
+        # Host id line (2-space indent): "  host_id:"
+        if indent == 2 and stripped.endswith(":"):
+            current_host = stripped[:-1].strip()
+            result[current_host] = {}
+            continue
+
+        # Property line (4+ space indent): "    key: value"
+        if indent >= 4 and current_host is not None and ":" in stripped:
+            key, _, raw_value = stripped.partition(":")
+            key = key.strip()
+            raw_value = raw_value.strip()
+
+            # Parse value
+            if raw_value == "null":
+                value: object = None
+            elif raw_value == "true":
+                value = True
+            elif raw_value == "false":
+                value = False
+            elif raw_value.startswith('"') and raw_value.endswith('"'):
+                value = raw_value[1:-1]
+            else:
+                value = raw_value
+
+            result[current_host][key] = value
+
+    return result
 
 
 def _load_hosts(hosts_file: Path) -> dict:
-    """Load hosts.yaml."""
+    """Load hosts.yaml and return {"hosts": {...}} structure."""
     text = hosts_file.read_text(encoding="utf-8")
-    return yaml.safe_load(text)
+    return {"hosts": _parse_hosts_yaml(text)}
 
 
 def render_header(template_path: Path, host_vars: dict) -> str:

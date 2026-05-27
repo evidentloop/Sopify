@@ -85,6 +85,18 @@ def _minimal_changelog(version: str, date: str) -> str:
     )
 
 
+def _minimal_source_template(version: str, *, english: bool) -> str:
+    body = "Note: {{config_dir}}/sopify/" if english else "说明：{{config_dir}}/sopify/"
+    return textwrap.dedent(
+        f"""\
+        <!-- SOPIFY_VERSION: {version} -->
+        # HEADER
+
+        {body}
+        """
+    )
+
+
 def _minimal_agents(version: str, *, claude: bool, english: bool) -> str:
     header = "CLAUDE" if claude else "AGENTS"
     body = "Note: ~/.claude/sopify/" if claude else "说明：~/.codex/sopify/"
@@ -118,7 +130,7 @@ def _release_body(changelog_text: str, version: str) -> str:
     return changelog_text[body_start:end]
 
 
-def _init_release_hook_fixture(root: Path, *, missing_claude_targets: bool = False) -> None:
+def _init_release_hook_fixture(root: Path, *, inject_sync_failure: bool = False) -> None:
     for relative in (
         "scripts/release-sync.sh",
         "scripts/release-draft-changelog.py",
@@ -127,10 +139,17 @@ def _init_release_hook_fixture(root: Path, *, missing_claude_targets: bool = Fal
         "scripts/sync-skills.sh",
         "scripts/check-skills-sync.sh",
         "scripts/check-version-consistency.sh",
+        "scripts/render-host-skills.py",
         ".githooks/pre-commit",
         ".githooks/commit-msg",
     ):
         _copy_script(relative, root)
+
+    # Copy skills/hosts.yaml (needed by sync-skills.sh -> render-host-skills.py).
+    # Skip when inject_sync_failure to make sync-skills.sh fail after
+    # release-sync has already modified README/CHANGELOG, testing rollback.
+    if not inject_sync_failure:
+        _copy_script("skills/hosts.yaml", root)
 
     old_version = "2026-03-20.183348"
     old_date = "2026-03-20"
@@ -138,16 +157,21 @@ def _init_release_hook_fixture(root: Path, *, missing_claude_targets: bool = Fal
     _write(root / "README.zh-CN.md", _minimal_readme(old_version, english=False))
     _write(root / "CHANGELOG.md", _minimal_changelog(old_version, old_date))
 
+    # Source templates (skills/ is the source of truth)
+    _write(root / "skills/zh/header.md.template", _minimal_source_template(old_version, english=False))
+    _write(root / "skills/en/header.md.template", _minimal_source_template(old_version, english=True))
+    _write(root / "skills/zh/skills/sopify/SKILL.md", "# skill\n")
+    _write(root / "skills/en/skills/sopify/SKILL.md", "# skill\n")
+
     _write(root / "Codex/Skills/CN/AGENTS.md", _minimal_agents(old_version, claude=False, english=False))
     _write(root / "Codex/Skills/EN/AGENTS.md", _minimal_agents(old_version, claude=False, english=True))
     _write(root / "Codex/Skills/CN/skills/sopify/SKILL.md", "# skill\n")
     _write(root / "Codex/Skills/EN/skills/sopify/SKILL.md", "# skill\n")
 
-    if not missing_claude_targets:
-        _write(root / "Claude/Skills/CN/CLAUDE.md", _minimal_agents(old_version, claude=True, english=False))
-        _write(root / "Claude/Skills/EN/CLAUDE.md", _minimal_agents(old_version, claude=True, english=True))
-        _write(root / "Claude/Skills/CN/skills/sopify/SKILL.md", "# skill\n")
-        _write(root / "Claude/Skills/EN/skills/sopify/SKILL.md", "# skill\n")
+    _write(root / "Claude/Skills/CN/CLAUDE.md", _minimal_agents(old_version, claude=True, english=False))
+    _write(root / "Claude/Skills/EN/CLAUDE.md", _minimal_agents(old_version, claude=True, english=True))
+    _write(root / "Claude/Skills/CN/skills/sopify/SKILL.md", "# skill\n")
+    _write(root / "Claude/Skills/EN/skills/sopify/SKILL.md", "# skill\n")
 
     _write(root / "runtime/gate.py", "print('baseline')\n")
     _write(root / "tests/test_runtime_gate.py", "print('baseline test')\n")
@@ -434,7 +458,7 @@ class ReleaseHookTests(unittest.TestCase):
     def test_pre_commit_restores_release_managed_files_when_release_sync_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            _init_release_hook_fixture(root, missing_claude_targets=True)
+            _init_release_hook_fixture(root, inject_sync_failure=True)
 
             original_readme = (root / "README.md").read_text(encoding="utf-8")
             original_changelog = (root / "CHANGELOG.md").read_text(encoding="utf-8")

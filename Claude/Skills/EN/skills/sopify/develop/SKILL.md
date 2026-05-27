@@ -30,7 +30,7 @@ description: Develop phase entry; routes task execution, state updates, KB sync,
 Use the script when task extraction must be auditable:
 
 ```bash
-python3 Codex/Skills/EN/skills/sopify/develop/scripts/extract_pending_tasks.py \
+python3 skills/en/skills/sopify/develop/scripts/extract_pending_tasks.py \
   --tasks-file .sopify-skills/plan/<plan>/tasks.md
 ```
 

@@ -128,7 +128,7 @@ Next: {下一步提示}
  | `~go plan` | 只规划不执行 |
  | `~go exec` | 高级恢复/调试入口；仅在已有活动 plan 或恢复态存在时使用 |
  | `~go finalize` | 对当前 metadata-managed plan 执行收口归档 |
- 
+
 说明：每次进入新的 Sopify 回合前，宿主必须先执行 runtime gate 并消费其 JSON contract；仅当 gate 通过时才可进入后续阶段。详见 `.sopify-skills/blueprint/protocol.md §8.1`：gate 入口协议、`allowed_response_mode` 值域、ActionProposal capability。
 
 说明：runtime 执行后，宿主必须优先消费 `.sopify-skills/state/current_handoff.json` 结构化字段决定下一步；有未完成 checkpoint 时必须先响应 checkpoint 再继续。详见 `.sopify-skills/blueprint/protocol.md §8.2`：handoff 消费协议与 `required_host_action` 值域。

@@ -32,7 +32,7 @@ description: Analyze phase entry; routes scoring, follow-up, and scope checks th
 Use the script when the score must be auditable:
 
 ```bash
-python3 Codex/Skills/EN/skills/sopify/analyze/scripts/score_requirement.py \
+python3 skills/en/skills/sopify/analyze/scripts/score_requirement.py \
   --goal-clarity 2 \
   --expected-outcome 2 \
   --scope-boundary 1 \

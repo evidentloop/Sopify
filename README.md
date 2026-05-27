@@ -261,7 +261,7 @@ Delete or clear `.sopify-skills/user/preferences.md`; keep `feedback.jsonl` only
 
 ### Q: When should I run sync scripts?
 
-When you change `Codex/Skills/{CN,EN}`, the mirrored `Claude/Skills/{CN,EN}` content, or `runtime/builtin_skill_packages/*/skill.yaml`, follow the validation steps in [CONTRIBUTING.md](./CONTRIBUTING.md).
+When you change `skills/{zh,en}` (source templates or skill packages), or `runtime/builtin_skill_packages/*/skill.yaml`, follow the validation steps in [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ## Version History
 

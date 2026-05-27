@@ -29,7 +29,7 @@ description: Design phase entry; routes plan grading, task breakdown, and plan p
 Use the selector when `plan.level=auto` must be auditable:
 
 ```bash
-python3 Codex/Skills/EN/skills/sopify/design/scripts/select_plan_level.py \
+python3 skills/en/skills/sopify/design/scripts/select_plan_level.py \
   --file-count 6 \
   --new-feature \
   --cross-module

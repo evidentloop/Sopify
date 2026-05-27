@@ -6,8 +6,8 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 README_PRIMARY="$ROOT_DIR/README.md"
 README_ZH="$ROOT_DIR/README.zh-CN.md"
 CHANGELOG="$ROOT_DIR/CHANGELOG.md"
-CODEX_CN="$ROOT_DIR/Codex/Skills/CN/AGENTS.md"
-CODEX_EN="$ROOT_DIR/Codex/Skills/EN/AGENTS.md"
+SKILLS_ZH="$ROOT_DIR/skills/zh/header.md.template"
+SKILLS_EN="$ROOT_DIR/skills/en/header.md.template"
 CHANGELOG_DRAFT_SCRIPT="$ROOT_DIR/scripts/release-draft-changelog.py"
 
 usage() {
@@ -19,8 +19,8 @@ Synchronize release version across key files:
   2) CHANGELOG.md:
      - move current [Unreleased] content into
        ## [<version>] - <date>
-  3) Codex SOPIFY_VERSION headers (CN/EN)
-  4) Sync Codex -> Claude and run consistency checks
+  3) skills/ source template SOPIFY_VERSION headers (zh/en)
+  4) Render skills/ -> host distributions and run consistency checks
 
 Arguments:
   <version>   release version, e.g. 2026-02-13 or 2026-01-15.1
@@ -69,8 +69,8 @@ required_files=(
   "$README_PRIMARY"
   "$README_ZH"
   "$CHANGELOG"
-  "$CODEX_CN"
-  "$CODEX_EN"
+  "$SKILLS_ZH"
+  "$SKILLS_EN"
   "$CHANGELOG_DRAFT_SCRIPT"
   "$ROOT_DIR/scripts/sync-skills.sh"
   "$ROOT_DIR/scripts/check-skills-sync.sh"
@@ -279,8 +279,8 @@ echo "  - Date: $RELEASE_DATE"
 
 require_single_match "$README_PRIMARY" 'img\.shields\.io/badge/version-.*-orange\.svg' "README primary version badge"
 require_single_match "$README_ZH" 'img\.shields\.io/badge/version-.*-orange\.svg' "README zh-CN version badge"
-require_single_match "$CODEX_CN" '^<!-- SOPIFY_VERSION: .* -->$' "Codex CN SOPIFY_VERSION"
-require_single_match "$CODEX_EN" '^<!-- SOPIFY_VERSION: .* -->$' "Codex EN SOPIFY_VERSION"
+require_single_match "$SKILLS_ZH" '^<!-- SOPIFY_VERSION: .* -->$' "skills/zh SOPIFY_VERSION"
+require_single_match "$SKILLS_EN" '^<!-- SOPIFY_VERSION: .* -->$' "skills/en SOPIFY_VERSION"
 
 if grep -Fq "## [$VERSION] - " "$CHANGELOG"; then
   echo "CHANGELOG already contains version $VERSION." >&2
@@ -294,8 +294,8 @@ update_readme_badge "$README_ZH"
 
 promote_unreleased_to_release "$CHANGELOG"
 
-replace_once "$CODEX_CN" '^<!-- SOPIFY_VERSION: .* -->$' "<!-- SOPIFY_VERSION: $VERSION -->"
-replace_once "$CODEX_EN" '^<!-- SOPIFY_VERSION: .* -->$' "<!-- SOPIFY_VERSION: $VERSION -->"
+replace_once "$SKILLS_ZH" '^<!-- SOPIFY_VERSION: .* -->$' "<!-- SOPIFY_VERSION: $VERSION -->"
+replace_once "$SKILLS_EN" '^<!-- SOPIFY_VERSION: .* -->$' "<!-- SOPIFY_VERSION: $VERSION -->"
 
 bash "$ROOT_DIR/scripts/sync-skills.sh"
 bash "$ROOT_DIR/scripts/check-skills-sync.sh"
