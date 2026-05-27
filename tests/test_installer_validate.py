@@ -21,7 +21,7 @@ class BundleSmokeFailureDetailsTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             bundle_root = root / "bundle"
-            smoke_script = bundle_root / "scripts" / "check-runtime-smoke.sh"
+            smoke_script = bundle_root / "scripts" / "check-bundle-smoke.sh"
             smoke_script.parent.mkdir(parents=True, exist_ok=True)
             smoke_script.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
             payload_manifest = root / "payload-manifest.json"
@@ -45,7 +45,7 @@ class BundleSmokeFailureDetailsTests(unittest.TestCase):
     def test_failure_details_always_include_exit_status_and_command(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             bundle_root = Path(temp_dir)
-            smoke_script = bundle_root / "scripts" / "check-runtime-smoke.sh"
+            smoke_script = bundle_root / "scripts" / "check-bundle-smoke.sh"
             smoke_script.parent.mkdir(parents=True, exist_ok=True)
             smoke_script.write_text("#!/usr/bin/env bash\nexit 1\n", encoding="utf-8")
 
@@ -70,7 +70,7 @@ class BundleSmokeFailureDetailsTests(unittest.TestCase):
     def test_empty_failure_details_fallback_to_xtrace_with_last_subcommand(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             bundle_root = Path(temp_dir)
-            smoke_script = bundle_root / "scripts" / "check-runtime-smoke.sh"
+            smoke_script = bundle_root / "scripts" / "check-bundle-smoke.sh"
             smoke_script.parent.mkdir(parents=True, exist_ok=True)
             smoke_script.write_text("#!/usr/bin/env bash\nexit 1\n", encoding="utf-8")
 

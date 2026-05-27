@@ -29,7 +29,7 @@ Use these commands when you need maintainer-level control over the vendored runt
 
 ```bash
 # Sync runtime assets into a target workspace (maintainer command)
-python3 -c "from installer.runtime_bundle import sync_runtime_bundle; from pathlib import Path; sync_runtime_bundle(Path('.'), Path('/path/to/project'))"
+python3 -c "from installer.sopify_bundle import sync_runtime_bundle; from pathlib import Path; sync_runtime_bundle(Path('.'), Path('/path/to/project'))"
 
 # Validate the raw input entry in the target workspace
 python3 /path/to/project/.sopify-runtime/scripts/sopify_runtime.py \
@@ -37,7 +37,7 @@ python3 /path/to/project/.sopify-runtime/scripts/sopify_runtime.py \
 
 # Optional: portable smoke checks in the target workspace
 python3 -m pytest /path/to/project/.sopify-runtime/tests/test_runtime.py -v
-bash /path/to/project/.sopify-runtime/scripts/check-runtime-smoke.sh
+bash /path/to/project/.sopify-runtime/scripts/check-bundle-smoke.sh
 ```
 
 Bundle rules:
@@ -112,7 +112,7 @@ python3 scripts/sopify_runtime.py "Refactor the database layer"
 python3 scripts/runtime_gate.py enter --workspace-root . --request "Refactor the database layer"
 python3 scripts/sopify_runtime.py "~go plan Refactor the database layer"
 python3 scripts/sopify_runtime.py "~go finalize"
-bash scripts/check-runtime-smoke.sh
+bash scripts/check-bundle-smoke.sh
 ```
 
 Documentation and release validation:

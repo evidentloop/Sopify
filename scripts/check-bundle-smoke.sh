@@ -5,7 +5,7 @@ BUNDLE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 usage() {
   cat <<'EOF'
-Usage: scripts/check-runtime-smoke.sh
+Usage: scripts/check-bundle-smoke.sh
 
 Run a minimal zero-config smoke test against the current Sopify runtime bundle.
 This script works both in the repository root and inside a vendored runtime bundle.

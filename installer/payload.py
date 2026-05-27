@@ -12,7 +12,7 @@ from typing import Any
 
 from installer.hosts.base import HostAdapter, read_sopify_version, HEADER_TEMPLATE_NAME, render_single_file
 from installer.models import BootstrapResult, InstallError, InstallPhaseResult
-from installer.runtime_bundle import sync_runtime_bundle
+from installer.sopify_bundle import sync_runtime_bundle
 from installer.validate import _normalize_payload_bundle_version, resolve_payload_bundle_root, validate_payload_install
 from canonical_writer import iso_now
 

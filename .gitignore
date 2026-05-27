@@ -18,3 +18,6 @@ evals/skill_eval_report.json
 Codex/Skills/
 Claude/Skills/
 Copilot/Skills/
+
+# Copilot workspace install product (dogfood / local testing).
+.github/copilot-instructions.md

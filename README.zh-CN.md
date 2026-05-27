@@ -93,7 +93,8 @@ python3 scripts/install_sopify.py --target claude:zh-CN --workspace /path/to/pro
 - `codex:en-US`
 - `claude:zh-CN`
 - `claude:en-US`
-- `copilot`
+- `copilot:zh-CN`
+- `copilot:en-US`
 
 协议层适用于任何宿主。当前已验证的 runtime 集成：
 
@@ -101,7 +102,7 @@ python3 scripts/install_sopify.py --target claude:zh-CN --workspace /path/to/pro
 |------|-------------|--------|----------|------|
 | `codex` | `codex:zh-CN` / `codex:en-US` | Deep verified | 已验证宿主安装链路、workspace bootstrap，且运行时包已通过 smoke 验证 | 适合日常使用 |
 | `claude` | `claude:zh-CN` / `claude:en-US` | Deep verified | 已验证宿主安装链路、workspace bootstrap，且运行时包已通过 smoke 验证 | 适合日常使用 |
-| `copilot` | 通过 `install.sh` bootstrap | Workspace ready | 已验证 workspace bootstrap、指令分发和 workspace marker | 触发入口即将推出 |
+| `copilot` | `copilot:zh-CN` / `copilot:en-US` | Workspace ready | 已验证 workspace bootstrap、指令分发和 workspace marker | 触发入口即将推出 |
 
 说明：
 

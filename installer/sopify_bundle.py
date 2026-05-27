@@ -12,7 +12,7 @@ from runtime.manifest import write_bundle_manifest
 DEFAULT_BUNDLE_DIRNAME = ".sopify-runtime"
 
 _DIRECTORY_ASSETS = ("runtime", "sopify_contracts", "canonical_writer")
-_SCRIPT_ASSETS = ("sopify_runtime.py", "runtime_gate.py", "check-runtime-smoke.sh")
+_SCRIPT_ASSETS = ("sopify_runtime.py", "runtime_gate.py", "check-bundle-smoke.sh")
 _COPY_IGNORE = shutil.ignore_patterns("__pycache__", "*.pyc")
 
 
@@ -60,7 +60,7 @@ def sync_runtime_bundle(repo_root: Path, workspace_root: Path, *, bundle_dirname
         bundle_root / "runtime" / "__init__.py",
         bundle_root / "scripts" / "sopify_runtime.py",
         bundle_root / "scripts" / "runtime_gate.py",
-        bundle_root / "scripts" / "check-runtime-smoke.sh",
+        bundle_root / "scripts" / "check-bundle-smoke.sh",
         bundle_root / "tests" / "test_runtime.py",
     )
     missing = [path for path in required_paths if not path.exists()]

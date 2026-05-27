@@ -93,7 +93,8 @@ Install targets:
 - `codex:en-US`
 - `claude:zh-CN`
 - `claude:en-US`
-- `copilot`
+- `copilot:zh-CN`
+- `copilot:en-US`
 
 The protocol works with any host. Verified runtime integrations today:
 
@@ -101,7 +102,7 @@ The protocol works with any host. Verified runtime integrations today:
 |------|----------------|--------------|---------------------|-------|
 | `codex` | `codex:zh-CN` / `codex:en-US` | Deep verified | Host install flow, workspace bootstrap, and runtime package smoke are verified | Suitable for daily use |
 | `claude` | `claude:zh-CN` / `claude:en-US` | Deep verified | Host install flow, workspace bootstrap, and runtime package smoke are verified | Suitable for daily use |
-| `copilot` | Bootstrap via `install.sh` | Workspace ready | Workspace bootstrap, instruction distribution, and workspace marker are verified | Trigger wiring coming next |
+| `copilot` | `copilot:zh-CN` / `copilot:en-US` | Workspace ready | Workspace bootstrap, instruction distribution, and workspace marker are verified | Trigger wiring coming next |
 
 Notes:
 

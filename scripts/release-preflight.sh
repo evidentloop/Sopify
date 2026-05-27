@@ -70,6 +70,6 @@ else
 fi
 run_step "Run install/payload bootstrap smoke" python3 "$ROOT_DIR/scripts/check-install-payload-bundle-smoke.py"
 run_step "Run prompt runtime gate smoke" python3 "$ROOT_DIR/scripts/check-prompt-runtime-gate-smoke.py"
-run_step "Run bundle runtime smoke check" bash "$ROOT_DIR/scripts/check-runtime-smoke.sh"
+run_step "Run bundle runtime smoke check" bash "$ROOT_DIR/scripts/check-bundle-smoke.sh"
 
 echo "[release-preflight] All checks passed."
