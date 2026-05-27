@@ -8,12 +8,12 @@
     "tree": "sorted files, posix_path\\0raw_bytes per file, NL-joined, sha256"
   },
   "snapshots": {
-    "codex:zh-CN:header": "b6f7ed30241e8a550892983e9d817a91fb9958d15cc4ee3603c30f7597443467",
-    "codex:en-US:header": "e3203542a4ed2a688542eefd00c45401962be2482f025d23ee36eec3d01f3f83",
-    "claude:zh-CN:header": "e4cdf95be330d14b052b41101c4a24acbe839616f3ca59392715d68681ecfa03",
-    "claude:en-US:header": "4138b70de2186883d8d400c44ca0140be437ebcf768a2c56bf8f6d48fc1e169f",
-    "copilot:zh-CN:managed_block_payload": "872a85be7ad9e512f37b1c7e40c81a5b4e38bc95ec2ef1858521ab4b3e780495",
-    "copilot:en-US:managed_block_payload": "00b0a5248b2c6798575308902b2b8b10fb1ed0f1af9b707f07d47d27dec6fa60",
+    "codex:zh-CN:header": "76ca4d4165f52ce5ffc62375f11d8d0c190c49bc1318af91b822b4f1a8e9b228",
+    "codex:en-US:header": "dc34e78fd18370258a351bc6f796f58d79c8b63a08f70baa48ad12196efac3da",
+    "claude:zh-CN:header": "9b9656c93feedd3258cebe1668ae867669f1bb190f3358b8629da8e34883cb02",
+    "claude:en-US:header": "8716d513902d7e34e9f0b3d7f0d0e96f8bca3e99877c6c2b48dbab80c776e426",
+    "copilot:zh-CN:managed_block_payload": "25a1deef786dc4025d8b53651fbfaa6d1410c497e4f3d3d1b4ffca2a7df37c99",
+    "copilot:en-US:managed_block_payload": "7506e5a49a2ef13757b244deae144c9def4c687ae0227ef2e84c1a23f3ce081c",
     "skills:zh-CN:tree": "ad27f25d839651530f19c27f90ffe6e159c34b086802e0d51a304162bed72657",
     "skills:en-US:tree": "e3ce3913b26154edc0d87eb770d61906bc34550154642383913de17d27ff0a2a"
   }

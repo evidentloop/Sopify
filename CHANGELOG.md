@@ -6,25 +6,26 @@ Format: Summary → Changed → Plan Packages. File-level details live in `git l
 
 ## [Unreleased]
 
-## [2026-05-27.161019] - 2026-05-27
+## [2026-05-27.214655] - 2026-05-27
 
 ### Summary
 
-- Host bundle unification closeout: `runtime_bundle` → `sopify_bundle` rename, plan `20260526_pre_launch_host_and_bundle_unification` finalized and archived.
-- Changes across: Docs, Runtime, Scripts, Skills, Tests, Changed.
+- Host bundle unification closeout: `runtime_bundle` → `sopify_bundle` rename, Copilot 纳入统一 registry.
+- Skill writing quality convergence: shared writing DNA (6 rules ZH+EN), output template v2 with verification tables, render pipeline fix for top-level `references/` inline.
+- Changes across: Installer, Skills, Tests, Plan Governance.
 
 ### Changed
 
-- **Docs**: Refined public documentation (5 files)
-- **Runtime**: Updated runtime internals (2 files)
-- **Scripts**: Adjusted maintenance scripts (5 files) — `check-runtime-smoke` → `check-bundle-smoke` rename
-- **Skills**: Synced prompt-layer skills (92 files)
-- **Tests**: Updated automated coverage (4 files)
-- **Changed**: Updated project files (10 files)
+- **Installer**: `render_single_file()` now inlines top-level `references/` directory (+8 lines)
+- **Skills**: Shared writing DNA + 3 SKILL.md philosophy lines + 4 output templates rewritten with verification summary tables, reason_code, review evidence, status symbol constraint (ZH+EN, 22 files)
+- **Scripts**: `check-runtime-smoke` → `check-bundle-smoke` rename, script cleanup
+- **Tests**: Golden snapshot hashes updated (8/8 passing)
+- **Docs**: Public documentation and README refinements
 
 ### Plan Packages
 
 - `20260526_pre_launch_host_and_bundle_unification` (completed → archived)
+- `20260527_skill_writing_quality` (completed → archived)
 
 ## [2026-05-26.221112] - 2026-05-26
 
