@@ -350,7 +350,7 @@ class DistributionFacadeTests(unittest.TestCase):
             self.assertEqual(report.install_result.target.value, "copilot:en-US")
             rendered = render_distribution_user_result(report)
             self.assertIn("Copilot", rendered)
-            self.assertTrue((workspace_root / ".sopify-skills" / "sopify.json").exists())
+            self.assertTrue((workspace_root / ".github" / "copilot-instructions.md").exists())
 
     def test_install_script_copilot_defaults_language_from_lang(self) -> None:
         with tempfile.TemporaryDirectory() as workspace_dir:
@@ -364,7 +364,6 @@ class DistributionFacadeTests(unittest.TestCase):
                     "copilot",
                     "--workspace",
                     workspace_dir,
-                    "--no-copilot",
                 ],
                 capture_output=True,
                 text=True,
@@ -373,7 +372,7 @@ class DistributionFacadeTests(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, msg=result.stderr)
-            self.assertIn("Sopify 工作区已就绪。", result.stdout)
+            self.assertIn("Sopify 安装完成。", result.stdout)
             self.assertIn("宿主：Copilot（copilot:zh-CN）", result.stdout)
 
     def test_repo_local_ref_override_is_rejected(self) -> None:

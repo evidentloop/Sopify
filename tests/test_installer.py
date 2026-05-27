@@ -233,6 +233,69 @@ class PayloadInstallTests(unittest.TestCase):
             self.assertTrue(payload_manifest["minimum_workspace_manifest"]["required_capabilities"]["runtime_gate"])
             self.assertTrue(payload_manifest["minimum_workspace_manifest"]["required_capabilities"]["runtime_entry_guard"])
 
+    def test_ensure_workspace_instruction_resources_repairs_missing_manifest(self) -> None:
+        """full.md present but manifest.json missing → ensure repairs manifest."""
+        from installer.payload import _ensure_workspace_instruction_resources, PAYLOAD_INSTRUCTION_RESOURCES_DIR
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            home_root = Path(temp_dir)
+            CODEX_ADAPTER.destination_root(home_root).mkdir(parents=True, exist_ok=True)
+            # First install creates both files
+            install_global_payload(CODEX_ADAPTER, repo_root=REPO_ROOT, home_root=home_root)
+            payload_root = CODEX_ADAPTER.payload_root(home_root)
+            resource_dir = payload_root / PAYLOAD_INSTRUCTION_RESOURCES_DIR / "copilot"
+            manifest_file = resource_dir / "manifest.json"
+            full_file = resource_dir / "full.md"
+
+            # Precondition: both exist after install
+            self.assertTrue(full_file.is_file())
+            self.assertTrue(manifest_file.is_file())
+
+            # Simulate manifest loss
+            manifest_file.unlink()
+            self.assertFalse(manifest_file.is_file())
+
+            # ensure must repair it
+            changed = _ensure_workspace_instruction_resources(repo_root=REPO_ROOT, payload_root=payload_root)
+            self.assertTrue(changed)
+            self.assertTrue(manifest_file.is_file())
+
+            # Second call: both present and current → no change
+            changed = _ensure_workspace_instruction_resources(repo_root=REPO_ROOT, payload_root=payload_root)
+            self.assertFalse(changed)
+
+    def test_workspace_instruction_sync_rejects_path_traversal(self) -> None:
+        """Manifest with ../escape or absolute path must be rejected."""
+        from installer.bootstrap_workspace import _sync_workspace_instruction_assets
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace_root = Path(temp_dir) / "workspace"
+            workspace_root.mkdir()
+            payload_root = Path(temp_dir) / "payload"
+            resource_dir = payload_root / "resources" / "copilot"
+            resource_dir.mkdir(parents=True)
+            (resource_dir / "full.md").write_text("# test content", encoding="utf-8")
+
+            # Test ../escape
+            (resource_dir / "manifest.json").write_text(
+                json.dumps({"destination_dirname": "../escape", "header_filename": "evil.md"}),
+                encoding="utf-8",
+            )
+            result = _sync_workspace_instruction_assets(
+                host_id="copilot", workspace_root=workspace_root, payload_root=payload_root
+            )
+            self.assertFalse(result)
+
+            # Test absolute path
+            (resource_dir / "manifest.json").write_text(
+                json.dumps({"destination_dirname": "/tmp", "header_filename": "evil.md"}),
+                encoding="utf-8",
+            )
+            result = _sync_workspace_instruction_assets(
+                host_id="copilot", workspace_root=workspace_root, payload_root=payload_root
+            )
+            self.assertFalse(result)
+
     def test_install_versioned_runtime_bundle_rejects_invalid_manifest_bundle_version_before_rename(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             host_root = Path(temp_dir)
@@ -1279,9 +1342,7 @@ class CopilotInstructionSyncTests(unittest.TestCase):
             self.assertIn("Sopify", content)
 
             owned_path = workspace_root / ".github" / "instructions" / "sopify.instructions.md"
-            self.assertTrue(owned_path.exists(), "sopify.instructions.md should be created")
-            owned_content = owned_path.read_text(encoding="utf-8")
-            self.assertIn("applyTo:", owned_content)
+            self.assertFalse(owned_path.exists(), "sopify.instructions.md should not be created")
 
     def test_codex_host_does_not_create_instruction_files(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1370,9 +1431,9 @@ class CopilotInstructionSyncTests(unittest.TestCase):
                 (workspace_root / ".github" / "copilot-instructions.md").exists(),
                 "Codex bootstrap should not remove Copilot instruction files",
             )
-            self.assertTrue(
+            self.assertFalse(
                 (workspace_root / ".github" / "instructions" / "sopify.instructions.md").exists(),
-                "Codex bootstrap should not remove owned instruction file",
+                "sopify.instructions.md should not be created",
             )
 
     def test_copilot_instruction_sync_on_ready_workspace(self) -> None:

@@ -11,10 +11,10 @@ Thanks for your interest in contributing to Sopify.
 
 ## Prompt-layer and Skill Authoring
 
-- `Codex/Skills/{CN,EN}` is the prompt-layer source of truth.
-- `Claude/Skills/{CN,EN}` is the mirrored host layer and should be synced, not hand-maintained independently.
+- `skills/{zh,en}` is the prompt-layer source of truth. Each language directory contains `header.md.template` (host-agnostic template) and `skills/sopify/` (skill packages).
+- `Codex/Skills/{CN,EN}` and `Claude/Skills/{CN,EN}` are generated distribution outputs rendered from `skills/` via `scripts/sync-skills.sh`. Do not hand-edit these files.
 - `runtime/builtin_skill_packages/*/skill.yaml` is the source of truth for builtin machine metadata.
-- For skill package changes, follow the `SKILL.md` files under [Codex/Skills/CN/skills/sopify/](./Codex/Skills/CN/skills/sopify/) / [Codex/Skills/EN/skills/sopify/](./Codex/Skills/EN/skills/sopify/).
+- For skill package changes, follow the `SKILL.md` files under [skills/zh/skills/sopify/](./skills/zh/skills/sopify/) / [skills/en/skills/sopify/](./skills/en/skills/sopify/).
 
 Key constraints:
 

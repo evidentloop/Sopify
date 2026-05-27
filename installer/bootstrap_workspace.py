@@ -120,10 +120,7 @@ _SOPIFY_MANAGED_IGNORE_ENTRIES = (
 )
 _SOPIFY_INSTRUCTION_BLOCK_BEGIN = "<!-- BEGIN SOPIFY MANAGED BLOCK -->"
 _SOPIFY_INSTRUCTION_BLOCK_END = "<!-- END SOPIFY MANAGED BLOCK -->"
-_COPILOT_INSTRUCTIONS_RELPATH = Path(".github") / "copilot-instructions.md"
-_COPILOT_INSTRUCTION_FILE_RELPATH = Path(".github") / "instructions" / "sopify.instructions.md"
-_COPILOT_HOST_ID = "copilot"
-_INSTRUCTION_RESOURCE_DIR = Path("resources") / "copilot"
+_INSTRUCTION_RESOURCES_DIR = Path("resources")
 REASON_STUB_SELECTED = "STUB_SELECTED"
 REASON_STUB_INVALID = "STUB_INVALID"
 REASON_CONFIRM_BOOTSTRAP_REQUIRED = "CONFIRM_BOOTSTRAP_REQUIRED"
@@ -275,13 +272,13 @@ def bootstrap_workspace(
                     bundle_manifest=bundle_manifest,
                     ignore_mode=desired_ignore_mode,
                 )
-            if host_id == _COPILOT_HOST_ID:
-                instruction_changed = _sync_copilot_instruction_assets(
-                    workspace_root=resolved_activation_root,
-                    payload_root=payload_root,
-                )
-                if instruction_changed:
-                    ignore_sync_changed = True
+            instruction_changed = _sync_workspace_instruction_assets(
+                host_id=host_id,
+                workspace_root=resolved_activation_root,
+                payload_root=payload_root,
+            )
+            if instruction_changed:
+                ignore_sync_changed = True
         return _result(
             action="updated" if ignore_sync_changed else "skipped",
             state=state,
@@ -417,11 +414,11 @@ def bootstrap_workspace(
         bundle_manifest=bundle_manifest,
         ignore_mode=desired_ignore_mode,
     )
-    if host_id == _COPILOT_HOST_ID:
-        _sync_copilot_instruction_assets(
-            workspace_root=resolved_activation_root,
-            payload_root=payload_root,
-        )
+    _sync_workspace_instruction_assets(
+        host_id=host_id,
+        workspace_root=resolved_activation_root,
+        payload_root=payload_root,
+    )
     action = "bootstrapped" if state == "MISSING" else "updated"
     return _result(
         action=action,
@@ -1098,12 +1095,12 @@ def _write_text_if_changed(path: Path, content: str) -> bool:
     return True
 
 
-# ── Copilot instruction managed block helpers ────────────────────────────
+# ── Workspace-scope instruction managed block helpers ─────────────────────
 
 
-def _read_instruction_resource(payload_root: Path, filename: str) -> str | None:
-    """Read a pre-distributed Copilot instruction resource file."""
-    resource_path = payload_root / _INSTRUCTION_RESOURCE_DIR / filename
+def _read_instruction_resource(payload_root: Path, host_name: str, filename: str) -> str | None:
+    """Read a pre-distributed instruction resource file for a workspace-scope host."""
+    resource_path = payload_root / _INSTRUCTION_RESOURCES_DIR / host_name / filename
     if not resource_path.is_file():
         return None
     return resource_path.read_text(encoding="utf-8")
@@ -1116,7 +1113,7 @@ def _write_managed_instruction_block(path: Path, content: str) -> bool:
     if _SOPIFY_INSTRUCTION_BLOCK_BEGIN in existing and _SOPIFY_INSTRUCTION_BLOCK_END in existing:
         new_content = re.sub(
             rf"{re.escape(_SOPIFY_INSTRUCTION_BLOCK_BEGIN)}.*?{re.escape(_SOPIFY_INSTRUCTION_BLOCK_END)}",
-            block,
+            lambda _: block,
             existing,
             count=1,
             flags=re.DOTALL,
@@ -1149,34 +1146,39 @@ def _remove_managed_instruction_block(path: Path) -> bool:
     return _write_text_if_changed(path, _ensure_trailing_newline(normalized))
 
 
-def _write_copilot_instruction_file(workspace_root: Path, content: str) -> bool:
-    """Write the owned Copilot instruction file."""
-    target = workspace_root / _COPILOT_INSTRUCTION_FILE_RELPATH
-    return _write_text_if_changed(target, _ensure_trailing_newline(content))
+def _sync_workspace_instruction_assets(*, host_id: str | None, workspace_root: Path, payload_root: Path) -> bool:
+    """Sync instruction files for workspace-scope hosts from payload into the workspace.
 
-
-def _remove_copilot_instruction_file(workspace_root: Path) -> bool:
-    """Remove the owned Copilot instruction file."""
-    target = workspace_root / _COPILOT_INSTRUCTION_FILE_RELPATH
-    if not target.is_file():
+    Reads resource manifest (written by payload.py) to discover target path.
+    This file is self-contained and does not import installer modules.
+    """
+    if not host_id:
         return False
-    target.unlink()
-    instructions_dir = target.parent
-    if instructions_dir.is_dir() and not any(instructions_dir.iterdir()):
-        instructions_dir.rmdir()
-    return True
-
-
-def _sync_copilot_instruction_assets(*, workspace_root: Path, payload_root: Path) -> bool:
-    """Sync Copilot instruction files from payload resources into the workspace."""
-    lightweight = _read_instruction_resource(payload_root, "lightweight.md")
-    if lightweight is None:
+    manifest_path = payload_root / _INSTRUCTION_RESOURCES_DIR / host_id / "manifest.json"
+    if not manifest_path.is_file():
         return False
-    full = _read_instruction_resource(payload_root, "full.md")
-    changed = _write_managed_instruction_block(workspace_root / _COPILOT_INSTRUCTIONS_RELPATH, lightweight)
-    if full is not None:
-        changed = _write_copilot_instruction_file(workspace_root, full) or changed
-    return changed
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, TypeError):
+        return False
+    if not isinstance(manifest, dict):
+        return False
+    dest_dir = manifest.get("destination_dirname", "")
+    header_file = manifest.get("header_filename", "")
+    if not dest_dir or not header_file or not isinstance(dest_dir, str) or not isinstance(header_file, str):
+        return False
+    # Path safety: reject absolute paths or traversal
+    if os.path.isabs(dest_dir) or ".." in Path(dest_dir).parts:
+        return False
+    if os.path.isabs(header_file) or ".." in Path(header_file).parts:
+        return False
+    target_path = (workspace_root / dest_dir / header_file).resolve()
+    if not str(target_path).startswith(str(workspace_root.resolve()) + os.sep) and target_path != workspace_root.resolve():
+        return False
+    full = _read_instruction_resource(payload_root, host_id, "full.md")
+    if full is None:
+        return False
+    return _write_managed_instruction_block(target_path, full)
 
 
 def _confirm_bootstrap_message(

@@ -1,0 +1,39 @@
+{
+  "protocol_version": "1.0",
+  "description": "T0 golden snapshot — generated from old host directories before migration",
+  "hash_algorithm": "sha256",
+  "normalization": "LF line endings, trailing whitespace stripped, files sorted by relative path ascending, NUL-separated path\\0content\\n format",
+  "snapshots": {
+    "claude:en-US": {
+      "source": "Claude/Skills/EN/",
+      "file_count": 23,
+      "hash": "sha256:726a4ae301ac57b495e7a56b9fe35e37de9f7c33775b261b87d623b1e8ac8e7e"
+    },
+    "claude:zh-CN": {
+      "source": "Claude/Skills/CN/",
+      "file_count": 23,
+      "hash": "sha256:1f7a4cda18ff19ff7b7cdce88c6a5f2439ad6c7d6ad75241721ab890d4da7de2"
+    },
+    "codex:en-US": {
+      "source": "Codex/Skills/EN/",
+      "file_count": 23,
+      "hash": "sha256:d36ece58aab0b6eab369409191cb33f09bf7b5745d7efc0435add73bef051037"
+    },
+    "codex:zh-CN": {
+      "source": "Codex/Skills/CN/",
+      "file_count": 23,
+      "hash": "sha256:7d91f9a82a8ef009da984fa7ba55b265ff11745481d9ad5b5760d4a71e927165"
+    },
+    "copilot:en-US": {
+      "source": null,
+      "file_count": 0,
+      "hash": null,
+      "note": "Copilot/Skills/EN/ does not exist in current codebase — no baseline to protect"
+    },
+    "copilot:zh-CN": {
+      "source": "Copilot/Skills/CN/",
+      "file_count": 1,
+      "hash": "sha256:2aad4da734745eb3adfece8fd3d17584718078bf88e06d1143a3ae53bc9e62c7"
+    }
+  }
+}

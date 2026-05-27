@@ -7,7 +7,7 @@ from pathlib import Path
 import sys
 from typing import Callable, TextIO
 
-from installer.hosts import iter_installable_hosts
+from installer.hosts import get_host_adapter, iter_host_registrations, iter_installable_hosts
 from installer.inspection import build_doctor_payload, build_status_payload
 from installer.models import InstallError, InstallResult, InstallTarget, LANGUAGE_DIRECTORY_MAP
 from installer.outcome_contract import render_outcome_summary
@@ -268,6 +268,15 @@ def render_distribution_user_result(report: DistributionInstallReport) -> str:
     install_result = report.install_result
     if isinstance(install_result, BootstrapOnlyResult):
         return _render_distribution_bootstrap_user_result(report)
+    # Workspace-scope hosts (e.g. Copilot): simpler output, no runtime/bundle/~go
+    try:
+        adapter = get_host_adapter(install_result.target.host)
+    except KeyError:
+        adapter = None
+    if adapter is not None and adapter.is_workspace_scope:
+        if install_result.target.language == "zh-CN":
+            return _render_workspace_scope_result_zh(report)
+        return _render_workspace_scope_result_en(report)
     if install_result.target.language == "zh-CN":
         return _render_distribution_user_result_zh(report)
     return _render_distribution_user_result_en(report)
@@ -359,7 +368,10 @@ def _target_options() -> tuple[str, ...]:
         for capability in iter_installable_hosts()
         for language in LANGUAGE_DIRECTORY_MAP
     ]
-    options.append("copilot")
+    # Append bare targets for hosts that accept them (have default_language)
+    for reg in iter_host_registrations():
+        if reg.capability.install_enabled and reg.adapter.default_language:
+            options.append(reg.adapter.host_name)
     return tuple(options)
 
 
@@ -458,10 +470,11 @@ def _map_install_error(exc: InstallError) -> DistributionError:
 
 
 def _build_next_step(target: InstallTarget, workspace_root: Path | None) -> str:
-    if target.host == "copilot":
+    adapter = get_host_adapter(target.host)
+    if adapter.is_workspace_scope:
         if workspace_root is None:
-            return "Open Copilot in your project workspace to start using Sopify."
-        return f"Open Copilot in {workspace_root} to start using Sopify."
+            return f"Open {target.host.title()} in your project workspace to start using Sopify."
+        return f"Open {target.host.title()} in {workspace_root} to start using Sopify."
     if workspace_root is None:
         return (
             f"Open {target.host} in any project workspace and trigger Sopify. "
@@ -565,6 +578,60 @@ def _render_distribution_user_result_zh(report: DistributionInstallReport) -> st
             "诊断：",
             f"  {_friendly_smoke_summary(install_result.smoke_output, 'zh-CN')}",
             "  需要完整安装细节时，请加 `--verbose` 重新运行。",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def _render_workspace_scope_result_zh(report: DistributionInstallReport) -> str:
+    install_result = report.install_result
+    assert isinstance(install_result, InstallResult)
+    title = "Sopify 已是最新。" if _is_noop_install(install_result) else "Sopify 安装完成。"
+    host_name = _host_display_name(install_result.target.host)
+    lines = [
+        title,
+        "",
+        "已安装：",
+        f"  宿主：{host_name}（{install_result.target.value}）",
+        f"  语言：{_language_display_name(install_result.target.language, 'zh-CN')}",
+        f"  宿主提示：{_action_label(install_result.host_install.action, 'zh-CN')}",
+        f"  版本：{install_result.host_install.version or 'unknown'}",
+    ]
+    for p in install_result.host_install.paths:
+        lines.append(f"  文件：{p}")
+    lines.extend(
+        [
+            "",
+            "下一步：",
+            f"  1. 在项目目录打开 {host_name}。",
+            "  2. Sopify 指令已自动加载，直接开始你的任务。",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def _render_workspace_scope_result_en(report: DistributionInstallReport) -> str:
+    install_result = report.install_result
+    assert isinstance(install_result, InstallResult)
+    title = "Sopify is already current." if _is_noop_install(install_result) else "Sopify installed successfully."
+    host_name = _host_display_name(install_result.target.host)
+    lines = [
+        title,
+        "",
+        "Installed:",
+        f"  Host: {host_name} ({install_result.target.value})",
+        f"  Language: {_language_display_name(install_result.target.language, 'en-US')}",
+        f"  Host prompt: {_action_label(install_result.host_install.action, 'en-US')}",
+        f"  Version: {install_result.host_install.version or 'unknown'}",
+    ]
+    for p in install_result.host_install.paths:
+        lines.append(f"  File: {p}")
+    lines.extend(
+        [
+            "",
+            "Next:",
+            f"  1. Open {host_name} in your project directory.",
+            "  2. Sopify instructions are loaded automatically — start your task.",
         ]
     )
     return "\n".join(lines)

@@ -8,9 +8,9 @@ from .base import HostAdapter, HostRegistration
 
 CLAUDE_ADAPTER = HostAdapter(
     host_name="claude",
-    source_dirname="Claude",
     destination_dirname=".claude",
     header_filename="CLAUDE.md",
+    config_dir="~/.claude",
 )
 
 CLAUDE_CAPABILITY = HostCapability(

@@ -92,8 +92,8 @@ class HostCapabilityRegistryTests(unittest.TestCase):
         installable = [capability.host_id for capability in iter_installable_hosts()]
         declared = [capability.host_id for capability in iter_declared_hosts()]
 
-        self.assertEqual(set(installable), {"codex", "claude"})
-        self.assertEqual(set(declared), {"codex", "claude"})
+        self.assertEqual(set(installable), {"codex", "claude", "copilot"})
+        self.assertEqual(set(declared), {"codex", "claude", "copilot"})
 
 
 class StatusDoctorContractTests(unittest.TestCase):

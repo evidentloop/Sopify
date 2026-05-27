@@ -10,10 +10,12 @@ from installer.models import HostCapability
 from .base import HostAdapter, HostRegistration
 from .claude import CLAUDE_ADAPTER, CLAUDE_HOST
 from .codex import CODEX_ADAPTER, CODEX_HOST
+from .copilot import COPILOT_ADAPTER, COPILOT_HOST
 
 _REGISTRATIONS = {
     CODEX_HOST.capability.host_id: CODEX_HOST,
     CLAUDE_HOST.capability.host_id: CLAUDE_HOST,
+    COPILOT_HOST.capability.host_id: COPILOT_HOST,
 }
 
 

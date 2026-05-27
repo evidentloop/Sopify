@@ -17,6 +17,8 @@ WORKFLOW_DOC_FILES = (
 CONTRIBUTING_FILES = (ROOT / "CONTRIBUTING_CN.md", ROOT / "CONTRIBUTING.md")
 MARKDOWN_LINK_CHECK_FILES = README_FILES + WORKFLOW_DOC_FILES + CONTRIBUTING_FILES
 VERSION_HEADERS = (
+    ROOT / "skills/zh/header.md.template",
+    ROOT / "skills/en/header.md.template",
     ROOT / "Codex/Skills/CN/AGENTS.md",
     ROOT / "Codex/Skills/EN/AGENTS.md",
     ROOT / "Claude/Skills/CN/CLAUDE.md",

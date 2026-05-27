@@ -23,9 +23,9 @@ from installer.distribution import (
     render_distribution_user_result,
     run_distribution_install,
 )
-from installer.hosts import get_host_adapter, iter_installable_hosts
+from installer.hosts import get_host_adapter, iter_host_registrations, iter_installable_hosts
 from installer.hosts.base import install_host_assets
-from installer.models import BootstrapResult, InstallError, InstallResult, LANGUAGE_DIRECTORY_MAP, parse_install_target
+from installer.models import BootstrapResult, InstallError, InstallPhaseResult, InstallResult, LANGUAGE_DIRECTORY_MAP, parse_install_target
 from installer.payload import install_global_payload, run_workspace_bootstrap
 from installer.validate import (
     resolve_payload_bundle_root,
@@ -44,10 +44,17 @@ def build_parser() -> argparse.ArgumentParser:
         for capability in iter_installable_hosts()
         for language in LANGUAGE_DIRECTORY_MAP
     )
-    supported_targets = f"copilot, {supported_targets}"
+    # Append bare targets for hosts that accept them (have default_language)
+    bare_targets = [
+        reg.adapter.host_name
+        for reg in iter_host_registrations()
+        if reg.capability.install_enabled and reg.adapter.default_language
+    ]
+    if bare_targets:
+        supported_targets = supported_targets + ", " + ", ".join(bare_targets)
     parser = argparse.ArgumentParser(
         description=(
-            "Install Sopify for a host. Use `--target copilot` to bootstrap a workspace; "
+            "Install Sopify for a host. Workspace-scope hosts (e.g. copilot) bootstrap directly; "
             "for Codex / Claude this installs the host prompt and Sopify kernel only, and "
             "project files are initialized later when you run `~go` in a workspace."
         )
@@ -61,17 +68,13 @@ def build_parser() -> argparse.ArgumentParser:
         "--workspace",
         default=None,
         help=(
-            "For copilot: bootstrap this workspace now (defaults to current directory when omitted). "
+            "For workspace-scope hosts (e.g. copilot): bootstrap this workspace now "
+            "(defaults to current directory when omitted). "
             "For other hosts: advanced prewarm path. Most users should omit this and let `~go` initialize "
             "project files on first use."
         ),
     )
-    parser.add_argument("--language", choices=("en-US", "zh-CN"), default=None, help="Copilot bootstrap output language.")
-    parser.add_argument(
-        "--no-copilot",
-        action="store_true",
-        help="Copilot bootstrap only: skip Copilot instruction file distribution.",
-    )
+    parser.add_argument("--language", choices=("en-US", "zh-CN"), default=None, help="Override output language for bare targets.")
     parser.add_argument(
         "--ref",
         default=None,
@@ -90,24 +93,8 @@ def run_install(
     workspace_value: str | None,
     repo_root: Path,
     home_root: Path | None = None,
-    copilot_enabled: bool = True,
 ) -> InstallResult | BootstrapOnlyResult:
     target = parse_install_target(target_value)
-    if target.host == "copilot":
-        workspace_root = Path(workspace_value or ".").expanduser().resolve()
-        result = init_workspace(
-            workspace_root,
-            source_root=repo_root,
-            copilot=copilot_enabled,
-        )
-        if result.get("action") == "failed":
-            raise InstallError(str(result.get("message") or "Workspace bootstrap failed"))
-        return BootstrapOnlyResult(
-            target=target,
-            workspace_root=workspace_root,
-            bundle_version=result.get("bundle_version"),
-            details=tuple(str(item) for item in result.get("details", [])),
-        )
     workspace_root = Path(workspace_value).expanduser().resolve() if workspace_value is not None else None
     if workspace_root is not None and not workspace_root.exists():
         raise InstallError(f"Workspace does not exist: {workspace_root}")
@@ -116,6 +103,35 @@ def run_install(
 
     resolved_home = (home_root or Path.home()).expanduser().resolve()
     adapter = get_host_adapter(target.host)
+
+    if adapter.is_workspace_scope:
+        # Workspace-scope hosts (e.g. Copilot): render single file to workspace,
+        # skip payload install and workspace bootstrap.
+        if workspace_root is None:
+            workspace_root = Path(workspace_value or ".").expanduser().resolve()
+        host_install = install_host_assets(
+            adapter,
+            repo_root=repo_root,
+            home_root=resolved_home,
+            language_directory=target.language_directory,
+            workspace_root=workspace_root,
+        )
+        return InstallResult(
+            target=target,
+            workspace_root=workspace_root,
+            host_root=host_install.root,
+            payload_root=host_install.root,
+            bundle_root=None,
+            host_install=host_install,
+            payload_install=InstallPhaseResult(
+                action="skipped",
+                root=host_install.root,
+                version=host_install.version,
+                paths=(),
+            ),
+            workspace_bootstrap=None,
+            smoke_output="",
+        )
 
     host_install = install_host_assets(
         adapter,
@@ -166,9 +182,15 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     verbose = args.verbose or _env_flag_enabled(os.environ.get("SOPIFY_DEBUG"))
     normalized_target = args.target
-    if normalized_target == "copilot":
-        copilot_language = args.language or _detect_default_output_language()
-        normalized_target = f"copilot:{copilot_language}"
+    # Expand bare targets for hosts with default_language (e.g. "copilot" → "copilot:zh-CN")
+    if normalized_target and ":" not in normalized_target:
+        try:
+            adapter = get_host_adapter(normalized_target)
+            if adapter.default_language:
+                lang = args.language or _detect_default_output_language()
+                normalized_target = f"{normalized_target}:{lang}"
+        except ValueError:
+            pass
     output_language = _infer_output_language(normalized_target)
     source_metadata = DistributionSourceMetadata(
         resolved_ref=args.source_resolved_ref,
@@ -188,7 +210,7 @@ def main(argv: list[str] | None = None) -> int:
             request=request,
             repo_root=REPO_ROOT,
             home_root=None,
-            install_executor=lambda **kwargs: run_install(**kwargs, copilot_enabled=not args.no_copilot),
+            install_executor=run_install,
         )
     except DistributionError as exc:
         if verbose:

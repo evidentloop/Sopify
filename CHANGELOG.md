@@ -6,6 +6,55 @@ Format: Summary → Changed → Plan Packages. File-level details live in `git l
 
 ## [Unreleased]
 
+## [2026-05-27.132948] - 2026-05-27
+
+### Summary
+
+- Changes across: Changed.
+
+### Changed
+
+- **Changed**: Updated project files (1 files)
+
+## [2026-05-27.111148] - 2026-05-27
+
+### Summary
+
+- Changes across: Scripts, Tests, Changed.
+
+### Changed
+
+- **Scripts**: Adjusted maintenance scripts (2 files)
+- **Tests**: Updated automated coverage (1 files)
+- **Changed**: Updated project files (6 files)
+
+## [2026-05-27.094217] - 2026-05-27
+
+### Summary
+
+- Changes across: Scripts, Tests, Changed.
+
+### Changed
+
+- **Scripts**: Adjusted maintenance scripts (2 files)
+- **Tests**: Updated automated coverage (4 files)
+- **Changed**: Updated project files (10 files)
+
+## [2026-05-26.221112] - 2026-05-26
+
+### Summary
+
+- Updated 1 active plan package(s); Changes across: Scripts, Changed.
+
+### Changed
+
+- **Scripts**: Adjusted maintenance scripts (1 files)
+- **Changed**: Updated project files (52 files)
+
+### Plan Packages
+
+- `20260526_pre_launch_host_and_bundle_unification` (active)
+
 ## [2026-05-26.134110] - 2026-05-26
 
 ### Summary

@@ -10,7 +10,7 @@ plans:
       title: "Cross-Review 独立内核方案"
       level: "standard"
       topic_key: "cross_review_engine"
-      lifecycle_state: "active"
+      lifecycle_state: "deferred"
       created_at: "2026-05-04T14:45:24+00:00"
     governance:
       priority: null
@@ -27,3 +27,49 @@ plans:
     meta:
       source: "runtime_backfill"
       updated_at: "2026-05-05T11:12:58+00:00"
+  - plan_id: "20260526_pre_launch_host_and_bundle_unification"
+    snapshot:
+      path: ".sopify-skills/plan/20260526_pre_launch_host_and_bundle_unification"
+      title: "推广前宿主分发与 Bundle 统一"
+      level: "standard"
+      topic_key: "pre_launch_host_and_bundle_unification"
+      lifecycle_state: "active"
+      created_at: "2026-05-26T14:30:00+08:00"
+    governance:
+      priority: "p0"
+      priority_source: "explicit"
+      priority_confirmed_at: "2026-05-26T14:30:00+08:00"
+      status: "active"
+      note: "推广前必做，当前最高优先级"
+    advice:
+      suggested_priority: "p0"
+      suggested_source: "explicit"
+      suggested_reason:
+        - "推广前结构清理，消灭宿主级内容重复"
+      suggested_at: "2026-05-26T14:30:00+08:00"
+    meta:
+      source: "manual"
+      updated_at: "2026-05-26T14:30:00+08:00"
+  - plan_id: "20260603_skill_writing_and_plugin_system"
+    snapshot:
+      path: ".sopify-skills/plan/20260603_skill_writing_and_plugin_system"
+      title: "Skill 写作 DNA 统一与插件增强系统"
+      level: "standard"
+      topic_key: "skill_writing_and_plugin_system"
+      lifecycle_state: "deferred"
+      created_at: "2026-06-03T22:00:00+08:00"
+    governance:
+      priority: null
+      priority_source: null
+      priority_confirmed_at: null
+      status: "draft"
+      note: "Part 1 共享写作 DNA + Part 2 design 插件系统"
+    advice:
+      suggested_priority: "p2"
+      suggested_source: "heuristic_v1"
+      suggested_reason:
+        - "增强性改进，不阻塞现有流程"
+      suggested_at: "2026-06-03T22:00:00+08:00"
+    meta:
+      source: "manual"
+      updated_at: "2026-06-03T22:00:00+08:00"

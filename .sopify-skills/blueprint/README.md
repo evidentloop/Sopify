@@ -13,7 +13,7 @@
 ## 当前焦点
 
 <!-- sopify:auto:focus:start -->
-- 当前活动 plan：暂无。
+- 当前活动 plan：[推广前宿主分发与 Bundle 统一](../plan/20260526_pre_launch_host_and_bundle_unification/)（P0）。
 - history 归档：已可用；最近归档为 `../history/2026-05/20260522_runtime_slimming_kernel_extraction`。
 <!-- sopify:auto:focus:end -->
 

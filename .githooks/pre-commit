@@ -20,6 +20,8 @@ snapshot_managed_release_paths() {
     "README.md"
     "README.zh-CN.md"
     "CHANGELOG.md"
+    "skills/zh/header.md.template"
+    "skills/en/header.md.template"
     "Codex/Skills/CN/AGENTS.md"
     "Codex/Skills/EN/AGENTS.md"
     "Claude/Skills/CN/CLAUDE.md"
@@ -89,7 +91,7 @@ trap on_exit EXIT
 is_release_relevant_file() {
   local path="$1"
   case "$path" in
-    runtime/*|installer/*|Codex/Skills/*|Claude/Skills/*|README.md|README.zh-CN.md|CHANGELOG.md)
+    runtime/*|installer/*|skills/*|Codex/Skills/*|Claude/Skills/*|README.md|README.zh-CN.md|CHANGELOG.md)
       return 0
       ;;
     scripts/sopify_runtime.py|scripts/model_compare_runtime.py|scripts/check-runtime-smoke.sh|scripts/release-sync.sh|scripts/release-preflight.sh|scripts/sync-skills.sh|scripts/check-skills-sync.sh|scripts/check-version-consistency.sh)
@@ -156,6 +158,8 @@ git -C "$ROOT_DIR" add \
   README.md \
   README.zh-CN.md \
   CHANGELOG.md \
+  skills/zh/header.md.template \
+  skills/en/header.md.template \
   Codex/Skills/CN/AGENTS.md \
   Codex/Skills/EN/AGENTS.md \
   Claude/Skills/CN/CLAUDE.md \

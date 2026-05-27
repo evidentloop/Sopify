@@ -11,6 +11,24 @@ LANGUAGE_DIRECTORY_MAP = {
     "en-US": "EN",
 }
 
+LANGUAGE_SOURCE_MAP: dict[str, str] = {
+    "zh-CN": "zh",
+    "en-US": "en",
+    "CN": "zh",
+    "EN": "en",
+}
+
+
+def language_to_source_dir(language: str) -> str:
+    """Map install language code to skills/ source directory name.
+
+    Accepts both locale codes (zh-CN, en-US) and legacy directory names (CN, EN).
+    """
+    try:
+        return LANGUAGE_SOURCE_MAP[language]
+    except KeyError as exc:
+        raise ValueError(f"Unsupported language: {language}") from exc
+
 
 class InstallError(RuntimeError):
     """Raised when the installer cannot complete safely."""
@@ -158,18 +176,25 @@ class BootstrapResult:
 
 
 def parse_install_target(raw_value: str) -> InstallTarget:
-    """Parse a CLI target like `codex:zh-CN`."""
+    """Parse a CLI target like `codex:zh-CN`.
+
+    Bare host names (without ``:lang``) are expanded using the adapter's
+    ``default_language`` when available.
+    """
     value = raw_value.strip()
-    if value == "copilot":
-        return InstallTarget(host="copilot", language="en-US")
-    if value.startswith("copilot:"):
-        language = value.partition(":")[2]
-        if language not in LANGUAGE_DIRECTORY_MAP:
-            raise InstallError(f"Unsupported language: {language}")
-        return InstallTarget(host="copilot", language=language)
     host, separator, language = value.partition(":")
     if not separator:
-        raise InstallError("Target must use the format <host:lang>, for example codex:zh-CN")
+        from installer.hosts import get_host_adapter
+
+        try:
+            adapter = get_host_adapter(value)
+        except ValueError:
+            raise InstallError("Target must use the format <host:lang>, for example codex:zh-CN")
+        if adapter.default_language:
+            host = value
+            language = adapter.default_language
+        else:
+            raise InstallError("Target must use the format <host:lang>, for example codex:zh-CN")
     from installer.hosts import get_host_capability
 
     try:

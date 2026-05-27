@@ -77,9 +77,7 @@ class SopifyInitSmokeTests(unittest.TestCase):
             self.assertIn("Sopify", content)
 
             owned = workspace / ".github" / "instructions" / "sopify.instructions.md"
-            self.assertTrue(owned.exists(), "sopify.instructions.md should be created")
-            owned_content = owned.read_text(encoding="utf-8")
-            self.assertIn("applyTo", owned_content)
+            self.assertFalse(owned.exists(), "sopify.instructions.md should not be created")
 
     def test_no_copilot_skips_instruction_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -91,10 +89,6 @@ class SopifyInitSmokeTests(unittest.TestCase):
             self.assertFalse(
                 (workspace / ".github" / "copilot-instructions.md").exists(),
                 "--no-copilot should skip copilot-instructions.md",
-            )
-            self.assertFalse(
-                (workspace / ".github" / "instructions" / "sopify.instructions.md").exists(),
-                "--no-copilot should skip sopify.instructions.md",
             )
 
             marker = workspace / ".sopify-skills" / "sopify.json"

@@ -42,6 +42,7 @@ CHECK_SKIP = "skip"
 STATUS_YES = "yes"
 STATUS_NO = "no"
 STATUS_NOT_REQUESTED = "not_requested"
+STATUS_NOT_APPLICABLE = "not_applicable"
 REASON_OK = "ok"
 REASON_WORKSPACE_NOT_REQUESTED = "WORKSPACE_NOT_REQUESTED"
 REASON_RUNTIME_STATE_CONFLICT = "RUNTIME_STATE_CONFLICT"
@@ -187,6 +188,19 @@ class HostInspection:
         return self.registration.adapter
 
     def to_status_dict(self) -> dict[str, object]:
+        if self.adapter.is_workspace_scope:
+            # Workspace-scope hosts (e.g. Copilot): installed == configured == host_prompt present.
+            # No HOME payload / bundle / ingress concepts apply.
+            installed = self.host_prompt.status == CHECK_PASS
+            return {
+                **self.capability.to_dict(),
+                "state": {
+                    "installed": STATUS_YES if installed else STATUS_NO,
+                    "configured": STATUS_YES if installed else STATUS_NO,
+                    "workspace_bundle_healthy": STATUS_NOT_APPLICABLE,
+                    "workspace_ingress_proof": STATUS_NOT_APPLICABLE,
+                },
+            }
         configured = self.payload.status == CHECK_PASS
         workspace_bundle_healthy = _check_state_value(self.workspace_bundle)
         workspace_ingress_proof = _check_state_value(self.ingress_proof)
@@ -204,6 +218,8 @@ class HostInspection:
         }
 
     def doctor_checks(self) -> tuple[InspectionCheck, ...]:
+        if self.adapter.is_workspace_scope:
+            return (self.host_prompt,)
         return (
             self.host_prompt,
             self.payload,
@@ -246,7 +262,7 @@ def inspect_host(
     """Inspect one registered host."""
     adapter = registration.adapter
     capability = registration.capability
-    if _host_is_absent(adapter=adapter, home_root=home_root):
+    if _host_is_absent(adapter=adapter, home_root=home_root, workspace_root=workspace_root):
         skipped = InspectionCheck(
             host_id=capability.host_id,
             check_id="host_prompt_present",
@@ -303,7 +319,7 @@ def inspect_host(
                 reason_code=REASON_OK,
             ),
         )
-    host_prompt = _inspect_host_prompt(adapter=adapter, capability=capability, home_root=home_root)
+    host_prompt = _inspect_host_prompt(adapter=adapter, capability=capability, home_root=home_root, workspace_root=workspace_root)
     payload = _inspect_payload(adapter=adapter, capability=capability, home_root=home_root)
     payload_bundle = inspect_payload_bundle_resolution(payload_root=adapter.payload_root(home_root), host_id=capability.host_id)
     if workspace_root is None:
@@ -469,6 +485,17 @@ def render_status_text(payload: dict[str, object]) -> str:
     ]
     for host in payload["hosts"]:
         state = host["state"]
+        # Workspace-scope hosts: compact line without payload/bundle noise
+        if state.get("workspace_bundle_healthy") == STATUS_NOT_APPLICABLE:
+            lines.append(
+                "  - {host_id}: tier={support_tier}, installed={installed}, configured={configured}".format(
+                    host_id=host["host_id"],
+                    support_tier=host["support_tier"],
+                    installed=state["installed"],
+                    configured=state["configured"],
+                )
+            )
+            continue
         payload_bundle = host.get("payload_bundle") or {}
         workspace_bundle = host.get("workspace_bundle") or {}
         ingress_proof = host.get("workspace_ingress_proof") or {}
@@ -720,9 +747,17 @@ def _describe_state_conflict(code: str) -> str:
     )
 
 
-def _inspect_host_prompt(*, adapter: HostAdapter, capability: HostCapability, home_root: Path) -> InspectionCheck:
+def _inspect_host_prompt(*, adapter: HostAdapter, capability: HostCapability, home_root: Path, workspace_root: Path | None = None) -> InspectionCheck:
     try:
-        paths = validate_host_install(adapter, home_root=home_root)
+        if adapter.is_workspace_scope:
+            if workspace_root is None:
+                raise InstallError("Workspace-scope host requires --workspace for verification")
+            paths = adapter.workspace_expected_paths(workspace_root)
+            missing = [p for p in paths if not p.exists()]
+            if missing:
+                raise InstallError(f"Host install verification failed: {missing[0]}")
+        else:
+            paths = validate_host_install(adapter, home_root=home_root)
         return InspectionCheck(
             host_id=capability.host_id,
             check_id="host_prompt_present",
@@ -1333,5 +1368,10 @@ def _payload_evidence_paths(payload_root: Path) -> tuple[Path, ...]:
     return tuple(evidence)
 
 
-def _host_is_absent(*, adapter: HostAdapter, home_root: Path) -> bool:
+def _host_is_absent(*, adapter: HostAdapter, home_root: Path, workspace_root: Path | None = None) -> bool:
+    if adapter.is_workspace_scope:
+        # Workspace-scope hosts are checked against workspace, not HOME
+        if workspace_root is None:
+            return True
+        return not any(p.exists() for p in adapter.workspace_expected_paths(workspace_root))
     return not adapter.destination_root(home_root).exists() and not adapter.payload_root(home_root).exists()

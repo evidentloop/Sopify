@@ -21,6 +21,8 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 _SOPIFY_SKILLS_DIR = ".sopify-skills"
 _SOPIFY_JSON_FILENAME = "sopify.json"
@@ -46,8 +48,6 @@ _MANAGED_IGNORE_ENTRIES = (
 
 _INSTRUCTION_BLOCK_BEGIN = "<!-- BEGIN SOPIFY MANAGED BLOCK -->"
 _INSTRUCTION_BLOCK_END = "<!-- END SOPIFY MANAGED BLOCK -->"
-_COPILOT_INSTRUCTIONS_RELPATH = Path(".github") / "copilot-instructions.md"
-_COPILOT_INSTRUCTION_FILE_RELPATH = Path(".github") / "instructions" / "sopify.instructions.md"
 
 _SOPIFY_VERSION_RE = re.compile(r"^<!--\s*SOPIFY_VERSION:\s*(?P<version>.+?)\s*-->$", re.MULTILINE)
 
@@ -170,7 +170,7 @@ def _write_managed_instruction_block(path: Path, content: str) -> bool:
     if _INSTRUCTION_BLOCK_BEGIN in existing and _INSTRUCTION_BLOCK_END in existing:
         new_content = re.sub(
             rf"{re.escape(_INSTRUCTION_BLOCK_BEGIN)}.*?{re.escape(_INSTRUCTION_BLOCK_END)}",
-            block,
+            lambda _: block,
             existing,
             count=1,
             flags=re.DOTALL,
@@ -182,24 +182,29 @@ def _write_managed_instruction_block(path: Path, content: str) -> bool:
     return _write_text_if_changed(path, _ensure_trailing_newline(new_content))
 
 
-def _write_copilot_instruction_file(workspace_root: Path, content: str) -> bool:
-    target = workspace_root / _COPILOT_INSTRUCTION_FILE_RELPATH
-    return _write_text_if_changed(target, _ensure_trailing_newline(content))
-
-
-def _sync_copilot_instructions(workspace_root: Path, *, source_root: Path) -> bool:
-    resource_dir = source_root / "installer" / "resources" / "copilot"
-    lightweight_path = resource_dir / "lightweight.md"
-    if not lightweight_path.is_file():
+def _sync_workspace_scope_instructions(workspace_root: Path, *, source_root: Path) -> bool:
+    """Render full rules from skills/{lang} and write managed blocks for workspace-scope hosts."""
+    try:
+        from installer.hosts import iter_host_registrations
+        from installer.hosts.base import render_single_file, HEADER_TEMPLATE_NAME as _HTN
+    except ImportError:
         return False
-    lightweight = lightweight_path.read_text(encoding="utf-8")
-    changed = _write_managed_instruction_block(
-        workspace_root / _COPILOT_INSTRUCTIONS_RELPATH, lightweight,
-    )
-    full_path = resource_dir / "full.md"
-    if full_path.is_file():
-        full = full_path.read_text(encoding="utf-8")
-        changed = _write_copilot_instruction_file(workspace_root, full) or changed
+    changed = False
+    for reg in iter_host_registrations():
+        adapter = reg.adapter
+        if not adapter.is_workspace_scope or not reg.capability.install_enabled:
+            continue
+        language_directory = "CN"
+        skills_root = adapter.source_root(source_root, language_directory)
+        header_template = skills_root / _HTN
+        header_source = header_template if header_template.is_file() else skills_root / adapter.header_filename
+        skills_source = skills_root / "skills" / "sopify"
+        if not header_source.is_file() or not skills_source.is_dir():
+            continue
+        full_content = render_single_file(header_source, skills_source, adapter)
+        target_path = workspace_root / adapter.destination_dirname / adapter.header_filename
+        if _write_managed_instruction_block(target_path, full_content):
+            changed = True
     return changed
 
 
@@ -210,7 +215,7 @@ def init_workspace(
     workspace: Path,
     *,
     source_root: Path = REPO_ROOT,
-    copilot: bool = True,
+    workspace_instructions: bool = True,
 ) -> dict:
     workspace = workspace.resolve()
     if not workspace.is_dir():
@@ -236,12 +241,12 @@ def init_workspace(
     else:
         results.append(".gitignore skipped (not a git repo)")
 
-    # 3. Copilot instructions (if resources available)
-    if copilot:
-        if _sync_copilot_instructions(workspace, source_root=source_root):
-            results.append("copilot instructions synced")
+    # 3. Workspace-scope host instructions (if resources available)
+    if workspace_instructions:
+        if _sync_workspace_scope_instructions(workspace, source_root=source_root):
+            results.append("workspace instructions synced")
         else:
-            results.append("copilot instructions unchanged")
+            results.append("workspace instructions unchanged")
 
     sopify_json_path = workspace / _SOPIFY_SKILLS_DIR / _SOPIFY_JSON_FILENAME
     return {
@@ -332,7 +337,7 @@ def main(argv: list[str] | None = None) -> int:
     result = init_workspace(
         workspace,
         source_root=REPO_ROOT,
-        copilot=not args.no_copilot,
+        workspace_instructions=not args.no_copilot,
     )
 
     if sys.stdout.isatty() and result.get("action") != "failed":
