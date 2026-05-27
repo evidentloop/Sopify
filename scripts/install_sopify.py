@@ -228,7 +228,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Sopify install failed: {exc}\n\nDiagnostics:\n  reason_code: INSTALLER_FAILED", file=sys.stderr)
         return 1
 
-    if isinstance(report.install_result, BootstrapOnlyResult) and sys.stdout.isatty():
+    if isinstance(report.install_result, BootstrapOnlyResult) and sys.stdout.isatty() and not os.environ.get("SOPIFY_LOGO_PRINTED"):
         use_color = os.environ.get("NO_COLOR") is None
         for line in _LOGO_LINES:
             print(f"{_LOGO_COLOR}{line}{_LOGO_RESET}" if use_color else line)
