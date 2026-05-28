@@ -6,35 +6,25 @@ Format: Summary → Changed → Plan Packages. File-level details live in `git l
 
 ## [Unreleased]
 
-## [2026-05-28.102531] - 2026-05-28
+
+## [2026-05-28.044700] - 2026-05-28
 
 ### Summary
 
-- Updated 1 active plan package(s); Changes across: Tests, Changed.
+- Stale stub diagnostics: enriched error messages when workspace stub version mismatches installed bundle
+- Removed `reason_code` from user-facing develop output templates (internal-only field)
+- Output contract enforcement for all skill stages (PR #48)
+- Added renderer scope audit backlog item
 
 ### Changed
 
-- **Tests**: Updated automated coverage (1 files)
-- **Changed**: Updated project files (2 files)
+- **Installer**: `_stale_stub_diagnostic()` helper in `bootstrap_workspace.py`; enriched `_workspace_bundle_recommendation` in `inspection.py`; neutral hint in `gate_output.py`
+- **Skills**: Removed `reason_code` column from 6 develop output templates (ZH+EN); added human-readable 说明/Note column to partial templates; updated `output-contract.md` and `develop-rules.md`
+- **Tests**: 2 new unit tests for stale stub diagnostic; updated golden snapshot hashes
 
 ### Plan Packages
 
-- `20260528_output_contract_enforcement` (active)
-
-## [2026-05-28.101947] - 2026-05-28
-
-### Summary
-
-- Updated 1 active plan package(s); Changes across: Tests, Changed.
-
-### Changed
-
-- **Tests**: Updated automated coverage (2 files)
-- **Changed**: Updated project files (10 files)
-
-### Plan Packages
-
-- `20260528_output_contract_enforcement` (active)
+- `20260528_output_contract_enforcement` (completed)
 
 ## [2026-05-27.220559] - 2026-05-27
 

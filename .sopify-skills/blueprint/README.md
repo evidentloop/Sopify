@@ -14,7 +14,7 @@
 
 <!-- sopify:auto:focus:start -->
 - 当前活动 plan：暂无。
-- history 归档：已可用；最近归档为 `../history/2026-05/20260527_skill_writing_quality`。
+- history 归档：已可用；最近归档为 `../history/2026-05/20260528_output_contract_enforcement`。
 <!-- sopify:auto:focus:end -->
 
 ## 深入阅读入口
@@ -27,5 +27,5 @@
 - [Sopify 宿主接入规范 (Protocol v0)](./protocol.md)
 - [Skill 标准对齐蓝图](./skill-standards-refactor.md)
 - [变更历史](../history/index.md)
-- 最近归档：`../history/2026-05/20260527_skill_writing_quality`
+- 最近归档：`../history/2026-05/20260528_output_contract_enforcement`
 <!-- sopify:auto:read-next:end -->

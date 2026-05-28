@@ -144,6 +144,8 @@ P0→P4c 主航道已全部完成。后续执行遵循以下原则：
 - [x] GitHub Release pipeline 建立（首次 release 创建 + tag 规范 + install 脚本端到端验证）
 - [x] 测试套件健康基线（pass rate ≥ 99%；当前基线 619 tests / 619 passed = 100%，含 49 subtests；退役 124 测试后仍保持 100% pass rate）
 - [ ] Skill packaging / localization governance：skill 打包格式、多语言资产管理、bundle 内 i18n 分层规范
+- [ ] Stale stub 检测与错误可观测性：~~诊断信息~~（PR #49 已补 `_stale_stub_diagnostic`）；剩余：自动建议 `--target <host>` 重装或降级到已安装版本（layer 3 auto-fix，用户已明确延后为 opt-in）
+- [ ] Runtime output renderer scope audit：明确 `runtime/output.py` 是否仅保持 gate/handoff-summary 渲染，还是应承载 develop 结果表格渲染。若 yes，先定义 verification/review result 数据模型再实现；若 no，文档化 develop 最终输出归宿主/skill 所有。背景：develop 输出模板定义了验证摘要表格，但 renderer 从未消费这些模板（20260527_skill_writing_quality 设计盲区）
 - [ ] Post-runtime skeleton governance：runtime/ 目录最终形态治理（Phase 2 全删后遗留结构清理规范）
 
 ## 已关闭 / 已吸收项

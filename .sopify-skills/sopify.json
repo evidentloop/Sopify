@@ -1,10 +1,12 @@
 {
-  "bundle_version": "2026-05-03.203432",
+  "bundle_version": "2026-05-27.220559",
   "capabilities": [
-    "runtime_gate",
-    "preferences_preload"
+    "runtime_gate"
   ],
+  "ignore_mode": "exclude",
   "locator_mode": "global_first",
   "schema_version": "1",
-  "workspace_kind": "deep"
+  "stub_version": "1",
+  "workspace_kind": "deep",
+  "written_by_host": true
 }
