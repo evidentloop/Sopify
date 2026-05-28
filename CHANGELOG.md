@@ -6,6 +6,36 @@ Format: Summary → Changed → Plan Packages. File-level details live in `git l
 
 ## [Unreleased]
 
+## [2026-05-28.102531] - 2026-05-28
+
+### Summary
+
+- Updated 1 active plan package(s); Changes across: Tests, Changed.
+
+### Changed
+
+- **Tests**: Updated automated coverage (1 files)
+- **Changed**: Updated project files (2 files)
+
+### Plan Packages
+
+- `20260528_output_contract_enforcement` (active)
+
+## [2026-05-28.101947] - 2026-05-28
+
+### Summary
+
+- Updated 1 active plan package(s); Changes across: Tests, Changed.
+
+### Changed
+
+- **Tests**: Updated automated coverage (2 files)
+- **Changed**: Updated project files (10 files)
+
+### Plan Packages
+
+- `20260528_output_contract_enforcement` (active)
+
 ## [2026-05-27.220559] - 2026-05-27
 
 ### Summary

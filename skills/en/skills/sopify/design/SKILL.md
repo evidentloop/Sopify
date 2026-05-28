@@ -24,6 +24,7 @@ description: Design phase entry. Aggregates plan-level selection, task breakdown
 
 - Long rules: `references/design-rules.md`
 - Shared writing standards: `../references/shared-writing-dna.md` (apply to all output)
+- Output contract: `../references/output-contract.md` (required sections, conditional enhancement, self-check)
 - Templates: `assets/*.md`
 - Deterministic level selector: `scripts/select_plan_level.py`
 

@@ -25,6 +25,7 @@ description: Develop phase entry; routes task execution, state updates, KB sync,
 
 - Long rules: `references/develop-rules.md`
 - Shared writing standards: `../references/shared-writing-dna.md` (apply to all output)
+- Output contract: `../references/output-contract.md` (required sections, conditional enhancement, self-check)
 - Output templates: `assets/*.md`
 - Task extraction script: `scripts/extract_pending_tasks.py`
 

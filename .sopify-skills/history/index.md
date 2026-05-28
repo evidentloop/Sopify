@@ -4,6 +4,7 @@
 
 ## 索引
 
+- `2026-05-28` [`20260528_output_contract_enforcement`](2026-05/20260528_output_contract_enforcement/) - standard - 输出契约提示层与模板结构约束: output-contract.md（ZH+EN）定义必需 section / 表格列约束 / 条件增强与表达选型（DO/DON'T）/ 输出前自检，6 SKILL.md 引用行 + develop §2.6 自检子节 + 16 项 golden snapshot 结构与内联断言
 - `2026-05-27` [`20260527_skill_writing_quality`](2026-05/20260527_skill_writing_quality/) - standard - Skill 写作质量收敛: 共享写作 DNA（6 规则 ZH+EN）+ 4 输出模板 v2 重写（验证表/reason_code/复审依据/状态符硬约束）+ 3 SKILL.md 哲学声明 + human_action_required root_cause + render 管线顶层 references/ inline 修复
 - `2026-05-27` [`20260526_pre_launch_host_and_bundle_unification`](2026-05/20260526_pre_launch_host_and_bundle_unification/) - standard - 推广前宿主分发与 Bundle 统一: 4 套宿主语言内容→2 套语言源 + 安装时 host 渲染，Copilot 纳入统一 registry，runtime_bundle→sopify_bundle 命名收口，三宿主双语言端到端验证通过（6 条安装路径 + 8 项 golden snapshot 全绿），旧宿主目录删除
 - `2026-05-26` [`20260522_runtime_slimming_kernel_extraction`](2026-05/20260522_runtime_slimming_kernel_extraction/) - standard - 任务清单: Runtime Slimming — Orchestration Kernel Extraction

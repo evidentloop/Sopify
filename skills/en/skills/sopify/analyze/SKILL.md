@@ -26,6 +26,7 @@ description: Analyze phase entry. Aggregates scoring, follow-up, and scope-check
 
 - Long rules: `references/analyze-rules.md`
 - Shared writing standards: `../references/shared-writing-dna.md` (apply to all output)
+- Output contract: `../references/output-contract.md` (required sections, conditional enhancement, self-check)
 - Follow-up template: `assets/question-output.md`
 - Success template: `assets/success-output.md`
 - Deterministic scoring script: `scripts/score_requirement.py`

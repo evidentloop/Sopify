@@ -8,13 +8,13 @@
     "tree": "sorted files, posix_path\\0raw_bytes per file, NL-joined, sha256"
   },
   "snapshots": {
-    "codex:zh-CN:header": "22f0be36807f8e27fe170e721491f8123451b7b61639299c9106b7451a5d5095",
-    "codex:en-US:header": "92b8868fbce13f8d593dc7d733818221e13ed7120ee8f63cde15e688ec2591fe",
-    "claude:zh-CN:header": "95afafcecc7652c56dc84aa8434aa414756f71b60f597a6d90242c8a59ab493c",
-    "claude:en-US:header": "fed06dcf5aeb51f30b4ad577d0697612880217fc6521287dce78bdfe1bce41fe",
-    "copilot:zh-CN:managed_block_payload": "6643b47f917bfa41a53ee5f6e82b4f6fd6bca09962f6d830d043dd453d4fa983",
-    "copilot:en-US:managed_block_payload": "084620996d0b64d79f6eeb3d276cca85bb31d5221258330c0e7c4efef140318a",
-    "skills:zh-CN:tree": "ad27f25d839651530f19c27f90ffe6e159c34b086802e0d51a304162bed72657",
-    "skills:en-US:tree": "e3ce3913b26154edc0d87eb770d61906bc34550154642383913de17d27ff0a2a"
+    "codex:zh-CN:header": "75d37fa173f06a81c5734136b93424b4a577b1800f1b4d4d9b698c792cf8d950",
+    "codex:en-US:header": "58206658e6d10e0243ff9423f50759d6e71f9635b6633fe0732615fbe22217d7",
+    "claude:zh-CN:header": "0f246a780d7940e21ca1fab16faf8a54ce324759a721ba8ffa0783d64c87daf6",
+    "claude:en-US:header": "7543d624a6cf0b4d12f7c44e8c2c2bef252974d6245e6a49151c3c613965cdf4",
+    "copilot:zh-CN:managed_block_payload": "1b0bcb77a93570e0fa73379ccf264b1a2ea4f8240229d935d8b386f3ee59c632",
+    "copilot:en-US:managed_block_payload": "874f20a2ff8a780be6a26e94fd8c11b4388671664b0c77e509088171a1b63805",
+    "skills:zh-CN:tree": "a50c07ce08381c9f30a7b0ffaf29ed311cca02780352c5cf2cb7161f257fa801",
+    "skills:en-US:tree": "8647f117ed3992a5b369c17b61a9b75928511286f12efaa857ac25ac141594eb"
   }
 }
