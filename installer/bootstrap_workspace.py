@@ -754,12 +754,18 @@ def _resolve_selected_payload_bundle(
         return (None, None, {}, "GLOBAL_INDEX_CORRUPTED", str(exc))
     bundle_root = bundle_manifest_path.parent
     if not bundle_manifest_path.is_file():
+        message = _stale_stub_diagnostic(
+            requested_version=requested_version,
+            payload_manifest=payload_manifest,
+            payload_root=payload_root,
+            bundle_manifest_path=bundle_manifest_path,
+        )
         return (
             bundle_root,
             bundle_manifest_path,
             {},
             "GLOBAL_BUNDLE_MISSING",
-            f"Selected global bundle is missing: {bundle_manifest_path}",
+            message,
         )
     bundle_manifest = _read_json(bundle_manifest_path)
     if not bundle_manifest:
@@ -771,6 +777,26 @@ def _resolve_selected_payload_bundle(
             f"Selected global bundle manifest is unreadable: {bundle_manifest_path}",
         )
     return (bundle_root, bundle_manifest_path, bundle_manifest, None, None)
+
+
+def _stale_stub_diagnostic(
+    *,
+    requested_version: str | None,
+    payload_manifest: dict[str, Any],
+    payload_root: Path,
+    bundle_manifest_path: Path,
+) -> str:
+    """Build a diagnostic message distinguishing stale stub from truly missing bundle."""
+    active_version = _legacy_payload_bundle_version(payload_manifest)
+    if requested_version and active_version and requested_version != active_version:
+        return (
+            f"Workspace stub requests bundle version {requested_version}, "
+            f"but the active version is {active_version} "
+            f"(payload_root: {payload_root}). "
+            f"The workspace stub is stale. "
+            f"Reinstall for this workspace or update .sopify-skills/sopify.json."
+        )
+    return f"Selected global bundle is missing: {bundle_manifest_path} (payload_root: {payload_root})"
 
 
 def _resolve_payload_bundle_manifest_path(

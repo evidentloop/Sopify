@@ -1136,6 +1136,12 @@ def _workspace_bundle_recommendation(host_id: str, workspace_root: Path, reason_
         REASON_GLOBAL_BUNDLE_INCOMPATIBLE,
         REASON_GLOBAL_INDEX_CORRUPTED,
     }:
+        # For GLOBAL_BUNDLE_MISSING, prefer `message` which may carry
+        # stale-stub diagnostic from _stale_stub_diagnostic(); fall back
+        # to generic _payload_bundle_recommendation for other codes or
+        # when message is empty.
+        if reason_code == REASON_GLOBAL_BUNDLE_MISSING and message:
+            return message
         return _payload_bundle_recommendation(host_id, reason_code) or message
     return message
 

@@ -20,7 +20,7 @@
 | design/summary | 评分行、Changes、Next | — | — |
 | consult | Changes、Next | — (adaptive) | — |
 
-表格列约束：只展示当前场景有信息量的列。success 场景下全部 `reason_code=—` 时，可省略该列。列省略只影响最终展示，不影响内部验证判断。
+表格列约束：只展示当前场景有信息量的列。列省略只影响最终展示，不影响内部验证判断。`reason_code` 是内部验证字段，不在用户面输出中展示。
 
 ## 3. Conditional Enhancement & Format Selection
 
@@ -51,6 +51,6 @@
 输出最终回复前检查：
 
 1. 必需 section 是否存在：按 §2 核对当前输出类型的必需 section。
-2. 状态符是否正确：`✓` 仅当全部 `result=passed` 且 `reason_code=—`；否则必须 `!`。
+2. 状态符是否正确：`✓` 仅当全部验证通过且无降级/跳过；否则必须 `!`。
 3. footer 是否完整：`Changes:` + `Next:` 必须存在。
 4. 条件增强是否触发：如当前回复满足 §3 增强触发条件，应使用对应结构化表达。

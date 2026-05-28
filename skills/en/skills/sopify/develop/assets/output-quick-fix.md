@@ -3,9 +3,9 @@
 Fix: {one-line description}
 
 Verification summary:
-  | Source | Command | Result | reason_code |
-  |--------|---------|--------|-------------|
-  | {verification_source} | {command} | {result} | {reason_code / —} |
+  | Source | Command | Result |
+  |--------|---------|--------|
+  | {verification_source} | {command} | {result} |
 
 ---
 Changes: {N} files

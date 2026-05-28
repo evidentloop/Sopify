@@ -82,6 +82,7 @@ develop 阶段统一使用以下字段名，不再混用 `discovery_source`、`s
 
 - `.sopify-skills/project.md` 的 `verify` 约定是后续长期落点；当它已存在时，作为最高优先级来源，但不是当前 v1 落地前提。
 - `verification_source` 只表示来源，不复用为结果态；“是否跳过/为何降级”统一通过 `result + reason_code` 表达。
+- `reason_code` 是内部验证字段，最终用户输出不得展示原始值；需要解释时用人话填入"说明"列。
 
 ### 2.3 验证发现顺序
 

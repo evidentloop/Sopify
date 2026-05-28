@@ -4,14 +4,14 @@
 阻塞: {K} 项
 
 未完成项:
-  | 任务 | 阻塞原因 | reason_code | root_cause |
-  |------|---------|-------------|------------|
-  | {task} | {reason} | {code} | {root_cause / —} |
+  | 任务 | 阻塞原因 | 根因分类 |
+  |------|---------|---------|
+  | {task} | {reason} | {root_cause / —} |
 
 验证摘要:
-  | 任务 | 验证来源 | 命令 | 结果 | reason_code | 重试 |
-  |------|---------|------|------|-------------|------|
-  | {task} | {verification_source} | {command} | {result} | {reason_code / —} | {retry_count} |
+  | 任务 | 验证来源 | 命令 | 结果 | 说明 | 重试 |
+  |------|---------|------|------|------|------|
+  | {task} | {verification_source} | {command} | {result} | {为什么跳过/失败，passed 时留空} | {retry_count} |
 
 ---
 Changes: {N} files

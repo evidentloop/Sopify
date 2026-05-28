@@ -12,9 +12,9 @@
     "codex:en-US:header": "58206658e6d10e0243ff9423f50759d6e71f9635b6633fe0732615fbe22217d7",
     "claude:zh-CN:header": "0f246a780d7940e21ca1fab16faf8a54ce324759a721ba8ffa0783d64c87daf6",
     "claude:en-US:header": "7543d624a6cf0b4d12f7c44e8c2c2bef252974d6245e6a49151c3c613965cdf4",
-    "copilot:zh-CN:managed_block_payload": "1b0bcb77a93570e0fa73379ccf264b1a2ea4f8240229d935d8b386f3ee59c632",
-    "copilot:en-US:managed_block_payload": "874f20a2ff8a780be6a26e94fd8c11b4388671664b0c77e509088171a1b63805",
-    "skills:zh-CN:tree": "a50c07ce08381c9f30a7b0ffaf29ed311cca02780352c5cf2cb7161f257fa801",
-    "skills:en-US:tree": "8647f117ed3992a5b369c17b61a9b75928511286f12efaa857ac25ac141594eb"
+    "copilot:zh-CN:managed_block_payload": "116e0edf3c52064f65194a0c0f9aac3ec3980512c6b864fcce0f6c60dcdf1a8d",
+    "copilot:en-US:managed_block_payload": "8a03ac2f134eda90595ff6e7e813f37e94496706dbc94b054a6a7ccfb66a0985",
+    "skills:zh-CN:tree": "d9af054a30aa6ec4d23921ac2ac139781f8990f7c8b7320fb6dcc0965e8a161e",
+    "skills:en-US:tree": "034bfacfef1f2bc2ee6bf1cc06f08934df017a7002f881ef51780e67de4226a7"
   }
 }

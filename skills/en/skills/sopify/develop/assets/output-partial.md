@@ -4,14 +4,14 @@ Completed: {M}/{N} tasks
 Blocked: {K} items
 
 Incomplete items:
-  | Task | Block reason | reason_code | root_cause |
-  |------|-------------|-------------|------------|
-  | {task} | {reason} | {code} | {root_cause / —} |
+  | Task | Block reason | Root cause |
+  |------|-------------|------------|
+  | {task} | {reason} | {root_cause / —} |
 
 Verification summary:
-  | Task | Source | Command | Result | reason_code | Retries |
-  |------|--------|---------|--------|-------------|---------|
-  | {task} | {verification_source} | {command} | {result} | {reason_code / —} | {retry_count} |
+  | Task | Source | Command | Result | Note | Retries |
+  |------|--------|---------|--------|------|---------|
+  | {task} | {verification_source} | {command} | {result} | {why skipped/failed; blank when passed} | {retry_count} |
 
 ---
 Changes: {N} files

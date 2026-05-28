@@ -82,6 +82,7 @@ Additional rules:
 
 - `.sopify-skills/project.md` is the future long-term home for a project-level `verify` contract. When present, it has the highest priority, but it is not a prerequisite for v1.
 - `verification_source` is a source field only. Degrade/skip outcomes must be expressed through `result + reason_code`.
+- `reason_code` is an internal verification field and must not appear in user-facing output. Use a human-readable "Note" column when explanation is needed.
 
 ### 2.3 Verification discovery order
 

@@ -20,7 +20,7 @@ All stages (analyze / design / develop / consult) must follow this contract for 
 | design/summary | Score lines, Changes, Next | — | — |
 | consult | Changes, Next | — (adaptive) | — |
 
-Table column rule: only show columns that carry meaningful information for the current scenario. When all `reason_code=—` in a success scenario, that column may be omitted. Column omission only affects final display, not internal verification logic.
+Table column rule: only show columns that carry meaningful information for the current scenario. Column omission only affects final display, not internal verification logic. `reason_code` is an internal verification field and is not shown in user-facing output.
 
 ## 3. Conditional Enhancement & Format Selection
 
@@ -51,6 +51,6 @@ Constraint: use at most one primary structure per reply; avoid stacking table + 
 Before outputting the final reply, verify:
 
 1. Required sections present: check §2 for the current output type.
-2. Status symbol correct: `✓` only when all `result=passed` and `reason_code=—`; otherwise `!`.
+2. Status symbol correct: `✓` only when all verifications passed with no degradation or skips; otherwise `!`.
 3. Footer complete: `Changes:` + `Next:` must be present.
 4. Conditional enhancement applied: if the reply meets a §3 trigger condition, use the corresponding structured format.

@@ -22,6 +22,7 @@ from installer.bootstrap_workspace import (
     _REQUIRED_BUNDLE_FILES,
     _classify_workspace_bundle,
     _resolve_payload_bundle_manifest_path as _bootstrap_resolve_payload_bundle_manifest_path,
+    _stale_stub_diagnostic,
     _write_workspace_stub_overlay,
 )
 from installer.hosts.base import install_host_assets
@@ -578,6 +579,27 @@ class WorkspaceBootstrapCompatibilityTests(unittest.TestCase):
             self.assertEqual(reason_code, "GLOBAL_BUNDLE_INCOMPATIBLE")
             self.assertIn("incompatible", message)
             self.assertEqual(from_version, "2026-02-13")
+
+    def test_stale_stub_diagnostic_reports_version_mismatch(self) -> None:
+        msg = _stale_stub_diagnostic(
+            requested_version="2026-05-03.203432",
+            payload_manifest={"active_version": "2026-05-27.220559"},
+            payload_root=Path("/fake/payload"),
+            bundle_manifest_path=Path("/fake/payload/bundles/2026-05-03.203432/manifest.json"),
+        )
+        self.assertIn("2026-05-03.203432", msg)
+        self.assertIn("2026-05-27.220559", msg)
+        self.assertIn("stale", msg.lower())
+
+    def test_stale_stub_diagnostic_falls_back_when_versions_match(self) -> None:
+        msg = _stale_stub_diagnostic(
+            requested_version="2026-05-27.220559",
+            payload_manifest={"active_version": "2026-05-27.220559"},
+            payload_root=Path("/fake/payload"),
+            bundle_manifest_path=Path("/fake/payload/bundles/2026-05-27.220559/manifest.json"),
+        )
+        self.assertNotIn("stale", msg.lower())
+        self.assertIn("missing", msg.lower())
 
     def test_validate_bundle_install_requires_runtime_bridge_modules(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -3,9 +3,9 @@
 修复: {一句话描述}
 
 验证摘要:
-  | 验证来源 | 命令 | 结果 | reason_code |
-  |---------|------|------|-------------|
-  | {verification_source} | {command} | {result} | {reason_code / —} |
+  | 验证来源 | 命令 | 结果 |
+  |---------|------|------|
+  | {verification_source} | {command} | {result} |
 
 ---
 Changes: {N} files
