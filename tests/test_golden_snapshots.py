@@ -134,3 +134,91 @@ def test_skill_tree_snapshot(lang_dir: str, locale: str) -> None:
     key = f"skills:{locale}:tree"
     actual = _tree_hash(lang_dir)
     _assert_hash(key, actual, golden)
+
+
+# -- Template structure assertions --
+
+_ZH_TEMPLATE_MARKERS: list[tuple[str, list[str]]] = [
+    ("develop/assets/output-success.md", ["| 任务 |", "| 验证来源 |", "Changes:", "Next:"]),
+    ("develop/assets/output-partial.md", ["| 任务 |", "| 阻塞原因 |", "| 验证来源 |", "Changes:", "Next:"]),
+    ("develop/assets/output-quick-fix.md", ["| 验证来源 |", "Changes:", "Next:"]),
+    ("analyze/assets/success-output.md", ["假设与前提:", "已识别信息缺口:", "Changes:", "Next:"]),
+    ("design/assets/output-summary.md", ["方案质量:", "落地就绪:", "Changes:", "Next:"]),
+]
+
+_EN_TEMPLATE_MARKERS: list[tuple[str, list[str]]] = [
+    ("develop/assets/output-success.md", ["| Task |", "| Source |", "Changes:", "Next:"]),
+    ("develop/assets/output-partial.md", ["| Task |", "| Block reason |", "| Source |", "Changes:", "Next:"]),
+    ("develop/assets/output-quick-fix.md", ["| Source |", "Changes:", "Next:"]),
+    ("analyze/assets/success-output.md", ["Assumptions:", "Identified gaps:", "Changes:", "Next:"]),
+    ("design/assets/output-summary.md", ["Solution quality:", "Implementation readiness:", "Changes:", "Next:"]),
+]
+
+
+def _template_cases() -> list[tuple[str, str, list[str]]]:
+    cases: list[tuple[str, str, list[str]]] = []
+    for rel, markers in _ZH_TEMPLATE_MARKERS:
+        cases.append(("CN", rel, markers))
+    for rel, markers in _EN_TEMPLATE_MARKERS:
+        cases.append(("EN", rel, markers))
+    return cases
+
+
+@pytest.mark.parametrize(
+    "lang_dir,template_rel,required_markers",
+    _template_cases(),
+    ids=[f"{lang}:{rel}" for lang, rel, _ in _template_cases()],
+)
+def test_template_required_sections(
+    lang_dir: str, template_rel: str, required_markers: list[str]
+) -> None:
+    """Verify that output templates contain their required structural markers."""
+    source_dir = language_to_source_dir(lang_dir)
+    template_path = _REPO_ROOT / "skills" / source_dir / "skills" / "sopify" / template_rel
+    assert template_path.is_file(), f"Template not found: {template_path}"
+    content = template_path.read_text(encoding="utf-8")
+    for marker in required_markers:
+        assert marker in content, (
+            f"Required marker missing in {template_rel} ({lang_dir}): {marker!r}"
+        )
+
+
+# -- Output contract inline assertions (all 3 hosts) --
+
+def _render_full(adapter: HostAdapter, lang_dir: str) -> str:
+    source_root = adapter.source_root(_REPO_ROOT, lang_dir)
+    header_source = source_root / HEADER_TEMPLATE_NAME
+    skills_source = source_root / "skills" / "sopify"
+    return render_single_file(header_source, skills_source, adapter)
+
+
+_OUTPUT_CONTRACT_ZH_MARKERS = ["输出契约", "必需 section", "Conditional Enhancement & Format Selection"]
+_OUTPUT_CONTRACT_EN_MARKERS = ["Output Contract", "Required Sections", "Conditional Enhancement & Format Selection"]
+
+
+@pytest.mark.parametrize(
+    "adapter,lang_dir,markers",
+    [
+        (CODEX_ADAPTER, "CN", _OUTPUT_CONTRACT_ZH_MARKERS),
+        (CODEX_ADAPTER, "EN", _OUTPUT_CONTRACT_EN_MARKERS),
+        (CLAUDE_ADAPTER, "CN", _OUTPUT_CONTRACT_ZH_MARKERS),
+        (CLAUDE_ADAPTER, "EN", _OUTPUT_CONTRACT_EN_MARKERS),
+        (COPILOT_ADAPTER, "CN", _OUTPUT_CONTRACT_ZH_MARKERS),
+        (COPILOT_ADAPTER, "EN", _OUTPUT_CONTRACT_EN_MARKERS),
+    ],
+    ids=[
+        "codex:zh-CN:contract", "codex:en-US:contract",
+        "claude:zh-CN:contract", "claude:en-US:contract",
+        "copilot:zh-CN:contract", "copilot:en-US:contract",
+    ],
+)
+def test_output_contract_inlined(
+    adapter: HostAdapter, lang_dir: str, markers: list[str]
+) -> None:
+    """Verify that output-contract.md is inlined into the rendered prompt for all hosts."""
+    rendered = _render_full(adapter, lang_dir)
+    for marker in markers:
+        assert marker in rendered, (
+            f"Output contract marker missing in {adapter.host_name} ({lang_dir}): {marker!r}\n"
+            f"Ensure references/output-contract.md exists and render pipeline inlines it."
+        )

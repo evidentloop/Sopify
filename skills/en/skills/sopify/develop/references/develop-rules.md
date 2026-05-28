@@ -149,6 +149,15 @@ Output status symbol constraint:
 - `✓` is allowed only when every verification row has `result=passed` and `reason_code=—`
 - Otherwise `!` must be used
 
+### 2.6 Pre-output self-check
+
+After completing the two-stage review, before outputting the final summary:
+
+1. Status symbol correct: `✓` only when all `result=passed` and `reason_code=—`; otherwise `!`.
+2. Required tables present: success/partial must include a verification summary table; partial must include an incomplete items table.
+3. Review conclusion line present: success must include `spec_compliance` + `code_quality` each with one sentence of evidence.
+4. Footer complete: `Changes:` + `Next:` must be present.
+
 ## Step 3: Post-develop advisory review
 
 After all tasks pass the quality loop and two-stage review, if the workspace `.agents/skills/` contains an advisory skill whose triggers include `post_develop`, execute a single post-develop advisory review following its SKILL.md. Currently only CrossReview Phase 4a is included in this path.

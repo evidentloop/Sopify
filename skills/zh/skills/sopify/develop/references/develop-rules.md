@@ -149,6 +149,15 @@ Stage B `code_quality` 至少检查：
 - `✓` 仅当所有验证行 `result=passed` 且 `reason_code=—`
 - 否则必须使用 `!`
 
+### 2.6 输出前自检
+
+完成两阶段复审后，输出最终摘要前必须检查：
+
+1. 状态符是否正确：`✓` 仅当全部 `result=passed` 且 `reason_code=—`；否则必须 `!`。
+2. 必需表格是否存在：success/partial 必须有验证摘要表；partial 必须有未完成项表。
+3. 复审结论行是否存在：success 必须有 `spec_compliance` + `code_quality` 各一句依据。
+4. footer 是否完整：`Changes:` + `Next:` 必须存在。
+
 ## 步骤 3：Post-develop advisory review
 
 开发任务完成、验证与两阶段复审通过后，若工作区 `.agents/skills/` 下存在 triggers 包含 `post_develop` 且 mode 为 `advisory` 的技能，可按其 SKILL.md 执行一次 post-develop advisory review。当前仅 CrossReview Phase 4a 纳入此路径。
