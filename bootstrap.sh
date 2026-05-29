@@ -6,7 +6,7 @@ SOURCE_REF="main"
 
 usage() {
   cat <<'EOF'
-Usage: bootstrap.sh [init] [--workspace <path>] [--no-copilot]
+Usage: bootstrap.sh [--workspace <path>] [--no-copilot]
 
 Bootstrap remains available as a compatibility alias for:
   install.sh --target copilot
@@ -69,9 +69,6 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ "$HAS_INIT" != true ]]; then
-  :
-fi
 if [[ "$HAS_WORKSPACE" != true ]]; then
   FORWARDED_ARGS+=("--workspace" ".")
 fi

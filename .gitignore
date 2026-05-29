@@ -21,3 +21,13 @@ Copilot/Skills/
 
 # Copilot workspace install product (dogfood / local testing).
 .github/copilot-instructions.md
+
+# Local / environment files
+.env
+.venv/
+dist/
+build/
+.claude/settings.local.json
+.agents/history/
+
+reports/
