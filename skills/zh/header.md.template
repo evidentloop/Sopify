@@ -1,5 +1,5 @@
 <!-- bootstrap: lang=zh-CN; encoding=UTF-8 -->
-<!-- SOPIFY_VERSION: 2026-05-28.044700 -->
+<!-- SOPIFY_VERSION: 2026-05-29.180035 -->
 <!-- ARCHITECTURE: Adaptive Workflow + Layered Rules -->
 
 # Sopify - 自适应 AI 编程助手
@@ -84,7 +84,7 @@ Next: {下一步提示}
 **阶段名：**
 - 需求分析、方案设计、开发实施
 - 快速修复、轻量迭代
-- 命令完成（仅用于命令前缀流程，如 `~go/~go plan/~go exec`）
+- 命令完成（仅用于命令前缀流程，如 `~go/~go plan/~go finalize`）
 - 咨询问答（无命令前缀的问答/澄清场景）
 
 **输出原则：**
@@ -124,9 +124,8 @@ Next: {下一步提示}
 **命令：**
 | 命令 | 说明 |
 |-----|------|
- | `~go` | 自动判断并执行全流程 |
+ | `~go` | 自动判断并执行全流程（有活动 plan 时自动恢复执行） |
  | `~go plan` | 只规划不执行 |
- | `~go exec` | 高级恢复/调试入口；仅在已有活动 plan 或恢复态存在时使用 |
  | `~go finalize` | 对当前 metadata-managed plan 执行收口归档 |
 
 说明：每次进入新的 Sopify 回合前，宿主必须先执行 runtime gate 并消费其 JSON contract；仅当 gate 通过时才可进入后续阶段。详见 `.sopify-skills/blueprint/protocol.md §8.1`：gate 入口协议、`allowed_response_mode` 值域、ActionProposal capability。
@@ -357,9 +356,8 @@ Next: 请验证功能
 
 **常用命令：**
 ```
-~go              # 全流程自动执行
+~go              # 全流程自动执行（有活动 plan 时自动恢复执行）
 ~go plan         # 只规划不执行
-~go exec         # 高级恢复/调试入口，不是普通主链路默认下一步
 ~go finalize     # 显式收口当前 metadata-managed plan
 ```
 

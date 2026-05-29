@@ -324,7 +324,7 @@ ExecutionAuthorizationReceipt 是 execute_existing_plan 授权通过后生成的
 > | 现役路径 | canonical 映射 |
 > |---------|--------------|
 > | `current_plan.path`（state.py） | → `plan_subject.subject_ref`（workspace-relative 目录路径） |
-> | `~go exec` 隐含的 plan 指向 | → 应显式携带 `plan_subject`，当前未携带 |
+> | bare `~go` 隐含的 plan 指向 | → 应显式携带 `plan_subject`，当前未携带 |
 > | `review_or_execute_plan`（action_projection） | ✅ P3a 已收口：plan review 语义迁移至 `continue_host_develop` + `plan_generated` stage |
 >
 > 以上映射为 informative 注释，不构成规范性要求。现役路径的 canonical 化属于 P3a contract-aligned cleanup 范围。
@@ -415,7 +415,7 @@ runtime 执行后，若 `.sopify-skills/state/current_handoff.json` 存在，宿
 
 | 值 | 宿主行为 |
 |---|---|
-| `answer_questions` | 读 `.sopify-skills/state/current_clarification.json`，向用户展示 `missing_facts` / `questions`，等待补充后重入 default runtime entry。不得自行物化 plan 或跳到 `~go exec` |
+| `answer_questions` | 读 `.sopify-skills/state/current_clarification.json`，向用户展示 `missing_facts` / `questions`，等待补充后重入 default runtime entry。不得自行物化 plan 或直接跳到执行 |
 | `confirm_decision` | 优先读 `current_handoff.json.artifacts.decision_checkpoint` + `decision_submission_state`；回退到 `.sopify-skills/state/current_decision.json`。展示 `question` / `options` / `recommended_option_id`，等待用户确认后重入。不得自行生成 plan |
 | `continue_host_develop` | 宿主继续代码修改。develop_callback 回调机制已退役（mainline-only slimming），宿主不再支持中途回调 runtime 触发 clarification/decision 分叉 |
 | `continue_host_consult` | 在已消费当前回合 gate contract 前提下继续问答；不得自行路由，不得重判 consult / 非 consult |
@@ -436,7 +436,7 @@ runtime 执行后，若 `.sopify-skills/state/current_handoff.json` 存在，宿
 - 宿主不得在 gate 前自行路由
 - 宿主不得绕过 checkpoint 约束（`clarification_pending` / `decision_pending`）
 - 宿主不得手写 `current_decision.json` / `current_handoff.json` 等 machine truth
-- `~go exec` 仅为高级恢复/调试入口，不得在无活动 plan 时作为默认路径
+- bare `~go` 在有活动 plan 时自动路由到 exec_plan；无活动 plan 时进入 workflow
 - Prompt asset 是 prompt 层指引，不是 vendored runtime 的 machine contract
 
 ### 8.4 Runtime Helper 索引

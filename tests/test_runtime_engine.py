@@ -201,32 +201,22 @@ class EngineIntegrationTests(unittest.TestCase):
             workspace = Path(temp_dir)
             run_runtime("~go plan 优化一下", workspace_root=workspace, user_home=workspace / "home")
 
-            result = run_runtime("~go exec", workspace_root=workspace, user_home=workspace / "home")
+            result = run_runtime("~go", workspace_root=workspace, user_home=workspace / "home")
 
             self.assertEqual(result.route.route_name, "clarification_pending")
             self.assertIsNone(result.plan_artifact)
             self.assertEqual(result.handoff.required_host_action, "answer_questions")
             self.assertEqual(result.recovered_context.current_run.stage, "clarification_pending")
 
-    def test_exec_plan_is_unavailable_without_active_recovery_context(self) -> None:
+    def test_bare_go_without_active_plan_routes_to_workflow(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
 
-            result = run_runtime("~go exec", workspace_root=workspace, user_home=workspace / "home")
+            result = run_runtime("~go", workspace_root=workspace, user_home=workspace / "home")
 
-            self.assertEqual(result.route.route_name, "exec_plan")
+            # Bare ~go with no context triggers workflow → planning → clarification
+            self.assertIn(result.route.route_name, ("workflow", "clarification_pending"))
             self.assertIsNone(result.recovered_context.current_plan)
-            self.assertIsNone(result.handoff)
-            self.assertTrue(any("~go exec" in note for note in result.notes))
-            rendered = render_runtime_output(
-                result,
-                brand="demo-ai",
-                language="zh-CN",
-                title_color="none",
-                use_color=False,
-            )
-            self.assertIn("高级恢复入口", rendered)
-            self.assertIn("Next: 仅在已有活动 plan 或恢复态时使用 ~go exec", rendered)
 
     def test_exec_plan_respects_execution_gate_before_develop(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -238,7 +228,7 @@ class EngineIntegrationTests(unittest.TestCase):
             )
             run_runtime("1", workspace_root=workspace, user_home=workspace / "home")
 
-            result = run_runtime("~go exec", workspace_root=workspace, user_home=workspace / "home")
+            result = run_runtime("~go", workspace_root=workspace, user_home=workspace / "home")
 
             self.assertEqual(result.route.route_name, "exec_plan")
             self.assertEqual(result.recovered_context.current_run.stage, "plan_generated")
@@ -252,7 +242,7 @@ class EngineIntegrationTests(unittest.TestCase):
             config, _, _ = _prepare_ready_plan_state(workspace, session_id="session-a")
 
             result = run_runtime(
-                "~go exec",
+                "~go",
                 workspace_root=workspace,
                 session_id="session-a",
                 user_home=workspace / "home",
@@ -272,7 +262,7 @@ class EngineIntegrationTests(unittest.TestCase):
             workspace = Path(temp_dir)
             config, _, _ = _prepare_ready_plan_state(workspace, session_id="session-a")
             run_runtime(
-                "~go exec",
+                "~go",
                 workspace_root=workspace,
                 session_id="session-a",
                 user_home=workspace / "home",
@@ -286,7 +276,7 @@ class EngineIntegrationTests(unittest.TestCase):
             )
 
             result = run_runtime(
-                "~go exec",
+                "~go",
                 workspace_root=workspace,
                 session_id="session-b",
                 user_home=workspace / "home",
@@ -303,7 +293,7 @@ class EngineIntegrationTests(unittest.TestCase):
             workspace = Path(temp_dir)
             config, _, _ = _prepare_ready_plan_state(workspace, request_text="session-a plan", session_id="session-a")
             run_runtime(
-                "~go exec",
+                "~go",
                 workspace_root=workspace,
                 session_id="session-a",
                 user_home=workspace / "home",
@@ -373,7 +363,7 @@ class EngineIntegrationTests(unittest.TestCase):
             workspace = Path(temp_dir)
             config, _, _ = _prepare_ready_plan_state(workspace, session_id="session-a")
             run_runtime(
-                "~go exec",
+                "~go",
                 workspace_root=workspace,
                 session_id="session-a",
                 user_home=workspace / "home",
@@ -810,13 +800,13 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertEqual(surviving_decision.selected_option_id, "option_1")
 
     def test_natural_language_exec_starts_executing(self) -> None:
-        """After 6.2 protocol split: ~go exec command starts execution."""
+        """After 6.2 protocol split: ~go auto-detects active plan and starts execution."""
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
             _config, _store, plan_artifact = _prepare_ready_plan_state(workspace)
 
             result = run_runtime(
-                "~go exec",
+                "~go",
                 workspace_root=workspace,
                 user_home=workspace / "home",
             )
@@ -839,7 +829,7 @@ class EngineIntegrationTests(unittest.TestCase):
                 risk_lines=("范围取舍仍待拍板", "继续推进前需要先明确最终选项"),
             )
 
-            run_runtime("~go exec", workspace_root=workspace, user_home=workspace / "home")
+            run_runtime("~go", workspace_root=workspace, user_home=workspace / "home")
             result = run_runtime("开始", workspace_root=workspace, user_home=workspace / "home")
 
             self.assertEqual(result.route.route_name, "decision_pending")
@@ -1096,7 +1086,7 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertTrue((workspace / ".sopify-skills" / "state" / "current_handoff.json").exists())
 
             resumed = run_runtime(
-                "~go exec",
+                "~go",
                 workspace_root=workspace,
                 user_home=workspace / "home",
             )
@@ -1515,7 +1505,7 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertNotIn("run_stage", store.get_current_archive_receipt().artifacts)
 
             resumed = run_runtime(
-                "~go exec",
+                "~go",
                 workspace_root=workspace,
                 user_home=workspace / "home",
             )
@@ -1734,7 +1724,7 @@ class EngineIntegrationTests(unittest.TestCase):
             )
             store.set_current_decision(confirmed)
 
-            resumed = run_runtime("~go exec", workspace_root=workspace, user_home=workspace / "home")
+            resumed = run_runtime("~go", workspace_root=workspace, user_home=workspace / "home")
 
             self.assertEqual(resumed.route.route_name, "plan_only")
             self.assertIsNotNone(resumed.plan_artifact)
@@ -1961,7 +1951,7 @@ class EngineIntegrationTests(unittest.TestCase):
             self.assertIn("decision_pending", manifest["limits"]["host_required_routes"])
             self.assertTrue(manifest["limits"]["entry_guard"]["strict_runtime_entry"])
             self.assertEqual(manifest["limits"]["entry_guard"]["default_runtime_entry"], "scripts/sopify_runtime.py")
-            self.assertIn("~go exec", manifest["limits"]["entry_guard"]["bypass_blocked_commands"])
+            self.assertEqual(manifest["limits"]["entry_guard"]["bypass_blocked_commands"], [])
             self.assertEqual(manifest["limits"]["session_state"]["review_scope"], "session")
             self.assertEqual(manifest["limits"]["session_state"]["execution_scope"], "global")
             self.assertEqual(manifest["limits"]["session_state"]["source"], "host_supplied_or_runtime_gate_generated")
@@ -2323,9 +2313,9 @@ class ReceiptEngineHandoffIntegrationTests(unittest.TestCase):
             )
             receipt1 = run1.execution_authorization_receipt
 
-            # Run 2: resume with ~go exec → receipt should carry forward
+            # Run 2: resume with ~go (auto-detects active plan) → receipt should carry forward
             result2 = run_runtime(
-                "~go exec",
+                "~go",
                 workspace_root=workspace,
                 user_home=workspace / "home",
             )

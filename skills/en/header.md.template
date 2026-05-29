@@ -1,5 +1,5 @@
 <!-- bootstrap: lang=en-US; encoding=UTF-8 -->
-<!-- SOPIFY_VERSION: 2026-05-28.044700 -->
+<!-- SOPIFY_VERSION: 2026-05-29.180035 -->
 <!-- ARCHITECTURE: Adaptive Workflow + Layered Rules -->
 
 # Sopify - Adaptive AI Programming Assistant
@@ -84,7 +84,7 @@ Next: {Next step hint}
 **Phase Names:**
 - Requirements Analysis, Solution Design, Development
 - Quick Fix, Light Iteration
-- Command Complete (command-prefixed flows only, e.g., `~go/~go plan/~go exec`)
+- Command Complete (command-prefixed flows only, e.g., `~go/~go plan/~go finalize`)
 - Q&A (non-command questions/clarifications)
 
 **Output Principles:**
@@ -124,9 +124,8 @@ Complex Task (full 3 phases):
 **Commands:**
 | Command | Description |
 |---------|-------------|
-| `~go` | Auto-detect and execute full workflow |
+| `~go` | Auto-detect and execute full workflow (auto-resumes if active plan exists) |
 | `~go plan` | Plan only, no execution |
-| `~go exec` | Advanced recovery/debug entry; use only when an active plan or recovery state already exists |
 | `~go finalize` | Close out the current metadata-managed plan |
 
 Note: Before every Sopify turn, the host must execute the runtime gate and validate its JSON contract. Continue into normal stages only when the gate passes. See `.sopify-skills/blueprint/protocol.md §8.1` for the full gate entry protocol, `allowed_response_mode` values, and ActionProposal capability.
@@ -357,9 +356,8 @@ Next: Please verify the functionality
 
 **Common Commands:**
 ```
-~go              # Full workflow auto-execution
+~go              # Full workflow auto-execution (auto-resumes if active plan exists)
 ~go plan         # Plan only, no execution
-~go exec         # Advanced recovery/debug entry, not the default next step in the main flow
 ~go finalize     # Explicitly close out the current metadata-managed plan
 ```
 

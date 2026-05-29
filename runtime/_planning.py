@@ -1392,7 +1392,7 @@ def resolve_execution_resume(
                     decision,
                     reason="Advanced exec recovery is unavailable because no active plan or confirmed recovery state exists",
                 ),
-                ["Rejected ~go exec because no active plan or confirmed recovery state is available"],
+                ["Rejected ~go because no active plan or confirmed recovery state is available"],
                 prior_receipt,
             )
         return decision, ["No active plan available to resume"], prior_receipt

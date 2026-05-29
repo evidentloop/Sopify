@@ -41,7 +41,7 @@ P0→P4c 主航道已全部完成。后续执行遵循以下原则：
 
 **Companion: Continuation Entry Convergence**
 
-统一宿主级官方入口语义（Inspect Active Work / Continue Active Work / Start New Work），覆盖同宿主跨 session 与跨宿主接续。只消费现有 frozen contract，不新增 machine truth，不绑定 runtime 正则/路由实现。不规定入口语法或关键词，宿主自行选择暴露形式。有活动工作或 pending checkpoint 时 Start New Work 必须显式仲裁。当前 `~go exec` 是 Continue Active Work 的命令级实现，应被 host-level 入口语义取代。结合 P4d 非 deep 宿主试点 formalize。
+统一宿主级官方入口语义（Inspect Active Work / Continue Active Work / Start New Work），覆盖同宿主跨 session 与跨宿主接续。只消费现有 frozen contract，不新增 machine truth，不绑定 runtime 正则/路由实现。不规定入口语法或关键词，宿主自行选择暴露形式。有活动工作或 pending checkpoint 时 Start New Work 必须显式仲裁。当前 `~go`（auto-detect active plan）是 Continue Active Work 的命令级实现。结合 P4d 非 deep 宿主试点 formalize。
 
 - 前置：P4c ✅
 - 状态：✅ 已完成 — 归档于 `history/2026-05/20260519_p4d_copilot_cli_pilot/`

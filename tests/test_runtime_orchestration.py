@@ -43,10 +43,10 @@ class TestKernelTurnDirect(unittest.TestCase):
             store = StateStore(config)
             existing_plan = store.get_current_plan()
 
-            # Natural text (not ~go exec) so the router reuses the active
-            # plan through the standard planning path and emits a handoff.
-            # (~go exec maps to exec_plan which intentionally suppresses
-            # handoff — see handoff.py _should_emit_handoff.)
+            # Natural text (not bare ~go) so the router routes to workflow
+            # through the standard planning path and emits a handoff.
+            # (bare ~go with active plan maps to exec_plan which intentionally
+            # suppresses handoff — see handoff.py _should_emit_handoff.)
             result = execute_kernel_turn(
                 "帮我继续实现",
                 workspace_root=workspace,

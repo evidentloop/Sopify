@@ -15,7 +15,7 @@ from canonical_writer import StateStore
 
 _COMMAND_PATTERNS = (
     (re.compile(r"^~go\s+plan(?:\s+(?P<body>.+))?$", re.IGNORECASE), "~go plan"),
-    (re.compile(r"^~go\s+exec(?:\s+(?P<body>.+))?$", re.IGNORECASE), "~go exec"),
+    (re.compile(r"^~go\s+finalize(?:\s+(?P<body>.+))?$", re.IGNORECASE), "~go finalize"),
     (re.compile(r"^~go(?:\s+(?P<body>.+))?$", re.IGNORECASE), "~go"),
 )
 SUPPORTED_ROUTE_NAMES = (
@@ -242,7 +242,7 @@ class Router:
         if decide_decision is not None:
             return self._with_capture(decide_decision)
 
-        command_decision = _classify_command(text, config=self.config)
+        command_decision = _classify_command(text, config=self.config, snapshot=snapshot)
         if snapshot.is_conflict:
             return self._with_capture(
                 _classify_state_conflict(
@@ -349,7 +349,7 @@ class Router:
         return decision
 
 
-def _classify_command(text: str, *, config: RuntimeConfig) -> RouteDecision | None:
+def _classify_command(text: str, *, config: RuntimeConfig, snapshot: ContextResolvedSnapshot) -> RouteDecision | None:
     for pattern, command in _COMMAND_PATTERNS:
         match = pattern.match(text)
         if not match:
@@ -367,18 +367,39 @@ def _classify_command(text: str, *, config: RuntimeConfig) -> RouteDecision | No
                 plan_package_policy="immediate",
                 candidate_skill_ids=("analyze", "design"),
             )
-        if command == "~go exec":
+        if command == "~go finalize":
             return RouteDecision(
-                route_name="exec_plan",
+                route_name="archive_lifecycle",
                 request_text=request_text,
-                reason="Matched explicit execute-plan command",
+                reason="Matched explicit finalize command",
                 command=command,
-                complexity="medium",
-                should_recover_context=True,
-                candidate_skill_ids=("develop",),
-                active_run_action="resume",
+                complexity="low",
+                candidate_skill_ids=(),
             )
         if command == "~go":
+            # Migration hint: ~go exec was removed; nudge user to bare ~go
+            if body and body.lower() == "exec":
+                return RouteDecision(
+                    route_name="workflow",
+                    request_text=request_text,
+                    reason="`~go exec` has been removed. Use bare `~go` to auto-resume an active plan, or `~go <requirement>` for a new workflow.",
+                    command=command,
+                    complexity="low",
+                    candidate_skill_ids=(),
+                )
+            # Only bare ~go (no body) auto-detects active plan for exec_plan
+            active_plan = snapshot.current_plan or snapshot.execution_current_plan
+            if active_plan is not None and not body:
+                return RouteDecision(
+                    route_name="exec_plan",
+                    request_text=request_text,
+                    reason="Active plan detected; auto-routing to execution",
+                    command=command,
+                    complexity="medium",
+                    should_recover_context=True,
+                    candidate_skill_ids=("develop",),
+                    active_run_action="resume",
+                )
             return RouteDecision(
                 route_name="workflow",
                 request_text=request_text,
@@ -470,8 +491,32 @@ def _classify_pending_decision(
         )
 
     if command_decision is not None:
-        if command_decision.route_name in {"plan_only", "workflow", "light_iterate"}:
+        if command_decision.route_name in {"plan_only", "light_iterate"}:
             return None
+        if command_decision.route_name == "workflow":
+            if command_decision.command != "~go":
+                return None
+            # ~go explicitly typed with pending decision: intercept
+            if current_decision.status == "pending":
+                return RouteDecision(
+                    route_name="decision_pending",
+                    request_text=text,
+                    reason="Pending decision checkpoint must be resolved before workflow can continue",
+                    complexity="medium",
+                    should_recover_context=True,
+                    candidate_skill_ids=("design",),
+                    active_run_action="inspect_decision",
+                )
+            return RouteDecision(
+                route_name="decision_resume",
+                request_text=text,
+                reason="Confirmed decision checkpoint is being materialized through ~go",
+                command=command_decision.command,
+                complexity="medium",
+                should_recover_context=True,
+                candidate_skill_ids=("design",),
+                active_run_action="materialize_confirmed_decision",
+            )
         if command_decision.route_name == "exec_plan":
             if current_decision.status == "pending":
                 return RouteDecision(
@@ -527,8 +572,22 @@ def _classify_pending_clarification(
     command_decision: RouteDecision | None,
 ) -> RouteDecision | None:
     if command_decision is not None:
-        if command_decision.route_name in {"plan_only", "workflow", "light_iterate"}:
+        if command_decision.route_name in {"plan_only", "light_iterate"}:
             return None
+        if command_decision.route_name == "workflow":
+            # ~go with no active plan → allow new workflow (don't intercept)
+            if command_decision.command != "~go":
+                return None
+            # ~go explicitly typed: intercept if clarification is for the current flow
+            return RouteDecision(
+                route_name="clarification_pending",
+                request_text=text,
+                reason="Pending clarification must be answered before workflow can continue",
+                complexity="medium",
+                should_recover_context=True,
+                candidate_skill_ids=("analyze", "design"),
+                active_run_action="inspect_clarification",
+            )
         if command_decision.route_name == "exec_plan":
             return RouteDecision(
                 route_name="clarification_pending",

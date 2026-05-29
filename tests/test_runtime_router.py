@@ -132,8 +132,8 @@ class RouterTests(unittest.TestCase):
             archive_route = router.classify("~go finalize")
             self.assertEqual(plan_route.route_name, "plan_only")
             self.assertTrue(plan_route.should_create_plan)
-            self.assertEqual(archive_route.route_name, "workflow")
-            self.assertEqual(archive_route.command, "~go")
+            self.assertEqual(archive_route.route_name, "archive_lifecycle")
+            self.assertEqual(archive_route.command, "~go finalize")
 
             run_state = RunState(
                 run_id="run-1",
@@ -369,7 +369,7 @@ class RouterTests(unittest.TestCase):
 
             run_runtime("~go plan 优化一下", workspace_root=workspace, user_home=workspace / "home")
 
-            blocked_exec = router.classify("~go exec")
+            blocked_exec = router.classify("~go")
             answer = router.classify("目标是 runtime/router.py，预期结果是补状态骨架")
 
             self.assertEqual(blocked_exec.route_name, "clarification_pending")
@@ -415,7 +415,7 @@ class RouterTests(unittest.TestCase):
                 user_home=workspace / "home",
             )
 
-            blocked_exec = router.classify("~go exec")
+            blocked_exec = router.classify("~go")
             self.assertEqual(blocked_exec.route_name, "decision_pending")
             self.assertEqual(blocked_exec.active_run_action, "inspect_decision")
 
@@ -727,3 +727,17 @@ class DeriveRouteTests(unittest.TestCase):
  config=config, snapshot=None,
             )
         self.assertEqual(route.capture_mode, "off")
+
+    def test_go_exec_returns_migration_hint(self) -> None:
+        """~go exec (removed command) should return a migration hint, not silently enter workflow."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            config = load_runtime_config(workspace)
+            store = StateStore(config)
+            store.ensure()
+            router = Router(config, state_store=store)
+
+            route = router.classify("~go exec")
+
+            self.assertEqual(route.route_name, "workflow")
+            self.assertIn("removed", route.reason.lower())

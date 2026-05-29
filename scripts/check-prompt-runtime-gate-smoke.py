@@ -28,6 +28,9 @@ if str(REPO_ROOT) not in sys.path:
 
 from runtime.entry_guard import DIRECT_EDIT_BLOCKED_RUNTIME_REQUIRED_REASON_CODE
 from runtime.gate import CURRENT_GATE_RECEIPT_FILENAME
+from runtime.config import load_runtime_config
+from canonical_writer import StateStore, iso_now
+from sopify_contracts.artifacts import PlanArtifact
 from installer.hosts.codex import CODEX_ADAPTER
 from installer.payload import install_global_payload
 
@@ -167,12 +170,25 @@ def run_smoke(*, temp_root: Path) -> dict[str, Any]:
     )
 
     fail_closed_workspace = temp_root / "fail-closed"
+    # Set up an active plan so ~go routes to exec_plan (triggering handoff check)
+    fc_config = load_runtime_config(fail_closed_workspace)
+    fc_store = StateStore(fc_config)
+    fc_store.ensure()
+    fc_store.set_current_plan(PlanArtifact(
+        plan_id="plan-smoke-fc",
+        title="Smoke Fail-Closed Plan",
+        summary="test",
+        level="light",
+        path=".sopify-skills/plan/20260101_test/",
+        files=("plan.md",),
+        created_at=iso_now(),
+    ))
     scenarios.append(
         _run_gate_scenario(
             scenario_id="fail_closed_missing_handoff",
             workspace=fail_closed_workspace,
             home_root=smoke_home,
-            request="~go exec",
+            request="~go",
             expected_exit_code=1,
             expected_status="error",
             expected_mode="error_visible_retry",

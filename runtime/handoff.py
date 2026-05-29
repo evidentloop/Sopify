@@ -533,6 +533,6 @@ def _should_emit_handoff(*, decision: RouteDecision, current_run: RunState | Non
         return current_plan is not None or "archive_lifecycle" in decision.artifacts
     if decision.route_name != "exec_plan":
         return True
-    # ~go exec is an advanced recovery/debug entry; when it does not converge
+    # exec_plan is the internal recovery entry; when it does not converge
     # back into the standard checkpoints, avoid emitting a misleading develop handoff.
     return False

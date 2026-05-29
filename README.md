@@ -199,9 +199,8 @@ Notes:
 
 | Command | Description |
 |---------|-------------|
-| `~go` | Automatically route and run the full workflow |
+| `~go` | Automatically route and run the full workflow (auto-resumes if active plan exists) |
 | `~go plan` | Plan only |
-| `~go exec` | Advanced restore/debug entry, not the default user path |
 | `~go finalize` | Close out the current metadata-managed plan |
 
 Most users only need `~go` and `~go plan`; maintainer validation commands live in [CONTRIBUTING.md](./CONTRIBUTING.md).

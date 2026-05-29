@@ -2054,9 +2054,22 @@ class RuntimeGateTests(unittest.TestCase):
     def test_gate_fail_closes_when_handoff_is_missing(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
+            # Set up an active plan so ~go routes to exec_plan
+            config = load_runtime_config(workspace)
+            store = StateStore(config)
+            store.ensure()
+            store.set_current_plan(PlanArtifact(
+                plan_id="plan-no-handoff",
+                title="Test Plan",
+                summary="test",
+                level="light",
+                path=".sopify-skills/plan/20260101_test/",
+                files=("plan.md",),
+                created_at=iso_now(),
+            ))
 
             result = enter_runtime_gate(
-                "~go exec",
+                "~go",
                 workspace_root=workspace,
                 user_home=workspace / "home",
             )

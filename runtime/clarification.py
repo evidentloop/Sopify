@@ -264,7 +264,7 @@ def _has_target_anchor(text: str) -> bool:
 
 def _is_bodyless_command(text: str) -> bool:
     lowered = text.casefold()
-    return lowered in {"~go", "~go plan", "~go exec"}
+    return lowered in {"~go", "~go plan", "~go finalize"}
 
 
 def _is_generic_outcome(text: str) -> bool:

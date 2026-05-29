@@ -199,9 +199,8 @@ plan:
 
 | 命令 | 说明 |
 |-----|------|
-| `~go` | 自动判断并执行完整流程 |
+| `~go` | 自动判断并执行完整流程（有活动 plan 时自动恢复执行） |
 | `~go plan` | 只规划不执行 |
-| `~go exec` | 高级恢复/调试入口，不是普通主链路默认下一步 |
 | `~go finalize` | 收口当前 metadata-managed plan |
 
 普通用户只需要记住 `~go / ~go plan`；维护者验证命令放在 [贡献指南](./CONTRIBUTING_CN.md)。

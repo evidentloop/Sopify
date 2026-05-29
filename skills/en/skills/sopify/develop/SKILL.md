@@ -9,7 +9,7 @@ description: Develop phase entry; routes task execution, state updates, KB sync,
 
 ## When to activate
 
-- Entering the implementation phase (`workflow` / `light_iterate` / `quick_fix` / `exec_plan`).
+- Entering the implementation phase (`workflow` / `light_iterate` / `quick_fix`; bare `~go` auto-routes to `exec_plan` when an active plan exists).
 - Need to execute the task list, update state, and converge the delivery result.
 
 ## Execution skeleton
