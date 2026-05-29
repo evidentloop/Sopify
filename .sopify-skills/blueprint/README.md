@@ -13,7 +13,7 @@
 ## 当前焦点
 
 <!-- sopify:auto:focus:start -->
-- 当前活动 plan：暂无。
+- 当前活动 plan：`../plan/20260529_pre_launch_consolidation/`（推广前大收口整合，7 方向 4 波次）。
 - history 归档：已可用；最近归档为 `../history/2026-05/20260528_output_contract_enforcement`。
 <!-- sopify:auto:focus:end -->
 

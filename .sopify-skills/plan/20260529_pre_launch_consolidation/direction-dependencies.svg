@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 650">
+  <style>
+    text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif; }
+    .title { font-size: 20px; font-weight: 700; fill: #111827; }
+    .subtitle { font-size: 12px; fill: #6b7280; }
+    .wave-label { font-size: 11px; font-weight: 700; fill: #6b7280; letter-spacing: 0.08em; }
+    .dir-badge { font-size: 10px; font-weight: 700; fill: #ffffff; }
+    .dir-title { font-size: 13px; font-weight: 600; fill: #111827; }
+    .dir-desc { font-size: 10px; fill: #6b7280; }
+    .dir-count { font-size: 10px; font-weight: 500; fill: #374151; }
+    .readme-tag { font-size: 9px; font-weight: 600; fill: #ea580c; }
+    .largest-tag { font-size: 8px; font-weight: 700; fill: #dc2626; }
+    .legend-text { font-size: 10px; fill: #6b7280; }
+  </style>
+  <defs>
+    <marker id="ar-solid" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#3b82f6"/></marker>
+    <marker id="ar-dash" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#93c5fd"/></marker>
+    <marker id="ar-purple" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#7c3aed"/></marker>
+  </defs>
+  <rect width="1100" height="650" fill="#ffffff"/>
+  <text x="550" y="35" text-anchor="middle" class="title">Pre-Launch Consolidation</text>
+  <text x="550" y="55" text-anchor="middle" class="subtitle">52 tasks across 4 waves | README only written once in Wave 2 (Strategy A)</text>
+  <rect x="40" y="75" width="1020" height="170" rx="8" fill="#f0fdf4" stroke="#86efac" stroke-width="1" stroke-dasharray="6,3"/>
+  <text x="56" y="93" class="wave-label">WAVE 1 — CORE TIGHTENING + AUDIT FIX</text>
+  <rect x="60" y="105" width="300" height="120" rx="8" fill="#ffffff" stroke="#16a34a" stroke-width="1.5"/>
+  <rect x="60" y="105" width="28" height="20" rx="4" fill="#16a34a"/>
+  <text x="74" y="119" text-anchor="middle" class="dir-badge">D2</text>
+  <text x="98" y="119" class="dir-title">Output Enhancement</text>
+  <text x="72" y="141" class="dir-desc">output-contract.md full upgrade</text>
+  <text x="72" y="155" class="dir-desc">Rich Readable + density gradient</text>
+  <text x="72" y="169" class="dir-desc">emoji discipline + redaction rules</text>
+  <text x="72" y="189" class="dir-count">5 tasks | 4 files | 0 new files</text>
+  <text x="72" y="209" class="readme-tag">README: untouched</text>
+  <rect x="400" y="105" width="280" height="120" rx="8" fill="#ffffff" stroke="#16a34a" stroke-width="1.5"/>
+  <rect x="400" y="105" width="28" height="20" rx="4" fill="#16a34a"/>
+  <text x="414" y="119" text-anchor="middle" class="dir-badge">D3</text>
+  <text x="438" y="119" class="dir-title">Command Convergence</text>
+  <text x="412" y="141" class="dir-desc">~go exec becomes internal alias</text>
+  <text x="412" y="155" class="dir-desc">router / entry_guard / engine merge</text>
+  <text x="412" y="169" class="dir-desc">protocol.md deprecated annotation</text>
+  <text x="412" y="189" class="dir-count">6 tasks | 6 files</text>
+  <text x="412" y="209" class="readme-tag">README: deferred to Wave 2</text>
+  <rect x="720" y="105" width="320" height="120" rx="8" fill="#ffffff" stroke="#16a34a" stroke-width="2"/>
+  <rect x="720" y="105" width="28" height="20" rx="4" fill="#16a34a"/>
+  <text x="734" y="119" text-anchor="middle" class="dir-badge">D5</text>
+  <text x="758" y="119" class="dir-title">Engineering Cleanup</text>
+  <rect x="940" y="107" width="55" height="16" rx="4" fill="#fef2f2" stroke="#fca5a5" stroke-width="0.5"/>
+  <text x="967" y="118" text-anchor="middle" class="largest-tag">LARGEST</text>
+  <text x="732" y="141" class="dir-desc">Cleanup: paths / archives / CHANGELOG / meta</text>
+  <text x="732" y="155" class="dir-desc">Audit critical: .gitignore / ~summary / bootstrap</text>
+  <text x="732" y="169" class="dir-desc">Audit recommended: docs / examples / tests</text>
+  <text x="732" y="189" class="dir-count">17 tasks | 12+ files</text>
+  <text x="732" y="209" class="readme-tag">README: deferred to Wave 2</text>
+  <rect x="40" y="270" width="700" height="145" rx="8" fill="#eff6ff" stroke="#93c5fd" stroke-width="1" stroke-dasharray="6,3"/>
+  <text x="56" y="288" class="wave-label">WAVE 2 — EXPERIENCE LAYER</text>
+  <rect x="60" y="300" width="300" height="95" rx="8" fill="#ffffff" stroke="#2563eb" stroke-width="1.5"/>
+  <rect x="60" y="300" width="28" height="20" rx="4" fill="#2563eb"/>
+  <text x="74" y="314" text-anchor="middle" class="dir-badge">D1</text>
+  <text x="98" y="314" class="dir-title">README + Visual Assets</text>
+  <text x="72" y="336" class="dir-desc">Full rewrite EN + ZH-CN (absorbs Wave 1)</text>
+  <text x="72" y="350" class="dir-desc">Hero / See It In Action / 3 stories / arch diagram</text>
+  <text x="72" y="370" class="dir-count">7 tasks (2 done) | 6+ files</text>
+  <text x="72" y="386" class="readme-tag">README: one-shot full rewrite</text>
+  <rect x="410" y="300" width="300" height="95" rx="8" fill="#ffffff" stroke="#2563eb" stroke-width="1.5"/>
+  <rect x="410" y="300" width="28" height="20" rx="4" fill="#2563eb"/>
+  <text x="424" y="314" text-anchor="middle" class="dir-badge">D4</text>
+  <text x="448" y="314" class="dir-title">First-Touch UX</text>
+  <text x="422" y="336" class="dir-desc">Post-install welcome message</text>
+  <text x="422" y="350" class="dir-desc">Blank-state onboarding / quickstart</text>
+  <text x="422" y="370" class="dir-count">5 tasks | 4 files</text>
+  <rect x="40" y="440" width="500" height="85" rx="8" fill="#faf5ff" stroke="#c4b5fd" stroke-width="1" stroke-dasharray="6,3"/>
+  <text x="56" y="458" class="wave-label">WAVE 3 — LAUNCH AMPLIFICATION</text>
+  <rect x="60" y="470" width="460" height="40" rx="8" fill="#ffffff" stroke="#7c3aed" stroke-width="1.5"/>
+  <rect x="60" y="470" width="28" height="20" rx="4" fill="#7c3aed"/>
+  <text x="74" y="484" text-anchor="middle" class="dir-badge">D6</text>
+  <text x="98" y="484" class="dir-title">Launch Content</text>
+  <text x="72" y="504" class="dir-desc">Juejin / V2EX / GitHub Blog / X | 5 tasks</text>
+  <rect x="40" y="550" width="500" height="65" rx="8" fill="#f9fafb" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="6,3"/>
+  <text x="56" y="568" class="wave-label">WAVE 4 — POST-LAUNCH (DESIGN ONLY)</text>
+  <rect x="60" y="580" width="300" height="25" rx="6" fill="#ffffff" stroke="#d1d5db" stroke-width="1"/>
+  <rect x="60" y="580" width="28" height="16" rx="4" fill="#9ca3af"/>
+  <text x="74" y="592" text-anchor="middle" class="dir-badge">D7</text>
+  <text x="98" y="594" class="dir-title" style="font-size:11px">Runtime Phase 2 | 4 tasks (design only)</text>
+  <rect x="790" y="290" width="250" height="55" rx="8" fill="#f9fafb" stroke="#e5e7eb" stroke-width="1"/>
+  <rect x="790" y="290" width="28" height="20" rx="4" fill="#9ca3af"/>
+  <text x="804" y="304" text-anchor="middle" class="dir-badge">D8</text>
+  <text x="828" y="304" class="dir-title" style="font-size:11px">Docs Sync</text>
+  <text x="802" y="328" class="dir-desc">blueprint / tasks.md / design.md | 3 tasks</text>
+  <path d="M 540 225 L 540 280 L 310 280 L 310 300" stroke="#3b82f6" stroke-width="1.5" fill="none" marker-end="url(#ar-solid)"/>
+  <path d="M 880 225 L 880 265 L 340 265 L 340 300" stroke="#3b82f6" stroke-width="1.5" fill="none" marker-end="url(#ar-solid)"/>
+  <path d="M 210 225 L 210 285 L 460 285 L 460 300" stroke="#93c5fd" stroke-width="1" stroke-dasharray="5,3" fill="none" marker-end="url(#ar-dash)"/>
+  <line x1="210" y1="395" x2="210" y2="470" stroke="#7c3aed" stroke-width="1.5" marker-end="url(#ar-purple)"/>
+  <path d="M 560 395 L 560 435 L 400 435 L 400 470" stroke="#7c3aed" stroke-width="1.5" fill="none" marker-end="url(#ar-purple)"/>
+  <rect x="790" y="440" width="250" height="95" rx="6" fill="#f9fafb" stroke="#e5e7eb" stroke-width="1"/>
+  <text x="806" y="457" class="wave-label">LEGEND</text>
+  <line x1="806" y1="472" x2="830" y2="472" stroke="#3b82f6" stroke-width="1.5"/>
+  <text x="838" y="476" class="legend-text">Hard dependency (must-before)</text>
+  <line x1="806" y1="492" x2="830" y2="492" stroke="#93c5fd" stroke-width="1" stroke-dasharray="5,3"/>
+  <text x="838" y="496" class="legend-text">Soft dependency (benefits)</text>
+  <line x1="806" y1="512" x2="830" y2="512" stroke="#7c3aed" stroke-width="1.5"/>
+  <text x="838" y="516" class="legend-text">Content consumption</text>
+</svg>
