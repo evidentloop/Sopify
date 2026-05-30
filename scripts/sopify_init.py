@@ -69,6 +69,7 @@ def _read_source_version() -> str | None:
 
 
 def _resolve_git_dir(workspace_root: Path) -> Path | None:
+    """Return the .git directory, following gitdir pointers for worktrees."""
     dot_git = workspace_root / ".git"
     if dot_git.is_dir():
         return dot_git
@@ -91,6 +92,7 @@ def _resolve_git_dir(workspace_root: Path) -> Path | None:
 
 
 def _write_text_if_changed(path: Path, content: str) -> bool:
+    """Atomically write *content* to *path* only if it differs from the existing file."""
     existing = path.read_text(encoding="utf-8") if path.exists() else None
     if existing == content:
         return False
@@ -112,6 +114,7 @@ def _ensure_trailing_newline(content: str) -> str:
 
 
 def _write_sopify_json(workspace_root: Path, *, source_version: str | None) -> bool:
+    """Create or update .sopify-skills/sopify.json, preserving existing fields."""
     sopify_json_dir = workspace_root / _SOPIFY_SKILLS_DIR
     sopify_json_path = sopify_json_dir / _SOPIFY_JSON_FILENAME
 
@@ -144,6 +147,7 @@ def _render_managed_ignore_block() -> str:
 
 
 def _write_managed_ignore_block(path: Path) -> bool:
+    """Insert or update the Sopify-managed block in a .gitignore file."""
     existing = path.read_text(encoding="utf-8") if path.exists() else ""
     block = _render_managed_ignore_block()
     if _MANAGED_IGNORE_BEGIN in existing and _MANAGED_IGNORE_END in existing:
@@ -165,6 +169,7 @@ def _write_managed_ignore_block(path: Path) -> bool:
 
 
 def _write_managed_instruction_block(path: Path, content: str) -> bool:
+    """Insert or update a Sopify-managed instruction block in a host config file."""
     block = "\n".join((_INSTRUCTION_BLOCK_BEGIN, content.strip(), _INSTRUCTION_BLOCK_END))
     existing = path.read_text(encoding="utf-8") if path.exists() else ""
     if _INSTRUCTION_BLOCK_BEGIN in existing and _INSTRUCTION_BLOCK_END in existing:
@@ -217,6 +222,7 @@ def init_workspace(
     source_root: Path = REPO_ROOT,
     workspace_instructions: bool = True,
 ) -> dict:
+    """Initialize a Sopify workspace: write sopify.json, .gitignore block, and host instructions."""
     workspace = workspace.resolve()
     if not workspace.is_dir():
         return {"action": "failed", "reason_code": "WORKSPACE_NOT_FOUND", "message": f"Not a directory: {workspace}"}

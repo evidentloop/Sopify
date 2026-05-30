@@ -9,7 +9,7 @@ decisions, and persist project knowledge.
 - Python 3.11+
 - An AI host: **Copilot**, **Codex**, or **Claude**
 
-## Step 1 — Bootstrap
+## Step 1 — Install
 
 Run from your project root:
 
@@ -17,27 +17,60 @@ Run from your project root:
 curl -fsSL https://github.com/evidentloop/sopify/releases/latest/download/install.sh | bash -s -- --target copilot
 ```
 
-Or clone and run locally:
+Replace `copilot` with `codex:en-US` or `claude:en-US` for other hosts.
 
-```bash
-git clone https://github.com/evidentloop/sopify.git /tmp/sopify
-python3 /tmp/sopify/scripts/sopify_init.py init --workspace .
-```
-
-Expected output:
+Expected output (Copilot):
 
 ```
-✓ Sopify workspace ready
-  path:    /path/to/your-project
-  version: 2026-05-21.101226
+Sopify installed successfully.
 
-Next steps:
-  Open an AI host (Copilot / Codex / Claude) in this directory to start using Sopify.
+Installed:
+  Host: Copilot (copilot:en-US)
+  Language: English
+  Host prompt: installed
+  Version: 2026-05-30.193318
+  File: /path/to/your-project/.github/copilot-instructions.md
+
+Next:
+  1. Open Copilot in your project directory.
+  2. Sopify instructions are loaded automatically — start your task.
+```
+
+Expected output (Codex / Claude):
+
+```
+Sopify installed successfully.
+
+Installed:
+  Host: Codex (codex:en-US)
+  Language: English
+  Host prompt: updated
+  Runtime: ~/.codex/sopify
+  Version: 2026-05-30.193318
+  Runtime action: updated
+
+Project:
+  Prewarmed: /path/to/your-project
+  Bundle: /path/to/your-project/.sopify-runtime
+
+Next:
+  1. Reopen Codex in that project.
+  2. Type: ~go
+
+Diagnostics:
+  Runtime smoke check passed.
+  Run again with `--verbose` for full install details.
 ```
 
 ## Step 2 — Verify
 
-Check what was created:
+**Copilot** creates a single instruction file:
+
+| File | Purpose |
+|------|---------|
+| `.github/copilot-instructions.md` | Sopify instructions — loaded automatically by Copilot |
+
+**Codex / Claude** also create a workspace marker:
 
 ```bash
 cat .sopify-skills/sopify.json
@@ -45,9 +78,8 @@ cat .sopify-skills/sopify.json
 
 ```json
 {
-  "bundle_version": "2026-05-21.101226",
+  "bundle_version": "2026-05-30.193318",
   "capabilities": [
-    "preferences_preload",
     "runtime_gate"
   ],
   "locator_mode": "global_first",
@@ -56,31 +88,12 @@ cat .sopify-skills/sopify.json
 }
 ```
 
-The bootstrap also updated:
-
-| File | Purpose |
-|------|---------|
-| `.sopify-skills/sopify.json` | Workspace marker — version anchor + capability declaration |
-| `.gitignore` | Managed ignore block — excludes transient state from version control |
-| `.github/copilot-instructions.md` | Copilot instruction entry — tells Copilot about Sopify conventions |
-
 ## Step 3 — Start Using
 
-Open the project in your AI host and begin working. Sopify uses project
-conventions to make AI decisions visible and resumable.
+Open the project in your AI host and begin working.
 
-For **Codex** or **Claude** users: if you haven't installed Sopify globally yet,
-run the full installer first:
-
-```bash
-curl -fsSL https://github.com/evidentloop/sopify/releases/latest/download/install.sh | bash -s -- --target codex:en-US
-```
-
-Then use `~go` to start a managed workflow.
-
-For **Copilot** users: the workspace is ready. Full trigger wiring is coming in
-a future release. `bootstrap.sh` still works as a compatibility alias, but the
-recommended entrypoint is now `install.sh --target copilot`.
+- **Copilot**: instructions are loaded automatically — start your task directly.
+- **Codex / Claude**: type `~go` to start a managed workflow.
 
 ## What Happens Next
 
@@ -94,7 +107,7 @@ Project knowledge accumulates in `.sopify-skills/`:
 
 ```
 .sopify-skills/
-├── sopify.json       # workspace marker (created by bootstrap)
+├── sopify.json       # workspace marker (Codex/Claude only)
 ├── project.md        # technical conventions (created on first use)
 ├── blueprint/        # design baseline (created when needed)
 ├── plan/             # active plans
@@ -107,7 +120,7 @@ Project knowledge accumulates in `.sopify-skills/`:
 To remove Sopify from your project:
 
 ```bash
-rm -rf .sopify-skills/
+rm -rf .sopify-skills/ .sopify-runtime/
 rm -f .github/copilot-instructions.md
 # Then remove the sopify-managed block from .gitignore
 ```

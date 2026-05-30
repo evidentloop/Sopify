@@ -6,7 +6,7 @@
 
 [![许可证](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 [![文档](https://img.shields.io/badge/docs-CC%20BY%204.0-green.svg)](./LICENSE-docs)
-[![版本](https://img.shields.io/badge/version-2026--05--30.193318-orange.svg)](#版本历史)
+[![版本](https://img.shields.io/badge/version-2026--05--30.222058-orange.svg)](#版本历史)
 [![欢迎PR](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING_CN.md)
 
 [English](./README.md) · 简体中文 · [快速开始](#快速开始) · [贡献者](./CONTRIBUTORS.md)
@@ -29,6 +29,8 @@ Sopify 是一个 AI 辅助开发的协议层。缺事实时停下来问，需要
 - **随时恢复** — 基于 checkpoint；换宿主、换机器、换人接手都不用重新交代
 - **决策留痕** — 方案、取舍、审查持久保存在 `.sopify-skills/`
 
+[工作流详细说明 →](./docs/how-sopify-works.md)
+
 ## 实战演示
 
 <p align="center">
@@ -43,7 +45,7 @@ curl -fsSL https://github.com/evidentloop/sopify/releases/latest/download/instal
 
 安装后用 `~go` 启动全托管工作流。审查优先安装、其他宿主和 Windows 请看[安装说明](#安装说明)。
 
-**已在 Sopify 管理的仓库里？** 打开任意 AI 宿主，让它继续未完成的任务——它会从上次停点恢复。[完整演练 →](./docs/how-sopify-works.md)
+**已在 Sopify 管理的仓库里？** 打开任意 AI 宿主，让它继续未完成的任务——它会从上次停点恢复。
 
 ## 为什么选择 Sopify？
 

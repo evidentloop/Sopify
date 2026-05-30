@@ -2,7 +2,7 @@
 
 ## 需求背景
 
-当前仓库已经有 [`preferences.md`](/Users/weixin.li/Desktop/vs-code-extension/sopify-skills/.sopify-skills/user/preferences.md) 作为长期偏好落点，但它还没有成为稳定的 LLM 输入源。
+当前仓库已经有 [`preferences.md`](.sopify-skills/user/preferences.md) 作为长期偏好落点，但它还没有成为稳定的 LLM 输入源。
 
 这意味着：
 
@@ -94,7 +94,7 @@
 2. 当 `preferences.md` 缺失或异常时，Sopify 主链路仍可继续
 3. 当 `preferences.md` 可读时，LLM 收到稳定、可复用的偏好注入块
 4. 当前显式任务能覆盖长期偏好，长期偏好能覆盖默认规则
-5. 文档口径在 blueprint、[`README.md`](/Users/weixin.li/Desktop/vs-code-extension/sopify-skills/README.md) 与 [`README_EN.md`](/Users/weixin.li/Desktop/vs-code-extension/sopify-skills/README_EN.md) 中保持一致
+5. 文档口径在 blueprint、[`README.md`](README.md) 与 [`README_EN.md`](README_EN.md) 中保持一致
 
 ## 风险评估
 

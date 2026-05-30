@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 920">
+<style>
+  text { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif; }
+</style>
+<defs>
+  <marker id="arr" viewBox="0 0 10 7" refX="9" refY="3.5" markerWidth="10" markerHeight="7" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#374151"/></marker>
+  <marker id="arr-sm" viewBox="0 0 10 7" refX="9" refY="3.5" markerWidth="8" markerHeight="6" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#374151"/></marker>
+  <marker id="arr-g" viewBox="0 0 10 7" refX="9" refY="3.5" markerWidth="10" markerHeight="7" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#10b981"/></marker>
+  <marker id="arr-o" viewBox="0 0 10 7" refX="9" refY="3.5" markerWidth="10" markerHeight="7" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#ea580c"/></marker>
+</defs>
+<rect width="960" height="920" fill="#ffffff"/>
+<text x="36" y="30" font-size="20" font-weight="700" fill="#1f2937">Sopify — Workflow &amp; Checkpoints</text>
+<text x="36" y="50" font-size="12" fill="#6b7280">(Evidence-driven task lifecycle · Checkpoint-gated execution)</text>
+<rect x="345" y="64" width="180" height="38" rx="19" fill="#dbeafe" stroke="#93c5fd" stroke-width="1.5"/>
+<text x="435" y="88" text-anchor="middle" font-size="14" font-weight="600" fill="#1d4ed8">User Input</text>
+<rect x="345" y="132" width="180" height="40" rx="8" fill="#e0e7ff" stroke="#818cf8" stroke-width="1.5"/>
+<text x="435" y="157" text-anchor="middle" font-size="14" font-weight="600" fill="#4338ca">Runtime Gate</text>
+<path d="M435,200 L469,232 L435,264 L401,232Z" fill="#f8fafc" stroke="#6366f1" stroke-width="1.5"/>
+<text x="435" y="237" text-anchor="middle" font-size="14" font-weight="600" fill="#4f46e5">Route</text>
+<rect x="95" y="306" width="180" height="40" rx="8" fill="#dcfce7" stroke="#86efac" stroke-width="1.5"/>
+<text x="185" y="331" text-anchor="middle" font-size="14" font-weight="600" fill="#15803d">Consult / Q&amp;A</text>
+<rect x="580" y="306" width="180" height="40" rx="8" fill="#dcfce7" stroke="#86efac" stroke-width="1.5"/>
+<text x="670" y="331" text-anchor="middle" font-size="14" font-weight="600" fill="#15803d">Code Task</text>
+<path d="M670,388 L704,420 L670,452 L636,420Z" fill="#f8fafc" stroke="#6366f1" stroke-width="1.5"/>
+<text x="670" y="425" text-anchor="middle" font-size="12" font-weight="600" fill="#4f46e5">Complexity</text>
+<rect x="390" y="486" width="154" height="38" rx="6" fill="#fef9c3" stroke="#fbbf24" stroke-width="1.5"/>
+<text x="467" y="510" text-anchor="middle" font-size="13" font-weight="600" fill="#92400e">Quick Fix</text>
+<rect x="588" y="486" width="164" height="38" rx="6" fill="#fef9c3" stroke="#fbbf24" stroke-width="1.5"/>
+<text x="670" y="510" text-anchor="middle" font-size="13" font-weight="600" fill="#92400e">Light Iteration</text>
+<rect x="795" y="348" width="148" height="162" rx="8" fill="#fefce8" fill-opacity="0.3" stroke="#6366f1" stroke-width="1.5" stroke-dasharray="6,3"/>
+<text x="869" y="340" text-anchor="middle" font-size="12" font-weight="600" fill="#4f46e5" font-style="italic">Full Three-Phase Flow</text>
+<rect x="807" y="362" width="124" height="32" rx="5" fill="#fef9c3" stroke="#fbbf24" stroke-width="1"/>
+<text x="869" y="383" text-anchor="middle" font-size="11" font-weight="600" fill="#92400e">Requirements</text>
+<rect x="807" y="410" width="124" height="32" rx="5" fill="#fef9c3" stroke="#fbbf24" stroke-width="1"/>
+<text x="869" y="431" text-anchor="middle" font-size="11" font-weight="600" fill="#92400e">Solution Design</text>
+<rect x="807" y="458" width="124" height="32" rx="5" fill="#fef9c3" stroke="#fbbf24" stroke-width="1"/>
+<text x="869" y="479" text-anchor="middle" font-size="11" font-weight="600" fill="#92400e">Implementation</text>
+<text x="869" y="504" text-anchor="middle" font-size="10" fill="#6366f1" font-style="italic">↓ Checkpoint detail</text>
+<rect x="318" y="590" width="234" height="44" rx="8" fill="#4f46e5" stroke="#3730a3" stroke-width="1.5"/>
+<text x="435" y="617" text-anchor="middle" font-size="14" font-weight="600" fill="#ffffff">Output + Handoff</text>
+<rect x="348" y="658" width="174" height="32" rx="6" fill="#e0e7ff" stroke="#818cf8" stroke-width="1"/>
+<text x="435" y="679" text-anchor="middle" font-size="12" fill="#4338ca">.sopify-skills/state/</text>
+<line x1="435" y1="102" x2="435" y2="132" stroke="#374151" stroke-width="1.5" marker-end="url(#arr)"/>
+<line x1="435" y1="172" x2="435" y2="200" stroke="#374151" stroke-width="1.5" marker-end="url(#arr)"/>
+<line x1="401" y1="232" x2="275" y2="306" stroke="#374151" stroke-width="1.5" marker-end="url(#arr)"/>
+<line x1="469" y1="232" x2="580" y2="306" stroke="#374151" stroke-width="1.5" marker-end="url(#arr)"/>
+<line x1="670" y1="346" x2="670" y2="388" stroke="#374151" stroke-width="1.5" marker-end="url(#arr)"/>
+<line x1="636" y1="420" x2="467" y2="486" stroke="#374151" stroke-width="1.5" marker-end="url(#arr)"/>
+<line x1="670" y1="452" x2="670" y2="486" stroke="#374151" stroke-width="1.5" marker-end="url(#arr)"/>
+<line x1="704" y1="420" x2="795" y2="420" stroke="#374151" stroke-width="1.5" marker-end="url(#arr)"/>
+<line x1="869" y1="394" x2="869" y2="410" stroke="#374151" stroke-width="1" marker-end="url(#arr-sm)"/>
+<line x1="869" y1="442" x2="869" y2="458" stroke="#374151" stroke-width="1" marker-end="url(#arr-sm)"/>
+<line x1="435" y1="634" x2="435" y2="658" stroke="#374151" stroke-width="1.5" marker-end="url(#arr)"/>
+<path d="M185,346 L185,550 L365,550 L365,590" fill="none" stroke="#10b981" stroke-width="1.5" stroke-dasharray="6,3" marker-end="url(#arr-g)"/>
+<path d="M467,524 L467,590" fill="none" stroke="#10b981" stroke-width="1.5" stroke-dasharray="6,3" marker-end="url(#arr-g)"/>
+<path d="M670,524 L670,556 L490,556 L490,590" fill="none" stroke="#10b981" stroke-width="1.5" stroke-dasharray="6,3" marker-end="url(#arr-g)"/>
+<path d="M869,510 L869,564 L520,564 L520,590" fill="none" stroke="#10b981" stroke-width="1.5" stroke-dasharray="6,3" marker-end="url(#arr-g)"/>
+<line x1="40" y1="716" x2="920" y2="716" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="4,2"/>
+<text x="480" y="738" text-anchor="middle" font-size="13" font-weight="600" fill="#4f46e5">Checkpoint Detail — Full Three-Phase Flow</text>
+<rect x="30" y="760" width="155" height="50" rx="8" fill="#e0e7ff" stroke="#818cf8" stroke-width="1.5"/>
+<text x="107" y="790" text-anchor="middle" font-size="13" font-weight="600" fill="#4338ca">Requirements</text>
+<text x="107" y="803" text-anchor="middle" font-size="13" font-weight="600" fill="#4338ca">Analysis</text>
+<line x1="185" y1="785" x2="228" y2="785" stroke="#374151" stroke-width="1.5" marker-end="url(#arr)"/>
+<path d="M262,757 L290,785 L262,813 L234,785Z" fill="#fef9c3" stroke="#fbbf24" stroke-width="1.5"/>
+<text x="262" y="781" text-anchor="middle" font-size="10" font-weight="600" fill="#92400e">Missing</text>
+<text x="262" y="793" text-anchor="middle" font-size="10" font-weight="600" fill="#92400e">facts?</text>
+<line x1="290" y1="785" x2="358" y2="785" stroke="#374151" stroke-width="1.5" marker-end="url(#arr)"/>
+<text x="324" y="777" text-anchor="middle" font-size="10" fill="#6b7280">No</text>
+<rect x="358" y="760" width="160" height="50" rx="8" fill="#e0e7ff" stroke="#818cf8" stroke-width="1.5"/>
+<text x="438" y="790" text-anchor="middle" font-size="13" font-weight="600" fill="#4338ca">Solution Design</text>
+<line x1="518" y1="785" x2="562" y2="785" stroke="#374151" stroke-width="1.5" marker-end="url(#arr)"/>
+<path d="M596,757 L624,785 L596,813 L568,785Z" fill="#fef9c3" stroke="#fbbf24" stroke-width="1.5"/>
+<text x="596" y="781" text-anchor="middle" font-size="10" font-weight="600" fill="#92400e">Design</text>
+<text x="596" y="793" text-anchor="middle" font-size="10" font-weight="600" fill="#92400e">branch?</text>
+<line x1="624" y1="785" x2="710" y2="785" stroke="#374151" stroke-width="1.5" marker-end="url(#arr)"/>
+<text x="666" y="777" text-anchor="middle" font-size="10" fill="#6b7280">No</text>
+<rect x="710" y="760" width="160" height="50" rx="8" fill="#4f46e5" stroke="#3730a3" stroke-width="1.5"/>
+<text x="790" y="790" text-anchor="middle" font-size="14" font-weight="600" fill="#ffffff">Implementation</text>
+<line x1="262" y1="813" x2="262" y2="842" stroke="#ea580c" stroke-width="1.5" marker-end="url(#arr-o)"/>
+<text x="275" y="832" font-size="10" font-weight="600" fill="#ea580c">Yes</text>
+<line x1="596" y1="813" x2="596" y2="842" stroke="#ea580c" stroke-width="1.5" marker-end="url(#arr-o)"/>
+<text x="609" y="832" font-size="10" font-weight="600" fill="#ea580c">Yes</text>
+<rect x="185" y="842" width="154" height="34" rx="6" fill="#fff7ed" stroke="#fb923c" stroke-width="1.5"/>
+<text x="262" y="864" text-anchor="middle" font-size="11" font-weight="700" fill="#c2410c">answer_questions</text>
+<rect x="519" y="842" width="154" height="34" rx="6" fill="#fff7ed" stroke="#fb923c" stroke-width="1.5"/>
+<text x="596" y="864" text-anchor="middle" font-size="11" font-weight="700" fill="#c2410c">confirm_decision</text>
+<path d="M185,860 L50,860 L50,785 L30,785" fill="none" stroke="#ea580c" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#arr-o)"/>
+<text x="80" y="853" font-size="10" font-style="italic" fill="#ea580c">resume</text>
+<path d="M519,860 L438,860 L438,810" fill="none" stroke="#ea580c" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#arr-o)"/>
+<text x="458" y="853" font-size="10" font-style="italic" fill="#ea580c">resume</text>
+<rect x="60" y="892" width="840" height="24" rx="4" fill="#fefce8" stroke="#fbbf24" stroke-width="0.5"/>
+<text x="100" y="908" font-size="11" font-weight="700" fill="#1f2937">Core Rule:</text>
+<text x="175" y="908" font-size="11" fill="#1f2937">Missing facts → stop and ask (never guess) · Design branch → pause for confirmation</text>
+<rect x="26" y="630" width="126" height="74" rx="6" fill="#fafafa" stroke="#e5e7eb" stroke-width="1"/>
+<text x="40" y="647" font-size="12" font-weight="600" fill="#374151">Legend</text>
+<line x1="40" y1="660" x2="80" y2="660" stroke="#374151" stroke-width="1.5"/>
+<text x="90" y="664" font-size="11" fill="#6b7280">Protocol</text>
+<line x1="40" y1="677" x2="80" y2="677" stroke="#10b981" stroke-width="1.5" stroke-dasharray="6,3"/>
+<text x="90" y="681" font-size="11" fill="#6b7280">Converge</text>
+<line x1="40" y1="694" x2="80" y2="694" stroke="#ea580c" stroke-width="1.5" stroke-dasharray="5,3"/>
+<text x="90" y="698" font-size="11" fill="#6b7280">Checkpoint</text>
+</svg>

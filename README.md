@@ -6,7 +6,7 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 [![Docs](https://img.shields.io/badge/docs-CC%20BY%204.0-green.svg)](./LICENSE-docs)
-[![Version](https://img.shields.io/badge/version-2026--05--30.193318-orange.svg)](#version-history)
+[![Version](https://img.shields.io/badge/version-2026--05--30.222058-orange.svg)](#version-history)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
 English · [简体中文](./README.zh-CN.md) · [Quick Start](#quick-start) · [Contributors](./CONTRIBUTORS.md)
@@ -29,6 +29,8 @@ No new editor, no new CLI. Install into the host you already use — Codex, Clau
 - **Resume from anywhere** — checkpoint-based; switch hosts, machines, or teammates without re-explaining
 - **Trace every decision** — plans, choices, and reviews persist in `.sopify-skills/`
 
+[How the workflow works →](./docs/how-sopify-works.en.md)
+
 ## See It In Action
 
 <p align="center">
@@ -43,7 +45,7 @@ curl -fsSL https://github.com/evidentloop/sopify/releases/latest/download/instal
 
 After install, use `~go` to start a managed workflow. See [Installation](#installation) for other hosts, audit-first install, and Windows.
 
-**Already in a Sopify-managed repo?** Open any AI host and continue — it picks up from where you left off. [Full walkthrough →](./docs/how-sopify-works.en.md)
+**Already in a Sopify-managed repo?** Open any AI host and continue — it picks up from where you left off.
 
 ## Why Sopify?
 

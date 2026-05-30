@@ -5,7 +5,7 @@
 Sopify borrows harness engineering ideas, but does not use them as the repository's homepage identity. This section explains design rationale, not product positioning.
 
 <div align="center">
-<img src="../assets/sopify-harness.jpg" width="800" alt="Harness Engineering → Sopify Mapping" />
+<img src="../assets/sopify-harness.png" width="800" alt="Harness Engineering → Sopify Mapping" />
 </div>
 
 Official reference: [`Harness engineering: leveraging Codex in an agent-first world`](https://openai.com/index/harness-engineering/)
@@ -13,7 +13,7 @@ Official reference: [`Harness engineering: leveraging Codex in an agent-first wo
 ## Main Workflow
 
 <div align="center">
-<img src="../assets/sopify-workflow.jpg" width="800" alt="Sopify Main Workflow" />
+<img src="../assets/sopify-workflow.svg" width="800" alt="Sopify Main Workflow" />
 </div>
 
 Workflow notes:
@@ -22,13 +22,9 @@ Workflow notes:
 - Only code tasks go through complexity routing
 - The standard host loop follows handoff contracts instead of guessing from `Next:`
 
-## Checkpoint Pause and Resume
+### Checkpoint Pause and Resume
 
-<div align="center">
-<img src="../assets/sopify-checkpoint.jpg" width="800" alt="Sopify Checkpoint Pause and Resume" />
-</div>
-
-Checkpoint rules:
+The workflow diagram includes checkpoint nodes that pause execution in two scenarios:
 
 - `answer_questions` collects missing facts before a formal plan is materialized
 - `confirm_decision` resolves design branches before resuming the default runtime entry
@@ -52,10 +48,12 @@ Checkpoint rules:
 │   ├── current_handoff.json
 │   ├── current_run.json
 │   ├── current_decision.json
-│   ├── current_clarification.json
+│   ├── current_gate_receipt.json
+│   ├── last_route.json
 │   └── sessions/<session_id>/...   # parallel review isolation
 ├── user/
-│   └── preferences.md
+│   ├── preferences.md
+│   └── feedback.jsonl
 └── project.md
 ```
 
@@ -69,7 +67,7 @@ Layer notes:
 ## Appendix: Plan Lifecycle
 
 <div align="center">
-<img src="../assets/sopify-plan-lifecycle.jpg" width="800" alt="Sopify Plan Lifecycle" />
+<img src="../assets/sopify-plan-lifecycle.png" width="800" alt="Sopify Plan Lifecycle" />
 </div>
 
 This appendix is maintainer-oriented; most users only need the main workflow.

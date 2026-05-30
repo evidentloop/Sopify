@@ -59,8 +59,8 @@ archive_ready: true
 ## 3. 文档对齐
 
 - [x] 3.1 blueprint 已补齐 `preferences-preload-v1` 的背景、设计与任务口径
-- [x] 3.2 [`README.md`](/Users/weixin.li/Desktop/vs-code-extension/sopify-skills/README.md) 已补齐中文宿主接入口径
-- [x] 3.3 [`README_EN.md`](/Users/weixin.li/Desktop/vs-code-extension/sopify-skills/README_EN.md) 已同步英文宿主接入口径
+- [x] 3.2 [`README.md`](README.md) 已补齐中文宿主接入口径
+- [x] 3.3 [`README_EN.md`](README_EN.md) 已同步英文宿主接入口径
 - [x] 3.4 实现阶段补充对应测试说明与必要代码注释，确保机器契约可维护
 
 验收标准：

@@ -14,6 +14,7 @@
 
 <!-- sopify:auto:focus:start -->
 - 当前活动 plan：`../plan/20260529_pre_launch_consolidation/`（推广前大收口整合，7 方向 4 波次）。
+- 进度：Wave A（首次触达）✅ 完成；Wave B（文档/仓库）进行中（4.8 SVG 重画待做）；Wave C/D 待开始。
 - history 归档：已可用；最近归档为 `../history/2026-05/20260528_output_contract_enforcement`。
 <!-- sopify:auto:focus:end -->
 

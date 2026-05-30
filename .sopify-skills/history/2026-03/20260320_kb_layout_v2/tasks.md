@@ -164,10 +164,10 @@ knowledge_sync:
   - 明确 `project.md` 的职责边界，不与 `background/design` 重复
   - `blueprint/README.md` 最多保留轻量入口表：`Entry | Meaning | Status`
   - `blueprint/design.md` 以消费契约表固定 profile：`Context Profile | Reads | Fail-open Rule | Notes`
-- [x] 6.3 更新 `/Users/weixin.li/.codex/skills/sopify/kb/SKILL.md`
-- [x] 6.4 更新 `/Users/weixin.li/.codex/skills/sopify/templates/SKILL.md`
-- [x] 6.5 更新 `/Users/weixin.li/.codex/skills/sopify/develop/references/develop-rules.md`
-- [x] 6.6 更新 `/Users/weixin.li/.codex/skills/sopify/develop/assets/output-success.md`
+- [x] 6.3 更新 `skills/zh/skills/sopify/kb/SKILL.md`
+- [x] 6.4 更新 `skills/zh/skills/sopify/templates/SKILL.md`
+- [x] 6.5 更新 `skills/zh/skills/sopify/develop/references/develop-rules.md`
+- [x] 6.6 更新 `skills/zh/skills/sopify/develop/assets/output-success.md`
 - [x] 6.7 若需要，同步 `Codex/Skills/*` 与 `Claude/Skills/*` 中对 KB 结构的描述
 - [x] 6.8 把“方案评分”固定纳入方案包输出模板或生成约定
 

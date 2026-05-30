@@ -6,6 +6,36 @@ Format: Summary → Changed → Plan Packages. File-level details live in `git l
 
 ## [Unreleased]
 
+## [2026-05-30.222058] - 2026-05-30
+
+### Summary
+
+- Changes across: Docs, Tests, Changed.
+
+### Changed
+
+- **Docs**: Refined public documentation (4 files)
+- **Tests**: Updated automated coverage (1 files)
+- **Changed**: Updated project files (14 files)
+
+## [2026-05-30.213559] - 2026-05-30
+
+### v1.0 — Pre-launch Summary
+
+Sopify 解决的问题只有一条：AI 会忘，任务不能因为一次对话结束就丢失进度。
+
+v1.0 包含的能力：
+
+- **可恢复工作流**：任务在任意时间点中断，下次会话从 project state 恢复，无需重新解释背景
+- **三段式结构化流程**：需求分析 → 方案设计 → 开发实施，每段均可单独触发或跳过
+- **Checkpoint 暂停机制**：事实缺失时 AI 停下追问，遇到分叉决策时等待用户确认，不猜测推进
+- **持久知识库**：项目约定、长期偏好、方案包跨会话保留在 `.sopify-skills/`，git-tracked
+- **三宿主支持**：Copilot、Codex、Claude（ZH/EN 双语），单行命令安装，无侵入性
+- **输出契约**：所有阶段输出遵循统一格式（状态符、验证摘要、Changes、Next），AI 不自行发明格式
+- **一行命令启动**：`~go` 自动检测活动 plan 并恢复执行，无需记住上次做到哪步
+
+**当前状态：** 656 测试全绿，推广阻断项清零。
+
 ## [2026-05-30.193318] - 2026-05-30
 
 ### Summary

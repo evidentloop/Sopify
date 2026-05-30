@@ -2,12 +2,12 @@
   "schema_version": "3",
   "status": "ready",
   "gate_passed": true,
-  "workspace_root": "/Users/weixin.li/Desktop/Sopify/sopify-skills",
+  "workspace_root": "/mock/workspace/sopify-skills",
   "session_id": "session-p4d-s1-001",
   "preflight": {
     "action": "skipped",
     "action_level": "continue",
-    "activation_root": "/Users/weixin.li/Desktop/Sopify/sopify-skills"
+    "activation_root": "/mock/workspace/sopify-skills"
   },
   "preferences": {
     "status": "loaded",
