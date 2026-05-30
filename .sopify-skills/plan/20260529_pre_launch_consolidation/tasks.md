@@ -61,7 +61,7 @@
 - [x] 3.18 创建 `.github/ISSUE_TEMPLATE/`：bug_report.md + feature_request.md
 - [x] 3.1 清理 `.sopify-skills/project.md` 中的绝对路径
 - [x] 3.16 绝对路径清理（`.sopify-skills/history/` 5 文件 + test fixture 1 文件）
-- [ ] 3.3 撰写 CHANGELOG release note（覆盖 P0→P7 主线 + 本次收口）
+- [x] 3.3 撰写 CHANGELOG release note（覆盖 P0→P7 主线 + 本次收口）
 - [x] 3.10 `scripts/sopify_init.py` docstring 补全
 - [x] 3.13 `examples/sopify.config.yaml` 补全缺失配置项
 - [ ] 3.17 统一运行测试套件验证无回归
