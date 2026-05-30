@@ -230,9 +230,9 @@ elif [[ -t 1 ]]; then
     "╚══════╝ ╚════╝ ╚═╝     ╚═╝╚═╝        ╚═╝" \
     ""
 fi
-SOPIFY_LOGO_PRINTED=1 "$PYTHON_CMD" ${PYTHON_ARGS+"${PYTHON_ARGS[@]}"} "$ENTRYPOINT" \
+SOPIFY_LOGO_PRINTED=1 "$PYTHON_CMD" "${PYTHON_ARGS[@]}" "$ENTRYPOINT" \
   --source-channel "$SOURCE_CHANNEL" \
   --source-resolved-ref "$RESOLVED_REF" \
   --source-asset-name "$ASSET_NAME" \
-  ${FORWARDED_ARGS+"${FORWARDED_ARGS[@]}"}
+  "${FORWARDED_ARGS[@]}"
 exit $?

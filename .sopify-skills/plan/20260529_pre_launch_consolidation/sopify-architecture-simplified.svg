@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 700">
+  <style>
+    text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif; }
+    .title { font-size: 20px; font-weight: 700; fill: #111827; }
+    .subtitle { font-size: 12px; fill: #6b7280; }
+    .tier-label { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; }
+    .node-name { font-size: 13px; font-weight: 600; fill: #111827; }
+    .node-desc { font-size: 10px; fill: #6b7280; }
+    .slogan { font-size: 12px; font-weight: 500; fill: #374151; }
+    .arrow-label { font-size: 10px; font-weight: 500; }
+  </style>
+  <defs>
+    <marker id="a-blue" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#2563eb"/></marker>
+    <marker id="a-green" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#059669"/></marker>
+    <marker id="a-orange" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#ea580c"/></marker>
+  </defs>
+  <rect width="1100" height="700" fill="#ffffff"/>
+  <text x="550" y="38" text-anchor="middle" class="title">Sopify Architecture</text>
+  <text x="550" y="58" text-anchor="middle" class="subtitle">Evidence &amp; Authorization Layer for AI Coding | Resumable · Traceable · Host-agnostic</text>
+  <rect x="80" y="85" width="120" height="50" rx="10" fill="#eff6ff" stroke="#3b82f6" stroke-width="2"/>
+  <text x="140" y="115" text-anchor="middle" class="node-name">User</text>
+  <line x1="200" y1="110" x2="270" y2="110" stroke="#6b7280" stroke-width="1.5" marker-end="url(#a-blue)"/>
+  <text x="235" y="103" text-anchor="middle" class="arrow-label" fill="#6b7280">uses</text>
+  <rect x="280" y="80" width="770" height="60" rx="8" fill="#f9fafb" stroke="#e5e7eb" stroke-width="1"/>
+  <text x="296" y="98" class="tier-label" fill="#6b7280">HOST LAYER</text>
+  <rect x="310" y="100" width="110" height="30" rx="6" fill="#ffffff" stroke="#d1d5db" stroke-width="1"/>
+  <text x="365" y="120" text-anchor="middle" class="node-name" style="font-size:11px">Claude Code</text>
+  <rect x="460" y="100" width="110" height="30" rx="6" fill="#ffffff" stroke="#d1d5db" stroke-width="1"/>
+  <text x="515" y="120" text-anchor="middle" class="node-name" style="font-size:11px">Copilot CLI</text>
+  <rect x="610" y="100" width="110" height="30" rx="6" fill="#ffffff" stroke="#d1d5db" stroke-width="1"/>
+  <text x="665" y="120" text-anchor="middle" class="node-name" style="font-size:11px">Cursor</text>
+  <rect x="730" y="100" width="110" height="30" rx="6" fill="#ffffff" stroke="#d1d5db" stroke-width="1"/>
+  <text x="785" y="120" text-anchor="middle" class="node-name" style="font-size:11px">Windsurf</text>
+  <rect x="870" y="100" width="110" height="30" rx="6" fill="#f9fafb" stroke="#d1d5db" stroke-width="1" stroke-dasharray="4,2"/>
+  <text x="925" y="120" text-anchor="middle" class="node-desc">Any Host</text>
+  <line x1="550" y1="140" x2="550" y2="175" stroke="#2563eb" stroke-width="1.5" marker-end="url(#a-blue)"/>
+  <text x="570" y="162" class="arrow-label" fill="#2563eb">propose</text>
+  <rect x="80" y="180" width="970" height="110" rx="8" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.5"/>
+  <text x="96" y="200" class="tier-label" fill="#2563eb">CORE PROTOCOL</text>
+  <text x="260" y="200" class="node-desc">Durable evidence &amp; authorization semantics</text>
+  <rect x="110" y="215" width="200" height="55" rx="8" fill="#ffffff" stroke="#2563eb" stroke-width="1.5"/>
+  <text x="210" y="238" text-anchor="middle" class="node-name">ActionProposal</text>
+  <text x="210" y="256" text-anchor="middle" class="node-desc">Structured work order</text>
+  <rect x="350" y="215" width="200" height="55" rx="8" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+  <text x="450" y="238" text-anchor="middle" class="node-name">Validator</text>
+  <text x="450" y="256" text-anchor="middle" class="node-desc">Sole authorizer (fail-closed)</text>
+  <rect x="600" y="215" width="200" height="55" rx="8" fill="#ffffff" stroke="#2563eb" stroke-width="1.5"/>
+  <text x="700" y="238" text-anchor="middle" class="node-name">Receipt</text>
+  <text x="700" y="256" text-anchor="middle" class="node-desc">Authorization evidence</text>
+  <rect x="830" y="215" width="200" height="55" rx="8" fill="#ffffff" stroke="#2563eb" stroke-width="1.5"/>
+  <text x="930" y="238" text-anchor="middle" class="node-name">Handoff</text>
+  <text x="930" y="256" text-anchor="middle" class="node-desc">Cross-host resume</text>
+  <line x1="310" y1="242" x2="346" y2="242" stroke="#2563eb" stroke-width="1.5" marker-end="url(#a-blue)"/>
+  <line x1="550" y1="242" x2="596" y2="242" stroke="#2563eb" stroke-width="1.5" marker-end="url(#a-blue)"/>
+  <line x1="800" y1="242" x2="826" y2="242" stroke="#2563eb" stroke-width="1.5" marker-end="url(#a-blue)"/>
+  <rect x="80" y="310" width="520" height="45" rx="6" fill="#f0fdf4" stroke="#86efac" stroke-width="1"/>
+  <text x="96" y="330" class="tier-label" fill="#059669">INDEPENDENT CORE</text>
+  <text x="96" y="346" class="node-desc">sopify_contracts (1,227 LOC) + canonical_writer (605 LOC) — runtime-free</text>
+  <rect x="630" y="310" width="200" height="45" rx="6" fill="#faf5ff" stroke="#c4b5fd" stroke-width="1"/>
+  <text x="646" y="330" class="tier-label" fill="#7c3aed">PLUGINS</text>
+  <text x="646" y="346" class="node-desc">cross-review + extensible</text>
+  <rect x="80" y="370" width="970" height="40" rx="6" fill="#fefce8" stroke="#fde68a" stroke-width="1"/>
+  <text x="96" y="395" class="tier-label" fill="#a16207">DEFAULT WORKFLOW</text>
+  <text x="350" y="395" class="node-desc">analyze &gt; design &gt; develop &gt; verify &gt; archive</text>
+  <text x="700" y="395" class="node-desc">(~go triggers full cycle; detects active plan)</text>
+  <line x1="450" y1="410" x2="450" y2="450" stroke="#059669" stroke-width="1.5" marker-end="url(#a-green)"/>
+  <text x="465" y="435" class="arrow-label" fill="#059669">persist</text>
+  <line x1="550" y1="450" x2="550" y2="415" stroke="#ea580c" stroke-width="1.5" marker-end="url(#a-orange)"/>
+  <text x="565" y="435" class="arrow-label" fill="#ea580c">resume</text>
+  <rect x="80" y="455" width="970" height="110" rx="8" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
+  <text x="96" y="475" class="tier-label" fill="#059669">KNOWLEDGE LAYER</text>
+  <text x="300" y="475" class="node-desc">.sopify-skills/</text>
+  <rect x="100" y="490" width="175" height="50" rx="8" fill="#ffffff" stroke="#059669" stroke-width="1.2"/>
+  <text x="187" y="511" text-anchor="middle" class="node-name" style="font-size:12px">Blueprint</text>
+  <text x="187" y="528" text-anchor="middle" class="node-desc">Long-term baseline</text>
+  <rect x="310" y="490" width="175" height="50" rx="8" fill="#ffffff" stroke="#059669" stroke-width="1.2"/>
+  <text x="397" y="511" text-anchor="middle" class="node-name" style="font-size:12px">Plan</text>
+  <text x="397" y="528" text-anchor="middle" class="node-desc">Active work packages</text>
+  <rect x="520" y="490" width="175" height="50" rx="8" fill="#ffffff" stroke="#059669" stroke-width="1.2"/>
+  <text x="607" y="511" text-anchor="middle" class="node-name" style="font-size:12px">History</text>
+  <text x="607" y="528" text-anchor="middle" class="node-desc">Archived decisions</text>
+  <rect x="730" y="490" width="150" height="50" rx="8" fill="#ffffff" stroke="#059669" stroke-width="1.2"/>
+  <text x="805" y="511" text-anchor="middle" class="node-name" style="font-size:12px">project.md</text>
+  <text x="805" y="528" text-anchor="middle" class="node-desc">Tech conventions</text>
+  <rect x="910" y="490" width="120" height="50" rx="8" fill="#ffffff" stroke="#059669" stroke-width="1.2"/>
+  <text x="970" y="511" text-anchor="middle" class="node-name" style="font-size:12px">user/</text>
+  <text x="970" y="528" text-anchor="middle" class="node-desc">Prefs + feedback</text>
+  <text x="550" y="600" text-anchor="middle" class="slogan">Host LLM is only a proposal source</text>
+  <text x="550" y="618" text-anchor="middle" class="slogan">Validator is the sole authorizer — Work resumes from project state, not chat history</text>
+  <rect x="860" y="590" width="200" height="80" rx="6" fill="#f9fafb" stroke="#e5e7eb" stroke-width="1"/>
+  <text x="876" y="607" class="tier-label" fill="#6b7280">LEGEND</text>
+  <line x1="876" y1="622" x2="900" y2="622" stroke="#2563eb" stroke-width="1.5"/>
+  <text x="908" y="626" class="node-desc">Protocol flow</text>
+  <line x1="876" y1="640" x2="900" y2="640" stroke="#059669" stroke-width="1.5"/>
+  <text x="908" y="644" class="node-desc">Persist to knowledge</text>
+  <line x1="876" y1="658" x2="900" y2="658" stroke="#ea580c" stroke-width="1.5"/>
+  <text x="908" y="662" class="node-desc">Resume from state</text>
+</svg>

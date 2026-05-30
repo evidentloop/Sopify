@@ -2,13 +2,14 @@
 
 目录: `.sopify-skills/plan/20260529_pre_launch_consolidation/`
 
-## 价值分级
+## 价值分级说明
 
 | 标签 | 含义 | 门槛 |
 |------|------|------|
 | 🔴 P0 | 推广阻断 | 不完成不推广 |
 | 🟡 P1 | 推广前应做 | 显著提升推广效果 |
 | 🟢 P2 | 推广后迭代 | 按反馈优先级迭代 |
+| 📌 | README 硬前置 | 该任务产出直接影响 README 内容正确性，必须在 D1 4.3 之前完成 |
 
 ---
 
@@ -20,6 +21,7 @@
 - [x] 2.3 `runtime/engine.py` exec_plan 改为 ~go 自动路由
 - [x] 2.4 `protocol.md` 文档更新
 - [x] 2.5 `develop/SKILL.md` 激活条件更新
+- [-] 2.6 运行测试套件 — 已合并到 3.17（Wave 1 末尾统一跑一次）
 - [x] 2.7 全仓 29 处 ~go exec 引用收口
 
 ### D5-3B: 安全修复 — ✅ 全部完成
@@ -64,6 +66,7 @@
 - [x] 3.3 撰写 CHANGELOG release note（覆盖 P0→P7 主线 + 本次收口）
 - [x] 3.10 `scripts/sopify_init.py` docstring 补全
 - [x] 3.13 `examples/sopify.config.yaml` 补全缺失配置项
+- [-] 3.14 `CONTRIBUTING.md` 更新旧脚本路径引用 — 跳过：脚本实际存在，引用未断
 - [x] 3.17 统一运行测试套件验证无回归
 - [x] 8.1 更新 `.sopify-skills/blueprint/README.md` 托管区块
 
@@ -82,7 +85,7 @@
 
 - [ ] 6.1 掘金主文草稿："AI 编程的失忆症——我如何用 Sopify 解决"
 - [ ] 6.2 V2EX 讨论帖草稿："AI 编程的 3 个隐藏问题"
-- [ ] 6.3 dev.to 英文稿草稿："Beyond chat: resumable AI coding with Sopify"
+- [ ] 6.3 GitHub Blog / dev.to 英文稿草稿："Beyond chat: resumable AI coding with Sopify"
 - [ ] 6.4 即刻/X 短内容素材（截图 + 一句话 + 链接）× 3 条
 - [ ] 6.5 交付用户审阅修改后发布
 
@@ -123,6 +126,27 @@ Wave C (输出增强) ─────┘         ↑ 引用最终状态
 
 Wave E (延后) ──→ 推广后按反馈迭代
 ```
+
+## README 依赖链
+
+```
+Wave 1 📌 硬前置（必须在 D1 4.3 之前完成）
+  ├── D5-3B 3.6/3.7: .gitignore + local config 清理（安全可信）
+  ├── D3 2.1-2.3/2.5/2.7: ~go exec 全仓移除（命令表正确）
+  ├── D5-3C 3.11: 安装路径修正（quickstart 指引正确）
+  ├── D5-3C 3.12: install.sh python 回退（安装指引正确）
+  └── D5-3C 3.14: CONTRIBUTING.md 路径引用核对（当前已确认无需改动）
+
+Wave 1 非前置（完成更好，不阻断 README）
+  ├── D5-3A 3.3: CHANGELOG（README 不直接引用）
+  ├── D5-3A 3.5: repo metadata（GitHub UI 操作）
+  └── Wave C 1.1-1.4: output-contract / develop 输出增强（README 不直接引用）
+        ↓
+Wave B D1 4.3/4.4: README 一次性完整重写
+        ↓
+Wave D 6.1-6.5: 推广文章（引用 README 截图 / 链接）
+```
+
 
 ## 推广就绪门槛
 

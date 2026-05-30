@@ -10,7 +10,7 @@ D1-D5 可较大程度并行；D6 依赖 D1/D4 产出（截图 / 体验流）；D
 
 ## Sopify 简化架构参考
 
-![Sopify Architecture Simplified](../../assets/sopify-architecture.svg)
+![Sopify Architecture Simplified](./sopify-architecture-simplified.svg)
 
 三层结构：Host Layer → Core Protocol（ActionProposal → Validator → Receipt → Handoff）→ Knowledge Layer（Blueprint / Plan / History / project.md）。Validator 是唯一授权者，Host LLM 只是 proposal source。
 
