@@ -56,14 +56,14 @@
 
 > README → docs 点击体验不断层 + 仓库专业度
 
-- [ ] 4.7 更新 `docs/how-sopify-works.en.md` + `.md` 内容（移除过时描述，对齐当前行为）
+- [-] 4.7 更新 `docs/how-sopify-works.en.md` + `.md` 内容（移除过时描述，对齐当前行为）
 - [ ] 4.8 用 tech-graph 重画 4 张技术图为 SVG（workflow / checkpoint / plan-lifecycle / harness，ZH+EN 共 8 个）
 - [x] 3.18 创建 `.github/ISSUE_TEMPLATE/`：bug_report.md + feature_request.md
 - [x] 3.1 清理 `.sopify-skills/project.md` 中的绝对路径
 - [x] 3.16 绝对路径清理（`.sopify-skills/history/` 5 文件 + test fixture 1 文件）
 - [ ] 3.3 撰写 CHANGELOG release note（覆盖 P0→P7 主线 + 本次收口）
 - [x] 3.10 `scripts/sopify_init.py` docstring 补全
-- [ ] 3.13 `examples/sopify.config.yaml` 补全缺失配置项
+- [x] 3.13 `examples/sopify.config.yaml` 补全缺失配置项
 - [ ] 3.17 统一运行测试套件验证无回归
 - [ ] 8.1 更新 `.sopify-skills/blueprint/README.md` 托管区块
 
