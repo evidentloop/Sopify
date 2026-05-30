@@ -1,5 +1,5 @@
 {
-  "description": "T6 golden snapshot \u2014 sha256 hashes of all host install products rendered from skills/ source",
+  "description": "T6 golden snapshot — sha256 hashes of all host install products rendered from skills/ source",
   "hash_algorithm": "sha256",
   "normalization": {
     "header": "path\\0rendered_content, UTF-8, LF line endings",
@@ -8,13 +8,13 @@
   },
   "protocol_version": "1.0",
   "snapshots": {
-    "claude:en-US:header": "8bb35864fd8e119a6423d93f8e871a45412215e800d24b49110e525abaaca6bb",
-    "claude:zh-CN:header": "17ad4dd7852ba705dec2c719b5d5aa121827ca155583efa0db3d14b2b09bc52d",
-    "codex:en-US:header": "a42560e031edcc3799a3f72fa7cb4f5eb37fc283ac434b4a944db5cd97ff798c",
-    "codex:zh-CN:header": "56517df7ffe2af8c60bd287d575463fe74169d25a47bcefaff091e8b7692ce4b",
-    "copilot:en-US:managed_block_payload": "b65fc1587d74b81644d540bd25b5f94d965877c8dc9fcbb566c678bd62b2d1c0",
-    "copilot:zh-CN:managed_block_payload": "0a8b5f5ac0fcde37689989b0f4d987c413fa030977fdc5ed3a7b6408f61bab93",
-    "skills:en-US:tree": "6f21bbf6c5756698921af9a41c9505f42a4ffe922cb7d0bd4ddcdc8f9a96422b",
-    "skills:zh-CN:tree": "67a9cdf1f5ddad2e20b67f6ec0caa49f55774b3b52725f25cb7bf4c788331b3f"
+    "codex:zh-CN:header": "458841b593c78437996c8c480f1b72cd2b8ae8c52ff4a9db94a425bc8028dbfa",
+    "codex:en-US:header": "6d0b0d4c3825856f9a9689ebf431e6003a25afe21cf2e93eeeeaa66e06c787b8",
+    "claude:zh-CN:header": "ae3b124c8ccd33f9cc3c1d50f54fa893389ae649daebf529c583f5f92eed792d",
+    "claude:en-US:header": "ebbcbdf430a4a3605df8cb219690d0da186c7db4617524c7701d29f36ca53d36",
+    "copilot:zh-CN:managed_block_payload": "0ca719d94e23b42debdb01d11eb765765c79f659efc90d8cbed42edb851f701f",
+    "skills:zh-CN:tree": "67a9cdf1f5ddad2e20b67f6ec0caa49f55774b3b52725f25cb7bf4c788331b3f",
+    "copilot:en-US:managed_block_payload": "f810ad31a086732a1d6fcbf06ebac78e0c5a13905074d2db582ce2c6fb476e54",
+    "skills:en-US:tree": "6f21bbf6c5756698921af9a41c9505f42a4ffe922cb7d0bd4ddcdc8f9a96422b"
   }
 }
