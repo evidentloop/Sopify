@@ -15,14 +15,14 @@ This is a candidate pool for the first round, not the final scored pilot report.
 
 ## Environment Mapping
 
-- `runtime/infra`: `/Users/weixin.li/Desktop/vs-code-extension/sopify-skills`
-- `business`: `/Users/weixin.li/NIO_Project/EQUITY/freyr-h5pages`
-- `sdk/tool + quick-fix/control`: `/Users/weixin.li/NIO_Project/rs-sdk`
+- `runtime/infra`: `<project-root>`
+- `business`: `<external-project>`
+- `sdk/tool + quick-fix/control`: `<external-project>`
 
 Backup pools, not counted in the first 45:
 
-- `/Users/weixin.li/NIO_Project/EQUITY/equity-front-ai-demo/equity-front`
-- `/Users/weixin.li/NIO_Project/EQUITY/freyr-cards`
+- `<external-project>`
+- `<external-project>`
 
 ## Allocation Summary
 
