@@ -72,15 +72,15 @@
 
 - [x] 4.1 用 tech-graph skill 生成简化版 3 层架构图 SVG — ✅ 已完成（方案阶段产出）
 - [x] 4.2 用 tech-graph skill 生成方向依赖关系图 — ✅ 已完成（方案阶段产出）
-- [ ] 4.3 🔴 重写 `README.md` 结构（Hero 精简 + "See It In Action" + 3 故事场景 Why + 精简 FAQ），同时吸收：
+- [x] 4.3 🔴 重写 `README.md` 结构（Hero 精简 + "See It In Action" + 3 故事场景 Why + 精简 FAQ），同时吸收：
   - 删除 `~go exec` 命令行（来自 D3）
   - 更新 copilot target 状态（来自 D5）
   - 替换架构图为简化版
   - **新增 哲学宣言**：Hero 区增加 3-5 行核心理念（参考 Superpowers/OpenSpec 风格，突出"证据驱动 + 跨宿主可恢复 + 决策可追溯"）
   - **新增 "See It In Action"**：首屏放一个真实 `~go` 会话片段（ASCII 会话 demo 或终端截图），让用户秒懂产品价值
-- [ ] 4.4 🔴 同步重写 `README.zh-CN.md`
+- [x] 4.4 🔴 同步重写 `README.zh-CN.md`
 - [ ] 4.5 🟡 设计新 cover 图方案（场景图：Start → Pause → Resume 跨宿主流）
-- [ ] 4.6 🔴 替换 `assets/sopify-architecture.svg` 为简化版
+- [x] 4.6 🔴 替换 `assets/sopify-architecture.svg` 为简化版
 - [ ] 4.7 🟡 更新 `docs/how-sopify-works.en.md` 和 `docs/how-sopify-works.md` 中过时命令引用
 - [ ] 4.8 🟢 用 tech-graph 重画 how-sopify-works 的 4 张技术图为 SVG（workflow / checkpoint / plan-lifecycle / harness 映射，ZH + EN 各一版，共 8 个），并在 4.7 中一并更新图片引用
 

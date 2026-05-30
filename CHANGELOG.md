@@ -6,6 +6,23 @@ Format: Summary → Changed → Plan Packages. File-level details live in `git l
 
 ## [Unreleased]
 
+## [2026-05-30.152842] - 2026-05-30
+
+### Summary
+
+- Updated 1 active plan package(s); Changes across: Docs, Changed.
+
+### Changed
+
+- **Docs**: Refined public documentation (2 files)
+- **Changed**: Updated project files (6 files)
+
+### Plan Packages
+
+- `20260529_pre_launch_consolidation` (active)
+
+## [2026-05-29.180035] - 2026-05-29
+
 ### Summary
 
 - `~go exec` 命令移除，`~go` 自动检测活动 plan 并恢复执行

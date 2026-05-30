@@ -2,13 +2,11 @@
 
 <div align="center">
 
-<img src="./assets/logo.svg" width="120" alt="Sopify Logo" />
-
-**Resumable, traceable AI coding — decisions and history stay with the project**
+**AI coding that asks before it acts**
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 [![Docs](https://img.shields.io/badge/docs-CC%20BY%204.0-green.svg)](./LICENSE-docs)
-[![Version](https://img.shields.io/badge/version-2026--05--28.044700-orange.svg)](#version-history)
+[![Version](https://img.shields.io/badge/version-2026--05--30.152842-orange.svg)](#version-history)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
 English · [简体中文](./README.zh-CN.md) · [Quick Start](#quick-start) · [Contributors](./CONTRIBUTORS.md)
@@ -16,12 +14,26 @@ English · [简体中文](./README.zh-CN.md) · [Quick Start](#quick-start) · [
 </div>
 
 <div align="center">
-<img src="./assets/sopify-cover.jpg" width="800" alt="Sopify — Resumable, traceable AI coding" />
+<img src="./assets/sopify-cover.jpg" width="660" alt="Sopify — AI coding that asks before it acts" />
 </div>
 
 ---
 
-When facts are missing, Sopify stops and asks. When a decision needs your approval, it waits. When work is interrupted, it resumes from the last stopping point — even across different AI hosts.
+Sopify is a protocol layer for AI-assisted development. It stops when facts are missing, waits when a decision needs your sign-off, and resumes from the last checkpoint — even across different AI hosts.
+
+No new editor, no new CLI. Install into the host you already use — Codex, Claude, or Copilot.
+
+**Design principles:**
+
+- **Stop when unsure** — score every requirement; ask before assuming
+- **Resume from anywhere** — checkpoint-based; switch hosts, machines, or teammates without re-explaining
+- **Trace every decision** — plans, choices, and reviews persist in `.sopify-skills/`
+
+## See It In Action
+
+<p align="center">
+  <img src="./assets/demo-en.svg" alt="Sopify demo — Analysis on Claude Code, then resume on Codex CLI" width="900" />
+</p>
 
 ## Quick Start
 
@@ -29,46 +41,36 @@ When facts are missing, Sopify stops and asks. When a decision needs your approv
 curl -fsSL https://github.com/evidentloop/sopify/releases/latest/download/install.sh | bash -s -- --target codex:en-US
 ```
 
-After install, use `~go` to start a managed workflow. See [Installation](#installation) for other targets, platforms, and verification.
+After install, use `~go` to start a managed workflow. See [Installation](#installation) for other hosts, audit-first install, and Windows.
 
-**Already in a Sopify-managed repo?** Open any AI host and continue the unfinished task — it picks up from where you left off. [Full walkthrough →](./docs/how-sopify-works.en.md)
-
-| Step | What happens |
-|------|-------------|
-| Start | Ask the host to begin or continue a task |
-| Pause | Sopify stops when facts are missing or a decision needs you |
-| Resume | Work picks up from project state — even on a different host |
-
----
+**Already in a Sopify-managed repo?** Open any AI host and continue — it picks up from where you left off. [Full walkthrough →](./docs/how-sopify-works.en.md)
 
 ## Why Sopify?
 
-As repositories grow, AI-assisted development runs into a hidden problem: decision context stays trapped in chat history, each new session re-derives the project state, and the user's mental model, the AI's understanding, and the codebase start to drift apart.
+**When requirements are unclear, it stops to plan first.**
+You say "add a caching layer." Sopify doesn't start coding — it plans first: analyze, design, split into tasks, then save to `.sopify-skills/plan/`. Only after you confirm the plan does it write code. Every line changed traces back to a decision.
 
-Sopify uses project-level conventions to make critical steps visible. The basic process record is generated automatically, but the long-term compounding value still depends on consistently closing out work and maintaining project knowledge.
+**Your teammate picks up where you left off.**
+You start a feature in Codex, finish the design, and implement two of four tasks. Next week your teammate opens the same repo in Claude, types `~go`. Sopify reads the checkpoint and continues from task 3 — no handoff doc, no re-explaining context.
 
-| Gap | Sopify's answer |
-|-----|-----------------|
-| State is trapped in a single host's chat session | Portable project state — switch hosts mid-task |
-| No independent quality gate | An isolated, independent review pass before execution |
-| Decisions are invisible and non-auditable | Plan changes force re-confirmation — the AI cannot silently proceed |
-| Each session's learning is disposable | Plans, decisions, and reviews persist as reusable project assets |
+**Every decision leaves a trace.**
+A month later, someone asks why the cache key includes the user ID. The answer is in `.sopify-skills/plan/` — the requirement that prompted the decision, the design that resolved it, the review that approved it.
 
 ## Architecture
 
 <div align="center">
-<img src="./assets/sopify-architecture.svg" width="800" alt="Sopify Architecture — Evidence & Authorization Layer" />
+<img src="./assets/sopify-architecture.svg" width="760" alt="Sopify Architecture — 3-layer protocol" />
 </div>
 
-User input flows through a host adapter (Codex, Claude, Copilot) into the Core Protocol, where every action is proposed, validated, gated, and receipted. The Validator is the sole authorizer — the host LLM is only a proposal source. Knowledge layers (blueprint, plan, history) persist across sessions and hosts.
+The LLM is only a proposal source. The Validator is the sole authorizer — every action is proposed, validated, and receipted before it touches your code. Knowledge persists in `.sopify-skills/`, accessible across sessions, hosts, and teammates.
 
 ## Installation
 
-Two-step install (recommended for first-time review):
+Audit-first install:
 
 ```bash
 curl -fsSL -o sopify-install.sh https://github.com/evidentloop/sopify/releases/latest/download/install.sh
-sed -n '1,40p' sopify-install.sh
+less sopify-install.sh          # review before running
 bash sopify-install.sh --target codex:en-US
 ```
 
@@ -76,124 +78,21 @@ Windows PowerShell:
 
 ```powershell
 iwr https://github.com/evidentloop/sopify/releases/latest/download/install.ps1 -OutFile sopify-install.ps1
-Get-Content sopify-install.ps1 -TotalCount 40
+Get-Content sopify-install.ps1 | more
 .\sopify-install.ps1 --target codex:en-US
-```
-
-The repo-local install path remains available for developers and maintainers:
-
-```bash
-bash scripts/install-sopify.sh --target codex:en-US
-python3 scripts/install_sopify.py --target claude:en-US --workspace /path/to/project
 ```
 
 Install targets:
 
-- `codex:zh-CN`
-- `codex:en-US`
-- `claude:zh-CN`
-- `claude:en-US`
-- `copilot:zh-CN`
-- `copilot:en-US`
+| Host | Target | Status |
+|------|--------|--------|
+| Codex | `codex:en-US` / `codex:zh-CN` | Deep verified — suitable for daily use |
+| Claude | `claude:en-US` / `claude:zh-CN` | Deep verified — suitable for daily use |
+| Copilot | `copilot:en-US` / `copilot:zh-CN` | Baseline — feedback welcome |
 
-The protocol works with any host. Verified runtime integrations today:
-
-| Host | Install target | Availability | Validation coverage | Notes |
-|------|----------------|--------------|---------------------|-------|
-| `codex` | `codex:zh-CN` / `codex:en-US` | Deep verified | Host install flow, workspace bootstrap, and runtime package smoke are verified | Suitable for daily use |
-| `claude` | `claude:zh-CN` / `claude:en-US` | Deep verified | Host install flow, workspace bootstrap, and runtime package smoke are verified | Suitable for daily use |
-| `copilot` | `copilot:zh-CN` / `copilot:en-US` | Workspace ready | Workspace bootstrap, instruction distribution, and workspace marker are verified | Trigger wiring coming next |
-
-Notes:
-
-- Use `sopify status` / `sopify doctor` for detailed capability claims and live diagnostics
-- `Availability` expresses the current delivery tier, while `Validation coverage` describes what has already been validated
-
-### Setup Paths
-
-| You want to… | Script | Command |
-|--------------|--------|---------|
-| Set up Codex / Claude | `install.sh` | As shown above — installs host prompt layer + Sopify payload |
-| Set up Copilot | `install.sh` | `curl -fsSL https://github.com/evidentloop/sopify/releases/latest/download/install.sh \| bash -s -- --target copilot` |
-
-- `install.sh --target codex:... / claude:...` installs the selected host prompt layer and the Sopify payload. Most users do not need `--workspace`; that is an advanced prewarm path for maintainers or CI.
-- `install.sh --target copilot` bootstraps the current workspace, creates `.sopify-skills/sopify.json`, updates `.gitignore`, and distributes Copilot instruction files. Pass `--workspace <path>` to target another repo, `--language <lang>` to control output language, or `--no-copilot` to skip Copilot files.
-- `bootstrap.sh` remains available as a compatibility alias and forwards to `install.sh --target copilot`.
+Pass `--workspace <path>` to target another repo, `--language <lang>` to control output language.
 
 For the full setup guide, see [Getting Started](./docs/getting-started.md). For a step-by-step demo, see [External Repo Quickstart](./examples/external-repo-quickstart/README.md).
-
-### After Install
-
-- Use `~go` when you want Sopify to manage the full task workflow for you.
-- Interrupt anytime — come back (even in a different tool) and resume from where you left off.
-- Complex changes can get an independent review before execution starts.
-- Run `status` to see current progress, `doctor` to troubleshoot.
-
-### Verify Your Install
-
-```bash
-python3 scripts/sopify_status.py --format text
-python3 scripts/sopify_doctor.py --format text
-```
-
-- `will bootstrap on first project trigger`: the host install is ready and the project-local runtime has not been prepared yet
-- `workspace outcome: stub_selected [continue]`: the workspace runtime entry is healthy
-- Payload or bundle corruption errors (for example `global_bundle_missing`, `global_bundle_incompatible`, or `global_index_corrupted`): repair the install and retry
-
-### First Use
-
-After install, open your selected host inside a repository and paste one of the prompts below.
-
-```text
-# Simple task
-"Fix the typo on line 42 in src/utils.ts"
-
-# Medium task
-"Add error handling to login, signup, and password reset"
-
-# Complex task
-"~go Add user authentication with JWT"
-
-# Plan only
-"~go plan Refactor the database layer"
-```
-
-### What It Looks Like
-
-<div align="center">
-<img src="./assets/sopify-workflow.jpg" width="800" alt="Sopify Workflow — Start, Pause, Resume across hosts" />
-</div>
-
-The workflow follows a start → pause → resume cycle. Sopify stops automatically when facts are missing or a decision needs confirmation, and picks up from the last checkpoint — even if you switch to a different AI host.
-
-For the full workflow, checkpoints, and plan lifecycle details, see [How Sopify Works](./docs/how-sopify-works.en.md).
-
-## Configuration
-
-Start from the example config:
-
-```bash
-cp examples/sopify.config.yaml ./sopify.config.yaml
-```
-
-Most commonly used settings:
-
-```yaml
-brand: auto
-language: en-US
-
-workflow:
-  mode: adaptive
-  require_score: 7
-
-plan:
-  directory: .sopify-skills
-```
-
-Notes:
-
-- `workflow.mode` supports `strict / adaptive / minimal`
-- `plan.directory` only affects newly created knowledge and plan directories
 
 ## Command Reference
 
@@ -201,9 +100,29 @@ Notes:
 |---------|-------------|
 | `~go` | Automatically route and run the full workflow (auto-resumes if active plan exists) |
 | `~go plan` | Plan only |
-| `~go finalize` | Close out the current metadata-managed plan |
+| `~go finalize` | Close out the active plan |
 
 Most users only need `~go` and `~go plan`; maintainer validation commands live in [CONTRIBUTING.md](./CONTRIBUTING.md).
+
+## Configuration
+
+```bash
+cp examples/sopify.config.yaml ./sopify.config.yaml
+```
+
+```yaml
+brand: auto
+language: en-US
+
+workflow:
+  mode: adaptive   # strict | adaptive | minimal
+  require_score: 7
+
+plan:
+  directory: .sopify-skills
+```
+
+`plan.directory` only affects newly created knowledge and plan directories.
 
 ## Directory Structure
 
@@ -216,60 +135,18 @@ sopify/
 ├── skills/                # prompt-layer source of truth
 ├── .sopify-skills/        # project knowledge base
 │   ├── blueprint/         # design baseline, reduction targets
-│   │   └── architecture-decision-records/  # ADR entity files
 │   ├── plan/              # active plans
 │   └── history/           # archived plans
 └── installer/             # host adapters and install orchestration
 ```
 
-This is a simplified view of the core layout. See [docs/how-sopify-works.en.md](./docs/how-sopify-works.en.md) for the full workflow, checkpoints, and knowledge layout.
-
-## FAQ
-
-### Q: How do I switch language?
-
-Update `sopify.config.yaml`:
-
-```yaml
-language: zh-CN  # or en-US
-```
-
-### Q: Where are plan packages stored?
-
-By default they live under `.sopify-skills/` in the project root. To change that:
-
-```yaml
-plan:
-  directory: .my-custom-dir
-```
-
-This only affects newly created directories; existing history is not migrated automatically.
-
-### Q: When should I use `--workspace` prewarm?
-
-Most users do not need it. A default install is already complete; Sopify bootstraps the project-local runtime automatically on the first trigger.
-
-Use `--workspace` only for maintainer validation, CI, or when you explicitly want to prewarm a specific repository ahead of time. For this advanced path, use the repo-local installer:
-
-```bash
-python3 scripts/install_sopify.py --target codex:en-US --workspace /path/to/project
-```
-
-### Q: How do I reset learned preferences?
-
-Delete or clear `.sopify-skills/user/preferences.md`; keep `feedback.jsonl` only if you still want the audit trail.
-
-### Q: When should I run sync scripts?
-
-When you change `skills/{zh,en}` (source templates or skill packages), or `runtime/builtin_skill_packages/*/skill.yaml`, follow the validation steps in [CONTRIBUTING.md](./CONTRIBUTING.md).
+See [How Sopify Works](./docs/how-sopify-works.en.md) for the full workflow, checkpoints, and knowledge layout.
 
 ## Version History
 
 - See [CHANGELOG.md](./CHANGELOG.md) for the detailed history
 
 ## License
-
-This repository uses dual licensing:
 
 - Code and config: Apache 2.0, see [LICENSE](./LICENSE)
 - Documentation: CC BY 4.0, see [LICENSE-docs](./LICENSE-docs)
