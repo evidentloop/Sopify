@@ -36,15 +36,31 @@ Do not force structure on every scenario. Decide whether and how to enhance base
 
 Constraint: use at most one primary structure per reply; avoid stacking table + tree + flow.
 
+### 3.1 Output Density Gradient
+
+Select output density based on scenario complexity. Avoid heavy output for simple tasks:
+
+| Density Level | Applicable Scenarios | Verification Summary |
+|--------------|---------------------|---------------------|
+| Minimal | quick-fix, single-file change, Q&A | Simplified table (≤3 columns), omit review conclusion |
+| Standard | 3-5 task regular develop | Table, omit zero-info columns |
+| Full | 6+ tasks or cross-module delivery | Full table + phased review conclusions |
+
+Density level is auto-inferred from task count and change scope; no user specification needed.
+
 **DO:**
 - Use a comparison table when multi-option tradeoffs are present — make differences visible at a glance
 - Simplify verification summary on success when all passed — omit columns with no information
 - Keep plain text when information shape does not match any structure
+- Trim output by density gradient: quick-fix should not produce a full verification table
+- Group by deliverable when completing 3+ independent tasks; merge same conclusions into one line
+- No decorative emoji in body text (verification summaries, review conclusions, Changes section)
 
 **DON'T:**
 - Multi-option tradeoffs without comparison structure = missed enhancement
 - Forcing tables on simple Q&A = over-enhancement
 - Mixing two or more primary structures in one reply = cognitive overload
+- Expanding 5 identical `passed` conclusions item-by-item = information dilution
 
 ## 4. Pre-output Self-check
 
@@ -54,3 +70,5 @@ Before outputting the final reply, verify:
 2. Status symbol correct: `✓` only when all verifications passed with no degradation or skips; otherwise `!`.
 3. Footer complete: `Changes:` + `Next:` must be present.
 4. Conditional enhancement applied: if the reply meets a §3 trigger condition, use the corresponding structured format.
+5. Density level matched: quick-fix should not produce a full verification table; complex delivery should not lack review conclusions.
+6. Desensitization: rewrite raw `root_cause` enums as human descriptions; do not expose internal scoring weights; do not display gate/handoff JSON fields (`resolution_id`, `run_stage`, etc.).
