@@ -298,53 +298,6 @@ replace_once "$SKILLS_EN" '^<!-- SOPIFY_VERSION: .* -->$' "<!-- SOPIFY_VERSION: 
 bash "$ROOT_DIR/scripts/check-version-consistency.sh"
 
 # Regenerate golden snapshots after version bump (skips gracefully outside repo)
-python3 -c "
-import sys
-sys.path.insert(0, '$ROOT_DIR')
-try:
-    import hashlib, json
-    from pathlib import Path
-    from installer.hosts.base import HEADER_TEMPLATE_NAME, HostAdapter, render_single_file
-    from installer.hosts.claude import CLAUDE_ADAPTER
-    from installer.hosts.codex import CODEX_ADAPTER
-    from installer.hosts.copilot import COPILOT_ADAPTER
-    from installer.models import language_to_source_dir
-except ImportError:
-    sys.exit(0)
-
-R = Path('$ROOT_DIR')
-G = R / 'tests/golden-snapshots.json'
-if not G.exists():
-    sys.exit(0)
-IGNORE = {'.DS_Store','Thumbs.db','__pycache__'}
-
-def hh(a, d):
-    s = a.source_root(R, d)
-    c = (s/HEADER_TEMPLATE_NAME).read_text()
-    c = c.replace('{{config_dir}}', a.config_dir or '')
-    return hashlib.sha256(f'{a.header_filename}\x00{c}'.encode()).hexdigest()
-
-def th(d):
-    sr = R/'skills'/language_to_source_dir(d)/'skills'/'sopify'
-    parts = [f.relative_to(sr).as_posix().encode()+b'\x00'+f.read_bytes()
-             for f in sorted(sr.rglob('*')) if f.is_file() and f.name not in IGNORE]
-    return hashlib.sha256(b'\n'.join(parts)).hexdigest()
-
-def ph(d):
-    s = COPILOT_ADAPTER.source_root(R, d)
-    return hashlib.sha256(render_single_file(s/HEADER_TEMPLATE_NAME, s/'skills'/'sopify', COPILOT_ADAPTER).encode()).hexdigest()
-
-snap = {}
-for a,d,l in [(CODEX_ADAPTER,'CN','zh-CN'),(CODEX_ADAPTER,'EN','en-US'),(CLAUDE_ADAPTER,'CN','zh-CN'),(CLAUDE_ADAPTER,'EN','en-US')]:
-    snap[f'{a.host_name}:{l}:header'] = hh(a,d)
-for d,l in [('CN','zh-CN'),('EN','en-US')]:
-    snap[f'copilot:{l}:managed_block_payload'] = ph(d)
-    snap[f'skills:{l}:tree'] = th(d)
-
-g = json.loads(G.read_text())
-g['snapshots'] = snap
-G.write_text(json.dumps(g, indent=2, ensure_ascii=False)+'\n')
-print(f'  Golden snapshots regenerated ({len(snap)} entries).')
-"
+python3 "$ROOT_DIR/scripts/regenerate-golden-snapshots.py"
 
 echo "Release sync completed successfully."

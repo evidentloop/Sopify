@@ -139,6 +139,7 @@ def _init_release_hook_fixture(root: Path, *, inject_sync_failure: bool = False)
         "scripts/sync-skills.sh",
         "scripts/check-version-consistency.sh",
         "scripts/render-host-skills.py",
+        "scripts/regenerate-golden-snapshots.py",
         ".githooks/pre-commit",
         ".githooks/commit-msg",
     ):

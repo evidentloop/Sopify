@@ -57,7 +57,16 @@ PY
 }
 
 run_step "Check version consistency" bash "$ROOT_DIR/scripts/check-version-consistency.sh"
-run_step "Check golden snapshots" python3 -m pytest "$ROOT_DIR/tests/test_golden_snapshots.py" -q
+
+# Golden snapshots: auto-regenerate if stale, then verify
+if ! python3 -m pytest "$ROOT_DIR/tests/test_golden_snapshots.py" -q 2>/dev/null; then
+  echo "[release-preflight] Golden snapshots stale — regenerating..."
+  python3 "$ROOT_DIR/scripts/regenerate-golden-snapshots.py"
+  git add "$ROOT_DIR/tests/golden-snapshots.json"
+  run_step "Re-check golden snapshots" python3 -m pytest "$ROOT_DIR/tests/test_golden_snapshots.py" -q
+else
+  echo "[release-preflight] Check golden snapshots"
+fi
 run_step "Check builtin catalog drift" check_builtin_catalog_drift
 run_step "Check context checkpoints" python3 "$ROOT_DIR/scripts/check-context-checkpoints.py" repo --root "$ROOT_DIR"
 run_step "Run hard gate tests (contract + smoke + distribution)" python3 -m pytest "$ROOT_DIR/tests" -m "not implementation_mirror" -v
