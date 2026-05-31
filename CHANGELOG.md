@@ -6,6 +6,19 @@ Format: Summary → Changed → Plan Packages. File-level details live in `git l
 
 ## [Unreleased]
 
+## [2026-05-31.142150] - 2026-05-31
+
+### Summary
+
+Pre-launch consolidation: README rewrite, SVG diagrams, CI golden snapshot auto-fix, output contract upgrade.
+
+### Changed
+
+- **Docs**: Complete README pair rewrite for pre-launch (PR #50); JPG → SVG/PNG diagram migration, image compression (PR #51)
+- **CI**: Extract golden snapshot regeneration script + auto-stage in pre-commit hook (PR #53)
+- **Output Contract**: Add density gradient, symbol discipline, desensitization self-check (PR #54)
+- **Tests**: Update golden snapshot markers, add regeneration script to fixtures (PR #51, #53, #54)
+
 ## [2026-05-30.222058] - 2026-05-30
 
 ### Summary
