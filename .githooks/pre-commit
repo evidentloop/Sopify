@@ -151,7 +151,8 @@ git -C "$ROOT_DIR" add \
   README.zh-CN.md \
   CHANGELOG.md \
   skills/zh/header.md.template \
-  skills/en/header.md.template
+  skills/en/header.md.template \
+  tests/golden-snapshots.json
 
 cat >"$STATE_FILE" <<EOF
 RELEASE_VERSION=$RELEASE_VERSION
